@@ -157,6 +157,7 @@ Planned 2026-11-25 from a survey of Perch main at `9275e0b`. Findings that shape
 - Sending to a dormant session restarts it with `--resume <id>` (same id, so `OCHRE_SESSION` and the task binding still hold), then sends. Before resuming: folder trust (as at launch), and refuse if the session is live elsewhere, read from `~/.claude/sessions/{pid}.json` (port `SessionMonitor.ReadSession`, `IProcessProbe` and `ProcessIdentity` only). That read stands in for Perch's `SessionLock`.
 - Check Ochre's copies of `ClaudeSessionController` and `SessionConversation` carry #39's small edits (they were copied from main after it, so they should).
 - Tests: the ported readers' own; nothing new.
+- Done 2026-11-25; see `docs/testing/m2-dormant-testing.md`. `ReadTitle` and `ReadContextUsage` weren't needed yet (the context gauge fills on the first resumed turn). An agent that never got a message has no transcript, so its "resume" starts it fresh under the same id.
 
 ### Slice 2: park and resume a task
 

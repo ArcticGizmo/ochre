@@ -17,8 +17,9 @@ public enum SessionStatusDto
     [JsonStringEnumMemberName("waiting")]
     Waiting,
 
-    [JsonStringEnumMemberName("ended")]
-    Ended,
+    /// <summary>No process (it ended, or ran before the host restarted). Sending resumes it.</summary>
+    [JsonStringEnumMemberName("dormant")]
+    Dormant,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<ItemKindDto>))]

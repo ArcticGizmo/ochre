@@ -7,17 +7,21 @@ using Ochre.Core.Tasks;
 
 namespace Ochre.Host.Sessions;
 
-/// <summary>A controlled session the host is running (or ran, until the host quits).</summary>
+/// <summary>A session launched from a task: running, or dormant until something is sent to it.</summary>
 internal sealed class LiveSession
 {
-    public LiveSession(string id, string taskId, string cwd, string? role, ClaudeSessionController controller)
+    public LiveSession(string id, string taskId, string cwd, string? role, string? permissionMode, string claudeId, DateTimeOffset startedAt,
+        ClaudeSessionController controller)
     {
         Id = id;
         TaskId = taskId;
         Cwd = cwd;
         Role = role;
+        PermissionMode = permissionMode;
+        ClaudeId = claudeId;
+        StartedAt = startedAt;
         Controller = controller;
-        Conversation.SetSessionId(id);
+        Conversation.SetSessionId(claudeId);
         Conversation.Changed += (item, _) => Dirty.Add(item);
         Conversation.Reset += () => ResetPending = true;
         Conversation.StateChanged += () => HeaderDirty = true;
@@ -28,13 +32,22 @@ internal sealed class LiveSession
     public string TaskId { get; }
     public string Cwd { get; }
     public string? Role { get; }
-    public DateTimeOffset StartedAt { get; } = DateTimeOffset.UtcNow;
+    public string? PermissionMode { get; }
+    public DateTimeOffset StartedAt { get; }
     public ClaudeSessionController Controller { get; }
 
     /// <summary>Not thread-safe: touch it, and everything below, only while holding <see cref="Gate"/>.</summary>
     public SessionConversation Conversation { get; } = new();
     public Lock Gate { get; } = new();
-    public bool Ended { get; set; }
+
+    /// <summary>The Claude session a resume continues.</summary>
+    public string ClaudeId { get; set; }
+
+    /// <summary>No process: it ended, or the host started after it ran. Sending resumes it.</summary>
+    public bool Dormant { get; set; }
+
+    /// <summary>The thread holds what the transcript had (or the session ran in this host, so it never needed it).</summary>
+    public bool HistoryLoaded { get; set; }
 
     // What changed since the last broadcast, so streaming sends only the items that moved.
     public HashSet<ConversationItem> Dirty { get; } = new(ReferenceEqualityComparer.Instance);
@@ -48,24 +61,30 @@ internal sealed class LiveSession
 internal enum StartRefusal { None, NeedsTrust }
 
 /// <summary>
-/// Launches agents from tasks and keeps them running while windows come and go (ADR 0008). Output is folded into
-/// each session's <see cref="SessionConversation"/> and broadcast to every window in coalesced batches, so a
-/// streaming reply costs a handful of messages a second rather than one per token.
+/// Launches agents from tasks and keeps them while windows come and go (ADR 0008). Output is folded into each
+/// session's <see cref="SessionConversation"/> and broadcast to every window in coalesced batches, so a streaming
+/// reply costs a handful of messages a second rather than one per token. Sessions from earlier runs come back
+/// dormant: their thread loads from the transcript, and sending to one resumes it under the same id.
 /// </summary>
 internal sealed class SessionManager : IDisposable
 {
     private static readonly TimeSpan FlushInterval = TimeSpan.FromMilliseconds(80);
 
+    // Past this many transcript lines the thread shows only the tail; the CLI keeps the full context regardless.
+    private const int MaxHistoryLines = 4000;
+
     private readonly TaskStore _tasks;
+    private readonly SessionLedger _ledger;
     private readonly AppLog _log;
     private readonly OchreProfile _profile;
     private readonly Dictionary<string, LiveSession> _sessions = new(StringComparer.Ordinal);
     private readonly Lock _gate = new();
     private readonly Timer _flush;
 
-    public SessionManager(TaskStore tasks, AppLog log, OchreProfile profile)
+    public SessionManager(TaskStore tasks, SessionLedger ledger, AppLog log, OchreProfile profile)
     {
         _tasks = tasks;
+        _ledger = ledger;
         _log = log;
         _profile = profile;
         _flush = new Timer(_ => Flush(), null, FlushInterval, FlushInterval);
@@ -87,6 +106,23 @@ internal sealed class SessionManager : IDisposable
         lock (_gate) return _sessions.GetValueOrDefault(id);
     }
 
+    /// <summary>Brings back, dormant, every session a task says it launched. Cheap: no transcript is read until a
+    /// thread is opened.</summary>
+    public void LoadDormant()
+    {
+        foreach (var summary in _tasks.List())
+        {
+            if (_tasks.Get(summary.Id) is not { } doc) continue;
+            foreach (var s in doc.Sessions.Where(s => s.Binding == "launched" && ClaudeCli.IsSessionId(s.Id)))
+            {
+                var entry = _ledger.Get(s.Id);
+                var session = Create(s.Id, summary.Id, s.Cwd, s.Role, entry?.PermissionMode, entry?.ClaudeId ?? s.Id, entry?.StartedAt ?? DateTimeOffset.MinValue);
+                session.Dormant = true;
+                lock (_gate) _sessions.TryAdd(s.Id, session);
+            }
+        }
+    }
+
     /// <summary>
     /// Starts an agent on <paramref name="taskId"/> in <paramref name="cwd"/> and records it on the task. A folder
     /// Claude Code hasn't been told to trust is refused unless <paramref name="trustFolder"/> says the user just
@@ -103,50 +139,20 @@ internal sealed class SessionManager : IDisposable
         }
 
         var id = Guid.NewGuid().ToString();
-        var cli = AgentCli.Locate();
-        var env = new Dictionary<string, string?>
-        {
-            ["OCHRE_TASK"] = taskId,
-            ["OCHRE_SESSION"] = id,
-            // The agent's CLI must reach this host, not another profile's.
-            ["OCHRE_PROFILE"] = _profile.IsDefault ? null : _profile.Name,
-        };
-        string? note = null;
-        IReadOnlyList<string> allowed = [];
-        if (cli is not null)
-        {
-            var command = Path.GetFileNameWithoutExtension(cli);
-            env["PATH"] = Path.GetDirectoryName(cli) + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
-            note = AgentPrompt.For(taskId, command);
-            allowed = AgentPrompt.AllowedTools(command);
-        }
-        else
-        {
-            _log.Warn("the ochre CLI was not found; the agent won't be able to update its task");
-        }
-
-        var controller = new ClaudeSessionController { Log = _log.Info };
-        var session = new LiveSession(id, taskId, cwd, role, controller);
-        controller.EventReceived += ev => OnEvent(session, ev);
-        controller.Exited += (code, tail) => OnExited(session, code, tail);
+        var session = Create(id, taskId, cwd, role, permissionMode, id, DateTimeOffset.UtcNow);
+        session.HistoryLoaded = true;
         lock (_gate) _sessions[id] = session;
 
         try
         {
-            controller.Start(new SessionStartOptions(cwd)
-            {
-                NewSessionId = id,
-                PermissionMode = permissionMode,
-                AppendSystemPrompt = note,
-                AllowedTools = allowed,
-                Environment = env,
-            });
+            session.Controller.Start(Options(session) with { NewSessionId = id });
         }
         catch
         {
             lock (_gate) _sessions.Remove(id);
             throw;
         }
+        _ledger.Upsert(new LedgerEntry(id, taskId, cwd, null, role, permissionMode, id, session.StartedAt));
 
         await _tasks.UpdateAsync(taskId, "user", doc =>
         {
@@ -158,21 +164,73 @@ internal sealed class SessionManager : IDisposable
         return (session, StartRefusal.None);
     }
 
+    /// <summary>Fills a dormant session's thread from its transcript, once. The read and parse run off the caller's
+    /// thread; the result lands in front of anything already in the thread.</summary>
+    public async Task EnsureHistoryAsync(LiveSession session)
+    {
+        lock (session.Gate)
+        {
+            if (session.HistoryLoaded) return;
+            session.HistoryLoaded = true;
+        }
+        var claudeId = session.ClaudeId;
+        var (history, clipped, found) = await Task.Run(() =>
+        {
+            var path = TranscriptLocator.Resolve(claudeId, session.Cwd);
+            if (path is null) return ((IReadOnlyList<SessionConversation.ParsedTranscriptLine>)[], false, false);
+            var (lines, clip) = TranscriptScan.LastLines(TranscriptChain.ActiveLines(() => TranscriptScan.ReadLines(path)), MaxHistoryLines);
+            return (SessionConversation.ParseHistory(lines, claudeId), clip, true);
+        }).ConfigureAwait(false);
+
+        lock (session.Gate)
+        {
+            if (!found)
+            {
+                session.Conversation.AddNote("no conversation recorded yet; sending starts it");
+                return;
+            }
+            int n = session.Conversation.LoadHistory(history);
+            if (clipped && n > 0) session.Conversation.AddNote("showing the most recent part of a long transcript");
+            session.ResetPending = true;
+        }
+    }
+
     public void Send(LiveSession session, string text)
     {
         lock (session.Gate)
         {
-            if (session.Ended) throw new InvalidOperationException("the session has ended");
+            if (session.Dormant) Resume(session);
             session.Controller.SendPrompt(text);
             session.Conversation.AddUserPrompt(text);
         }
+    }
+
+    // Caller holds the session's gate. Continues the same Claude session, so the task binding and OCHRE_SESSION hold.
+    private void Resume(LiveSession session)
+    {
+        if (LiveClaudeSessions.Find(session.ClaudeId) is { } elsewhere)
+            throw new InvalidOperationException($"this session is open in another Claude Code (process {elsewhere.Pid}); close it there first");
+        if (!Directory.Exists(session.Cwd)) throw new InvalidOperationException($"its folder no longer exists: {session.Cwd}");
+        if (!DirectoryTrust.Evaluate(null, session.Cwd))
+            throw new InvalidOperationException("Claude Code no longer trusts its folder; start a new agent to be asked again");
+
+        // A session that never got a message wrote no transcript, and --resume would fail on it; starting it under the
+        // same id keeps the binding.
+        var hasTranscript = TranscriptLocator.Resolve(session.ClaudeId, session.Cwd) is not null;
+        session.Controller.Start(hasTranscript
+            ? Options(session) with { ResumeSessionId = session.ClaudeId }
+            : Options(session) with { NewSessionId = session.ClaudeId });
+        session.Dormant = false;
+        session.HeaderDirty = true;
+        session.Conversation.AddNote(hasTranscript ? "resumed" : "started");
+        _log.Info($"session {Short(session.Id)} resumed");
     }
 
     public void Interrupt(LiveSession session)
     {
         lock (session.Gate)
         {
-            if (session.Ended) return;
+            if (session.Dormant) return;
             session.Conversation.NoteInterrupt();
             session.Controller.Interrupt();
         }
@@ -202,11 +260,58 @@ internal sealed class SessionManager : IDisposable
         }
     }
 
+    private LiveSession Create(string id, string taskId, string cwd, string? role, string? permissionMode, string claudeId, DateTimeOffset startedAt)
+    {
+        var controller = new ClaudeSessionController { Log = _log.Info };
+        var session = new LiveSession(id, taskId, cwd, role, permissionMode, claudeId, startedAt, controller);
+        controller.EventReceived += ev => OnEvent(session, ev);
+        controller.Exited += (code, tail) => OnExited(session, code, tail);
+        return session;
+    }
+
+    // What every launch and resume of an agent carries: its task binding, the CLI on PATH, and what it's told.
+    private SessionStartOptions Options(LiveSession session)
+    {
+        var env = new Dictionary<string, string?>
+        {
+            ["OCHRE_TASK"] = session.TaskId,
+            ["OCHRE_SESSION"] = session.Id,
+            // The agent's CLI must reach this host, not another profile's.
+            ["OCHRE_PROFILE"] = _profile.IsDefault ? null : _profile.Name,
+        };
+        string? note = null;
+        IReadOnlyList<string> allowed = [];
+        if (AgentCli.Locate() is { } cli)
+        {
+            var command = Path.GetFileNameWithoutExtension(cli);
+            env["PATH"] = Path.GetDirectoryName(cli) + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
+            note = AgentPrompt.For(session.TaskId, command);
+            allowed = AgentPrompt.AllowedTools(command);
+        }
+        else
+        {
+            _log.Warn("the ochre CLI was not found; the agent won't be able to update its task");
+        }
+        return new SessionStartOptions(session.Cwd)
+        {
+            PermissionMode = session.PermissionMode,
+            AppendSystemPrompt = note,
+            AllowedTools = allowed,
+            Environment = env,
+        };
+    }
+
     private void OnEvent(LiveSession session, SessionEvent ev)
     {
         lock (session.Gate)
         {
             session.Conversation.Apply(ev);
+            if (ev is SessionInitEvent && session.Controller.SessionId is { } now && now != session.ClaudeId)
+            {
+                // `/clear` started a new Claude session; a later resume must continue that one.
+                session.ClaudeId = now;
+                _ledger.Rebind(session.Id, now);
+            }
             ControlledSessions.SetActivity(session.Controller.SessionId ?? session.Id, ActivityOf(session.Conversation));
         }
     }
@@ -215,7 +320,7 @@ internal sealed class SessionManager : IDisposable
     {
         lock (session.Gate)
         {
-            session.Ended = true;
+            session.Dormant = true;
             session.Conversation.SessionEnded(code, tail);
             session.HeaderDirty = true;
         }

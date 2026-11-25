@@ -7,7 +7,7 @@ export type PartKindDto = 'text' | 'thinking' | 'tool';
 
 export type ResolutionDto = 'pending' | 'allowed' | 'denied' | 'expired' | 'answeredElsewhere';
 
-export type SessionStatusDto = 'idle' | 'busy' | 'waiting' | 'ended';
+export type SessionStatusDto = 'idle' | 'busy' | 'waiting' | 'dormant';
 
 export type TaskStateDto = 'backlog' | 'active' | 'parked' | 'done';
 

@@ -28,9 +28,10 @@ internal static class SessionApi
         bridge.Handle("sessions.list", j.Empty, j.IReadOnlyListSessionSummary, _ =>
             (IReadOnlyList<SessionSummary>)sessions.All.Select(Summary).ToList());
 
-        bridge.Handle("sessions.get", j.SessionIdRequest, j.SessionSnapshot, r =>
+        bridge.Handle("sessions.get", j.SessionIdRequest, j.SessionSnapshot, async r =>
         {
             var s = Find(sessions, r.Id);
+            await sessions.EnsureHistoryAsync(s).ConfigureAwait(true);
             lock (s.Gate)
             {
                 var items = s.Conversation.Items;
@@ -79,9 +80,13 @@ internal static class SessionApi
             {
                 sessions.Send(Find(sessions, r.Id), text);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is InvalidOperationException or FileNotFoundException)
             {
                 throw new BridgeRejectException(ex.Message);
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                throw new BridgeRejectException($"claude could not be started: {ex.Message}");
             }
             return new Ack();
         });
@@ -142,7 +147,7 @@ internal static class SessionApi
     }
 
     private static SessionStatusDto Status(LiveSession s) =>
-        s.Ended ? SessionStatusDto.Ended
+        s.Dormant ? SessionStatusDto.Dormant
         : s.Conversation.PendingPermission is not null || s.Conversation.WaitingElsewhere ? SessionStatusDto.Waiting
         : s.Conversation.TurnActive ? SessionStatusDto.Busy
         : SessionStatusDto.Idle;

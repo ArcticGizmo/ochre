@@ -66,13 +66,13 @@ export function SessionView({ id, onBack, onError }: Props) {
         <button className="link back" onClick={onBack}>
           ← Back to task
         </button>
-        <p className="empty">This agent isn't running in this Ochre any more. Resuming past sessions comes with parking (M2).</p>
+        <p className="empty">Ochre doesn't know this agent. It may belong to a task that was deleted.</p>
       </div>
     );
   }
   if (!header) return <p className="empty">Loading...</p>;
 
-  const ended = header.status === 'ended';
+  const dormant = header.status === 'dormant';
 
   return (
     <div className="session">
@@ -83,8 +83,8 @@ export function SessionView({ id, onBack, onError }: Props) {
         <span className="session-title">{header.role ?? 'Agent'}</span>
         <span className={`status status-${header.status}`}>{header.status}</span>
         <span className="spacer" />
-        {!ended && turnActive && <button onClick={() => request('sessions.interrupt', { id }).catch((e: Error) => onError(e.message))}>Interrupt</button>}
-        {!ended && (
+        {!dormant && turnActive && <button onClick={() => request('sessions.interrupt', { id }).catch((e: Error) => onError(e.message))}>Interrupt</button>}
+        {!dormant && (
           <button className="link danger" onClick={() => setConfirmStop(true)}>
             Stop
           </button>
@@ -114,7 +114,7 @@ export function SessionView({ id, onBack, onError }: Props) {
         {turnActive && <p className="working">working...</p>}
       </div>
 
-      {!ended && <Composer sessionId={id} queued={header.queuedPrompts} onError={onError} />}
+      <Composer sessionId={id} queued={header.queuedPrompts} dormant={dormant} onError={onError} />
 
       <ConfirmDialog
         open={confirmStop}
@@ -127,7 +127,7 @@ export function SessionView({ id, onBack, onError }: Props) {
         }}
         onClose={() => setConfirmStop(false)}
       >
-        <p>The Claude session ends. Its conversation is kept by Claude Code and stays listed on the task.</p>
+        <p>The Claude session ends and goes dormant. Its conversation stays on the task; sending a message resumes it.</p>
       </ConfirmDialog>
     </div>
   );
@@ -314,7 +314,7 @@ function Permission({ sessionId, p, onError }: { sessionId: string; p: Permissio
   );
 }
 
-function Composer({ sessionId, queued, onError }: { sessionId: string; queued: number; onError: (m: string) => void }) {
+function Composer({ sessionId, queued, dormant, onError }: { sessionId: string; queued: number; dormant: boolean; onError: (m: string) => void }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -337,7 +337,7 @@ function Composer({ sessionId, queued, onError }: { sessionId: string; queued: n
       <textarea
         rows={3}
         value={text}
-        placeholder="Message the agent. Enter sends, Shift+Enter adds a line."
+        placeholder={dormant ? 'This agent is dormant. Sending resumes it with its conversation.' : 'Message the agent. Enter sends, Shift+Enter adds a line.'}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
@@ -349,7 +349,7 @@ function Composer({ sessionId, queued, onError }: { sessionId: string; queued: n
       <div className="composer-actions">
         {queued > 0 && <span className="muted">{queued} queued</span>}
         <button className="primary" onClick={() => void send()} disabled={sending || !text.trim()}>
-          Send
+          {dormant ? 'Resume and send' : 'Send'}
         </button>
       </div>
     </div>

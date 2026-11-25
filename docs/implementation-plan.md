@@ -144,11 +144,57 @@ The rest of the conventions (filter counts, search, a board view, ID under the t
 | Thread view takes longer than expected | The conversation model, stream parsing and input models come over from Perch as-is, so only the web rendering is new. Ship text, tool cards and permission prompts first; everything else waits |
 | EDR flags the host spawning Claude and shells | Sign dev builds early if it bites; report blocks, never work around them |
 
-## M2 onwards (outline)
+## M2: park, resume and the morning view
+
+Exit (from the roadmap): park two tasks at night; next morning "Today" shows both with notes; one click resumes a session with its context.
+
+Planned 2026-11-25 from a survey of Perch main at `9275e0b`. Findings that shape it: the `session-recovery` work was squash-merged into Perch main long ago (7dcec61, "Session recovery (#39)"; design in Perch's `docs/session-recovery-plan.md`), and Perch calls dormant sessions "parked". Perch has **no MCP server** on any branch, so ours is new code. Perch's shutdown handling only stamps the time (WM_QUERYENDSESSION via Avalonia); a shutdown leaves no time to ask agents for notes. The big Perch readers (`SessionMonitor`, 1.5k lines; `TranscriptReader`, 1.5k) are not ported whole: only the functions M2 needs are extracted.
+
+### Slice 1: dormant sessions and resume
+
+- A session ledger in `%LOCALAPPDATA%\Ochre\sessions.json`, modelled on Perch's `SessionLedger` (`LedgerSession`: id, task, cwd, configDir, role, model, permission mode). Written atomically on launch, `/clear` (rebind) and exit; never holds message bodies.
+- On host start, every session in the ledger (and every `launched` session on a task) becomes **dormant** in `SessionManager`: it shows in the task's Agents list and opens a thread loaded from its transcript. Port `TranscriptScan` (90 lines) and `TranscriptChain` (125) with their tests; history loads as Perch's `PerchSession.LoadHistoryAsync` does (resolve, active chain, last N lines, `ParseHistory` off the UI thread, `LoadHistory`, seed context tokens). Extract `ReadTitle` and `ReadContextUsage` from `TranscriptReader` rather than porting it.
+- Sending to a dormant session restarts it with `--resume <id>` (same id, so `OCHRE_SESSION` and the task binding still hold), then sends. Before resuming: folder trust (as at launch), and refuse if the session is live elsewhere, read from `~/.claude/sessions/{pid}.json` (port `SessionMonitor.ReadSession`, `IProcessProbe` and `ProcessIdentity` only). That read stands in for Perch's `SessionLock`.
+- Check Ochre's copies of `ClaudeSessionController` and `SessionConversation` carry #39's small edits (they were copied from main after it, so they should).
+- Tests: the ported readers' own; nothing new.
+
+### Slice 2: park and resume a task
+
+- **Park** on a task opens a dialog listing its running agents, with an optional note of your own. Confirming sets the task Parked, sends each idle agent a park turn ("write your state and next step with `ochre task park-note`"), waits for each note (busy agents: wait for the turn to end, up to a timeout, then interrupt), then stops them so they go dormant.
+- `ochre task park-note "<text>"`: accepted only from a bound session while a park request for it is open, capped in length, logged. It inherits ADR 0010's pre-allow, so these limits live on the host. Tests extend `AgentCommandsTests` (security boundary).
+- Storage: `park.note` keeps your note first, then one line per agent (`- alpha: ...`), so the single-note format in task-model.md still reads naturally. **Open question:** per-agent notes as separate frontmatter entries instead.
+- **Resume** sets the task Active and shows the park note above the plan; agents stay dormant until you send to one.
+
+### Slice 3: Today
+
+- A new screen: every Active and Parked task with title, park note, next unchecked step, agents (running / dormant / ended), links; sorted by last activity. One click on an agent opens its thread ready to resume. Git and worktree state wait for the git module (M4).
+- Larger visual change, so it starts from a design artefact. Fold in the pending M1 "UI design pass" (filter counts, search, board view, ID under the title, coloured status dropdown, centred content) so one artefact covers list, detail, thread and Today.
+
+### Slice 4: observed sessions and binding suggestions
+
+- List live sessions Ochre didn't start, from `~/.claude/sessions/*.json` (slice 1's reader) plus their transcripts; read-only threads by tailing (port `TranscriptTailReader`, 200 lines, with tests). Accept ADR 0006 (hook-free observation) when this works.
+- Suggestions, never automatic: cwd inside a task's repo; a Jira key in the branch (port `JiraTicket.cs`, 105 lines, with tests) matching a task link. One click binds (`binding: confirmed`). `SessionWorktree` (infers a worktree from a transcript's edits) is a later refinement.
+- **Open question:** an observed session has no `OCHRE_SESSION`, so its agent can't use the task commands. Options: bound observed sessions stay read-only (proposed for M2), or the CLI looks its session up by parent process.
+
+### Slice 5: MCP server
+
+- `ochre mcp`: a stdio JSON-RPC server inside the NativeAOT CLI (`initialize`, `tools/list`, `tools/call`), with tools `task_show`, `task_check`, `task_uncheck`, `task_add_step`, `task_note`, `task_park_note`. It forwards to the host over the same pipe, so `AgentCommands` stays the only rule-keeper. Hand-rolled: a few hundred lines, no SDK dependency.
+- Launched agents get it through `--mcp-config <file>` with `mcp__ochre__*` pre-allowed (ADR 0010 extended). **Open question:** whether launched agents get MCP, the CLI or both. Proposal: both for a while, then keep whichever agents use reliably.
+- Tests: none beyond `AgentCommands`; the framing is thin and exercised by every agent.
+
+### Slice 6: auto-park on shutdown (optional)
+
+- Off by default (a setting). On WM_QUERYENDSESSION the host stamps the shutdown in the ledger (Perch's approach), marks each task with running agents Parked with an automatic note ("Ochre was shut down while alpha and beta were working; last step ticked: p3"), and lets the sessions end. There's no time for agent-written notes. A heartbeat after the stamp means the shutdown was cancelled, and the stamp is undone.
+- Skip Perch's `PowerHistory` (Windows event log, extra package). Port `SessionEnd`'s clean/abrupt classification only if Today needs it.
+
+### Slice 7: exit run
+
+- Walk the exit criterion, write `docs/testing/m2-testing.md`.
+
+## M3 onwards (outline)
 
 Re-plan each milestone in detail when it starts. Notes worth keeping now:
 
-- **M2: park, resume, Today, observed sessions, MCP.** Port `SessionEnd`, `SessionLedger`, `RecentSessions` and the transcript readers; check Perch's `session-recovery` branch first. Park sends each running session a "write your park note" turn that calls `ochre task park-note`. Dormant sessions resume with `--resume <id>` on first send. MCP server shares the CLI's command handler. Binding suggestions only ever suggest. Tests: transcript readers come with Perch's; nothing new unless park-note collection proves fragile.
 - **M3: terminal tabs.** The spike's ConPTY and throughput findings feed directly in. Scrollback encrypted with DPAPI; OSC 52 and OSC 8 gating (security threat 7). Test the escape-sequence filter, since it's a security boundary.
 - **M4: module host.** This is where the contracts from ADR 0007 get designed, using the real features built in M1 to M3 as the examples. Move terminal, git and others behind modules, then add the "every module off" kernel test. Git graph, Jira, sprig and multi-window follow.
 - **M5 to M8** stay as written in the roadmap; too far out to plan usefully.

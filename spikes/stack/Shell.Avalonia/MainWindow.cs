@@ -27,7 +27,10 @@ internal sealed class MainWindow : Window
         {
             e.EnableDevTools = true;
             if (e is WindowsWebView2EnvironmentRequestedEventArgs w)
+            {
                 w.UserDataFolder = Path.Combine(SpikeHost.DataDir, "webview2-avalonia");
+                if (VirtualDesktop.BrowserArguments is { } args) w.AdditionalBrowserArguments = args;
+            }
         };
         web.AdapterCreated += (_, e) =>
         {
@@ -37,6 +40,20 @@ internal sealed class MainWindow : Window
             _page = WebView2Page.Attach(core, _host, Dispatcher.UIThread.CheckAccess, a => Dispatcher.UIThread.Post(a));
         };
         Content = web;
+
+        // Off-desktop bench runs shouldn't steal focus from whatever the user is doing.
+        ShowActivated = VirtualDesktop.Configured is null;
+        _moved = VirtualDesktop.TryMoveToConfigured(TryGetPlatformHandle()?.Handle ?? 0, _host.Log);
+    }
+
+    private bool _moved;
+
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        // Some Windows builds refuse to move a window that isn't visible yet.
+        if (!_moved && VirtualDesktop.Configured is not null)
+            _moved = VirtualDesktop.TryMoveToConfigured(TryGetPlatformHandle()?.Handle ?? 0, _host.Log);
     }
 
     public bool AllowClose { get; set; }

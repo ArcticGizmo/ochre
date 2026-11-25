@@ -67,7 +67,10 @@ internal sealed class TrayContext : ApplicationContext
         }
 
         _host.MarkWindowOpenRequested();
-        _environment ??= CoreWebView2Environment.CreateAsync(null, Path.Combine(SpikeHost.DataDir, "webview2"));
+        _environment ??= CoreWebView2Environment.CreateAsync(
+            null,
+            Path.Combine(SpikeHost.DataDir, "webview2"),
+            new CoreWebView2EnvironmentOptions(VirtualDesktop.BrowserArguments));
         _window = new MainForm(_host, _environment, _hideOnClose);
         _window.FormClosed += (_, _) => _window = null;
         _window.Show();

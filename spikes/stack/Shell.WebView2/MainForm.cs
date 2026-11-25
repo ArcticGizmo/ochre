@@ -26,6 +26,24 @@ internal sealed class MainForm : Form
 
     public void ReportReadyIfLoaded() => _page?.NotifyShown();
 
+    // Off-desktop bench runs shouldn't steal focus from whatever the user is doing.
+    protected override bool ShowWithoutActivation => VirtualDesktop.Configured is not null;
+
+    private bool _moved;
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        _moved = VirtualDesktop.TryMoveToConfigured(Handle, _host.Log);
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        // Some Windows builds refuse to move a window that isn't visible yet.
+        if (!_moved && VirtualDesktop.Configured is not null) _moved = VirtualDesktop.TryMoveToConfigured(Handle, _host.Log);
+    }
+
     private async Task InitAsync(Task<CoreWebView2Environment> environment)
     {
         var env = await environment.ConfigureAwait(true);

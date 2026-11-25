@@ -4,7 +4,9 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>ochre-spike-avalonia</AssemblyName>
     <RootNamespace>Shell.Avalonia</RootNamespace>
-    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <!-- The WebView2 SDK's CoreWebView2 wrapper is built on classic COM interop. -->
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" />

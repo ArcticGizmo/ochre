@@ -31,7 +31,11 @@ for ($i = 1; $i -le $Samples; $i++) {
     $ws = ($tree | Measure-Object -Property WorkingSetSize -Sum).Sum / 1MB
     $priv = ($tree | Measure-Object -Property PrivatePageCount -Sum).Sum / 1MB
     $hostWs = ($tree | Where-Object { $_.ProcessId -eq $root.Id }).WorkingSetSize / 1MB
+    # The spike target is host + WebView only; the terminal's shell and conhost belong to the user's work.
+    $app = $tree | Where-Object { $_.Name -notin @('pwsh.exe', 'powershell.exe', 'conhost.exe', 'cmd.exe') }
+    $appWs = ($app | Measure-Object -Property WorkingSetSize -Sum).Sum / 1MB
+    $appPriv = ($app | Measure-Object -Property PrivatePageCount -Sum).Sum / 1MB
     $names = ($tree | Group-Object Name | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ', '
-    "{0:HH:mm:ss}  total WS {1,7:N1} MB  private {2,7:N1} MB  host WS {3,6:N1} MB  [{4}]" -f (Get-Date), $ws, $priv, $hostWs, $names
+    "{0:HH:mm:ss}  total WS {1,7:N1} MB  private {2,7:N1} MB  host+WebView WS {3,7:N1} MB  private {4,7:N1} MB  host WS {5,6:N1} MB  [{6}]" -f (Get-Date), $ws, $priv, $appWs, $appPriv, $hostWs, $names
     if ($i -lt $Samples) { Start-Sleep -Seconds $IntervalSeconds }
 }

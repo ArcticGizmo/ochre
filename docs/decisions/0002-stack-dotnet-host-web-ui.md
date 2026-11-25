@@ -29,4 +29,20 @@ Option B, subject to the spike's measurements ([spike-stack.md](../spike-stack.m
 
 ## Spike results
 
-To be filled in after M0.
+Measured 2026-11-25 on the development laptop with WinForms + WebView2 and Avalonia 12 + `Avalonia.Controls.WebView`; full numbers and method in [spikes/stack/results.md](../../spikes/stack/results.md).
+
+| Metric | Target | WinForms + WebView2 | Avalonia |
+|---|---|---|---|
+| Cold start to tray | < 1.5 s | 0.4 to 0.5 s | 0.6 to 0.8 s |
+| Tray idle (5 min) | < 120 MB | 48 MB | 99 MB |
+| One window idle, host + WebView private bytes | < 350 MB | 196 MB | 275 MB |
+| First window open | | 0.85 s | 1.1 to 1.2 s |
+| Reopen: torn down / hidden | < 500 ms warm | 0.76 s / < 0.1 s | 0.76 to 0.87 s / < 0.1 s |
+| Bridge round trip (10k) | < 1 ms median | 0.10 ms | 0.10 ms |
+| Typing (input to echo) | < 30 ms | 1.2 ms median | 1.2 ms median |
+| 50 MB through the terminal, coalesced 16 ms | no freeze | 32.6 s, worst frame 17 ms | 31.6 s, worst frame 18 ms |
+| Package (win-x64, framework-dependent) | record | 17 MB | 45 MB |
+
+Findings that shape M1: terminal output must be coalesced (per-read delivery is ~30% slower and sends ~500k messages for 50 MB); WebView2's SmartScreen check added a fixed ~2 s to every cold page load and is turned off for the app's own page; Avalonia's `NativeWebView` has no host-to-page message or virtual-host API, so on Windows it ends up using the raw `CoreWebView2` anyway.
+
+Recommendation: accept option B, with raw WebView2 in a minimal WinForms host behind a shell seam in `Ochre.Platform.Windows`; macOS implements the same seam later. Status stays proposed until confirmed.

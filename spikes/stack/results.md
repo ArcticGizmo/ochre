@@ -2,7 +2,7 @@
 
 Date: 2026-11-25. Machine: the development laptop (Windows 11 Pro 26200, CrowdStrike Falcon and Defender running). Release builds, framework-dependent, .NET 10.0.15, WebView2 runtime from the OS. Toolchain: .NET SDK 10.0.404, Node 24.21.0, pnpm 12.3.4, TypeScript 7.0.2, Vite 8.3.8.
 
-Raw lines are in `%LOCALAPPDATA%\Ochre-spike\timing.log`. To rerun: build the UI (`pnpm build` in `ui/`), build a shell in Release, then start it with `OCHRE_SPIKE_AUTOBENCH=1` (and optionally `OCHRE_SPIKE_DESKTOP=<virtual desktop guid>` to keep the window off the current desktop) and open its window by launching it a second time. `open-timing.ps1` times window open; `measure.ps1` samples memory; `wt-baseline.ps1` times the same throughput commands in Windows Terminal.
+The spike code was deleted after M0; it is preserved at the git tag `spike-stack`. Raw lines were in `%LOCALAPPDATA%\Ochre-spike\timing.log`. To rerun, check out the tag, then: build the UI (`pnpm build` in `ui/`), build a shell in Release, then start it with `OCHRE_SPIKE_AUTOBENCH=1` (and optionally `OCHRE_SPIKE_DESKTOP=<virtual desktop guid>` to keep the window off the current desktop) and open its window by launching it a second time. `open-timing.ps1` times window open; `measure.ps1` samples memory; `wt-baseline.ps1` times the same throughput commands in Windows Terminal.
 
 ## Shells tried
 
@@ -42,7 +42,8 @@ Output from PowerShell through ConPTY to xterm.js, with the terminal tab visible
 | WinForms: cat 50 MB | 47.0 s, 556k messages, 33 ms | 32.6 s, 1.4k messages, 17 ms |
 | Avalonia: recursive listing | 82.9 s, 437k messages, 34 ms | 57.8 s, 2.6k messages, 34 ms |
 | Avalonia: cat 50 MB | 43.1 s, 562k messages, 33 ms | 31.6 s, 1.4k messages, 18 ms |
-| Windows Terminal (same commands) | not yet run: `wt-baseline.ps1` opens a visible window that can't be moved off the desktop, so it waits for the user | |
+| Windows Terminal (same commands, `Measure-Command` around `Out-Host`) | listing 48.5 s, cat 50 MB 27.9 s | |
+| Ochre vs Windows Terminal | listing 1.6 to 1.7x, cat 1.5 to 1.7x | listing 1.13 to 1.19x, cat 1.13 to 1.17x |
 | PowerShell with no terminal (`Out-String`) | listing 31.6 s | |
 
 No long tasks (> 50 ms) were recorded in any run, so the UI never froze. ConPTY emits roughly one message per line, so per-read delivery means hundreds of thousands of `postMessage` calls; coalescing on a 16 ms timer cuts time by about 30% and keeps frames under one vsync.
@@ -66,7 +67,7 @@ A reopen under 500 ms needs the WebView kept alive: hiding instead of closing re
 
 - Met: cold start, tray idle, one-window memory (on private bytes; summed working sets exceed 350 MB but double-count shared pages), bridge round trip, typing latency, no UI freeze under heavy output.
 - Met only with the WebView kept alive: window open under 500 ms. A torn-down WebView reopens in ~0.76 s.
-- Open: terminal throughput against Windows Terminal (baseline not yet run). Against PowerShell with no terminal attached, coalesced output costs about 1.7x on the listing.
+- Met: terminal throughput within 2x of Windows Terminal. Coalesced output is 13 to 19% slower than Windows Terminal on the same commands; per-read delivery is 1.5 to 1.7x.
 
 ## Recommendation
 

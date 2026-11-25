@@ -1,0 +1,55 @@
+# Nidus
+
+A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray host plus a web UI in a system WebView (proposed; see `docs/decisions/0002-stack-dotnet-host-web-ui.md`). The durable unit of work is the **task**; sessions, worktrees, terminals and links attach to it.
+
+**Status: pre-code.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md` and `docs/roadmap.md` before writing code. The first code is the M0 stack spike (`docs/spike-stack.md`) under `spikes/stack/`.
+
+## Layout (planned, settled after M0)
+
+- `src/Nidus.Core/`: UI-free core (task store, session registry, transcript parsing, git, module contracts). Plain `net10.0`.
+- `src/Nidus.Host/`: the tray host process (`nidus`), WebView shell, bridge, module host, PTYs.
+- `src/Nidus.Cli/`: NativeAOT CLI/MCP shim that talks to the host over a named pipe.
+- `src/Nidus.Platform.Windows/` (later `.Mac/`): OS implementations of Core interfaces.
+- `ui/`: TypeScript + React + Vite web UI (Monaco, xterm.js).
+- `modules/`: first-party modules (git, jira, sprig, terminal, …).
+- `tests/Nidus.Tests/`: xUnit over Core, with fixtures.
+- `spikes/`: throwaway experiments; never referenced by `src/`.
+- `docs/`: vision, architecture, decisions (ADRs), roadmap, testing docs.
+
+## Principles (enforce these in review)
+
+- **Tasks first.** Agents are launched from tasks; the task holds the plan.
+- **Compose.** The kernel works with zero modules. A feature is a module on the plugin contracts (ADR 0007), not a settings flag scattered through the code.
+- **Explicit over magic.** Detection suggests; the user confirms. Never auto-bind, auto-add or auto-start.
+- **Prefer simple over clever.** Recommend the small, direct fix and state its cost.
+- **The renderer is untrusted.** All UI → host calls go through the typed bridge and are validated on the host. Never inject host objects into script. Sanitise any HTML/markdown. See `docs/security.md`.
+- **The host is the only writer** of task files.
+
+## Conventions
+
+- Warnings are errors (`TreatWarningsAsErrors` in `Directory.Build.props`); fix warnings, don't suppress them.
+- `Nullable` and `ImplicitUsings` on everywhere.
+- IO and heavy work run off the UI thread; guard callbacks against closed windows.
+- Read Claude's live files with `FileShare.ReadWrite` and tolerate partial trailing lines; never throw out of a scan.
+- Every OS-specific capability goes behind a Core interface with a platform implementation.
+- A file path in a one-line space keeps the **file name** and elides the leading directory.
+- Every browser link also takes a middle click, which opens it in a new browser window.
+- Secrets go in Credential Manager / Keychain, never in settings or logs.
+- UI dependencies: exact pinned versions, lockfile committed, pnpm with install scripts disabled. Never run `npx`/`pnpm dlx` against unpinned packages.
+- Release scripts (`.ps1`, `.bat`, `.sh`, workflows) stay pure ASCII; `.sh` files stay LF.
+- Tests never plant runnable executables (EDR flags them); plant empty files and assert resolution.
+
+## Copying from Perch
+
+Allowed and encouraged (ADR 0003). Copy, then own. Put the source repo, path and commit in the commit message, and bring the matching tests and fixtures. Candidates: `docs/reuse-from-perch.md`.
+
+## Decisions and docs
+
+- Significant choices get an ADR in `docs/decisions/` (append-only; supersede rather than edit).
+- Every change ships a manual testing doc at `docs/testing/<feature>-testing.md` with before/after prompts to try.
+- Keep `docs/roadmap.md` current when a milestone's scope changes.
+- In markdown, never insert line breaks in the middle of a sentence.
+
+## Comments
+
+Explain only the *why* behind non-obvious code. Never describe what the code used to do.

@@ -38,6 +38,7 @@ A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray
 - UI dependencies: exact pinned versions, lockfile committed, pnpm with install scripts disabled. Never run `npx`/`pnpm dlx` against unpinned packages.
 - Release scripts (`.ps1`, `.bat`, `.sh`, workflows) stay pure ASCII; `.sh` files stay LF.
 - Tests never plant runnable executables (EDR flags them); plant empty files and assert resolution.
+- Experimental phase: write automated tests only for data-loss and security boundaries, or once a feature's direction has settled. Code copied from Perch brings its existing tests. Everything else is verified by hand through the manual testing docs. See `docs/implementation-plan.md`.
 
 ## Copying from Perch
 

@@ -29,6 +29,7 @@ Claude sessions end up being the to-do list, and that list disappears every time
 | [docs/security.md](docs/security.md) | Threat model and required mitigations |
 | [docs/roadmap.md](docs/roadmap.md) | Milestones M0 onwards with exit criteria |
 | [docs/spike-stack.md](docs/spike-stack.md) | M0: the stack spike that settles the UI technology |
+| [docs/implementation-plan.md](docs/implementation-plan.md) | How M0 and M1 get built, slice by slice, and the testing stance |
 | [docs/reuse-from-perch.md](docs/reuse-from-perch.md) | What to copy from Perch and where it lives |
 | [docs/landscape.md](docs/landscape.md) | Other ADEs as of Nov 2026 and where Ochre differs |
 | [docs/decisions/](docs/decisions/) | Architecture decision records |

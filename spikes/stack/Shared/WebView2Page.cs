@@ -11,7 +11,8 @@ namespace Spike.Shared;
 /// </summary>
 internal sealed class WebView2Page
 {
-    public const string HostName = "ochre.spike";
+    // A reserved name, so the virtual host can never shadow a real site.
+    public const string HostName = "ochre.example";
 
     private readonly CoreWebView2 _core;
     private readonly SpikeHost _host;
@@ -32,6 +33,9 @@ internal sealed class WebView2Page
         core.Settings.IsWebMessageEnabled = true;
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreDevToolsEnabled = true;
+        // The page only ever comes from the app's own folder and every other navigation is refused, so a
+        // SmartScreen lookup adds nothing; on this network it stalled each cold page load by ~2 s.
+        core.Settings.IsReputationCheckingRequired = false;
 
         var devUrl = Environment.GetEnvironmentVariable("OCHRE_SPIKE_DEV_URL");
         _allowedOrigin = devUrl is null ? $"https://{HostName}/" : new Uri(devUrl).GetLeftPart(UriPartial.Authority) + "/";

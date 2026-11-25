@@ -2,29 +2,31 @@ import { useCallback, useEffect, useState } from 'react';
 import { on, request, type PlanItemDto, type TaskDetail, type TaskStateDto } from '../bridge';
 import { ConfirmDialog } from '../Dialog';
 import { renderMarkdown } from '../markdown';
+import { Menu } from '../Menu';
 import { PathText } from '../PathText';
 import { SessionView } from '../sessions/SessionView';
 import { StartAgentDialog } from '../sessions/StartAgentDialog';
 import { useSessions } from '../sessions/useSessions';
 import { ParkDialog } from './ParkDialog';
-
-const states: TaskStateDto[] = ['backlog', 'active', 'parked', 'done'];
+import { agentStatus, agentWord, ParkNote, stateLabel, states, when } from './present';
 
 interface Props {
   id: string;
+  /** The agent whose thread this window shows in place of the task; per window, so two windows can differ. */
+  openSession: string | null;
+  onOpenSession: (sessionId: string | null) => void;
   onError: (message: string) => void;
   onDeleted: () => void;
 }
 
-export function TaskView({ id, onError, onDeleted }: Props) {
+export function TaskView({ id, openSession, onOpenSession, onError, onDeleted }: Props) {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [gone, setGone] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [startingAgent, setStartingAgent] = useState(false);
   const [parking, setParking] = useState(false);
-  // Which agent's thread this window shows in place of the task; per window, so two windows can differ.
-  const [openSession, setOpenSession] = useState<string | null>(null);
+  const [confirmDone, setConfirmDone] = useState(false);
   const live = useSessions();
 
   const load = useCallback(() => {
@@ -70,25 +72,85 @@ export function TaskView({ id, onError, onDeleted }: Props) {
 
   if (gone) return <p className="empty">This task no longer exists.</p>;
   if (!task) return <p className="empty">Loading...</p>;
-  if (openSession) return <SessionView key={openSession} id={openSession} onBack={() => setOpenSession(null)} onError={onError} />;
+  if (openSession)
+    return <SessionView key={openSession} id={openSession} backLabel={task.id} parkNote={task.park?.note ?? null} onBack={() => onOpenSession(null)} onError={onError} />;
 
   const update = (fields: { title?: string; notes?: string; repos?: string[] }) =>
     run(request('tasks.update', { id, title: fields.title ?? null, notes: fields.notes ?? null, repos: fields.repos ?? null }));
 
+  function chooseState(s: TaskStateDto) {
+    if (!task || s === task.state) return;
+    // Parking and finishing go through their dialogs, so agents are still asked for notes and Done is confirmed.
+    if (s === 'parked') setParking(true);
+    else if (s === 'done') setConfirmDone(true);
+    else void run(request('tasks.setState', { id, state: s }));
+  }
+
   return (
     <article className="task">
       <header className="task-header">
-        <TitleEditor title={task.title} onSave={(title) => update({ title })} />
-        <span className="task-id">{task.id}</span>
-        {task.state === 'parked' ? (
-          <button onClick={() => run(request('tasks.setState', { id, state: 'active' }))}>Resume</button>
-        ) : (
-          task.state !== 'done' && <button onClick={() => setParking(true)}>Park</button>
-        )}
-        <button className="link danger" onClick={() => setConfirmDelete(true)}>
-          Delete
-        </button>
+        <div className="task-heading">
+          <TitleEditor title={task.title} onSave={(title) => update({ title })} />
+          <div className="task-id">
+            <code>{task.id}</code>
+            {task.created && <span> · created {when(task.created)}</span>}
+            {task.updated && <span> · updated {when(task.updated)}</span>}
+          </div>
+        </div>
+        <div className="task-actions">
+          <Menu
+            ariaLabel={`State: ${stateLabel[task.state]}`}
+            buttonClass={`pill state-${task.state} state-button`}
+            label={
+              <>
+                <span className="dot" />
+                {stateLabel[task.state]}
+                <span className="chevron" aria-hidden="true" />
+              </>
+            }
+            items={states.map((s) => ({
+              key: s,
+              label: (
+                <>
+                  <span className={`dot state-${s}`} />
+                  <span className="grow">{s === 'done' && task.state !== 'done' ? 'Done…' : s === 'parked' && task.state !== 'parked' ? 'Parked…' : stateLabel[s]}</span>
+                </>
+              ),
+              current: s === task.state,
+              separatorBefore: s === 'done',
+              onSelect: () => chooseState(s),
+            }))}
+          />
+          {task.state === 'parked' ? (
+            <button className="primary" onClick={() => run(request('tasks.setState', { id, state: 'active' }))}>
+              Resume
+            </button>
+          ) : (
+            task.state !== 'done' && <button onClick={() => setParking(true)}>Park</button>
+          )}
+          <Menu
+            ariaLabel="More actions"
+            buttonClass="link more"
+            label={<span aria-hidden="true">⋯</span>}
+            items={[{ key: 'delete', label: 'Delete task…', danger: true, onSelect: () => setConfirmDelete(true) }]}
+          />
+        </div>
       </header>
+
+      <ConfirmDialog
+        open={confirmDone}
+        title={`Mark ${task.id} done?`}
+        confirmLabel="Mark done"
+        onConfirm={() => {
+          setConfirmDone(false);
+          void run(request('tasks.setState', { id, state: 'done' }));
+        }}
+        onClose={() => setConfirmDone(false)}
+      >
+        <p>
+          <strong>{task.title}</strong> moves to Done and leaves Today and the open list. Its agents aren't stopped. You can reopen it from the Done filter.
+        </p>
+      </ConfirmDialog>
 
       <ParkDialog
         open={parking}
@@ -113,18 +175,12 @@ export function TaskView({ id, onError, onDeleted }: Props) {
         </p>
       </ConfirmDialog>
 
-      <div className="states" role="group" aria-label="State">
-        {states.map((s) => (
-          <button key={s} className={s === task.state ? `chip active state-${s}` : 'chip'} onClick={() => run(request('tasks.setState', { id, state: s }))}>
-            {s}
-          </button>
-        ))}
-      </div>
-
       {task.park && (task.park.note || task.parkingWaitingFor.length > 0) && (task.state === 'parked' || task.state === 'active') && (
         <section className="park">
-          <h3>Where you left off</h3>
-          {task.park.note && <p>{task.park.note}</p>}
+          <h3>
+            Where you left off <span className="h3-aside">· parked {when(task.park.at)}</span>
+          </h3>
+          {task.park.note && <ParkNote note={task.park.note} />}
           {task.parkingWaitingFor.length > 0 && (
             <p className="muted">
               Waiting for park notes from{' '}
@@ -178,15 +234,18 @@ export function TaskView({ id, onError, onDeleted }: Props) {
         ) : (
           <ul className="plain agents">
             {task.sessions.map((s) => {
-              const running = live.find((l) => l.id === s.id);
+              const status = agentStatus(s.id, live);
               return (
                 <li key={s.id}>
-                  <span className={`status status-${running?.status ?? 'gone'}`}>{running?.status ?? 'not running'}</span>
-                  <span>{s.role ?? 'agent'}</span>
+                  <span className={`status status-${status}`}>
+                    <span className="dot" />
+                    {agentWord(status)}
+                  </span>
+                  <span className="who">{s.role ?? 'agent'}</span>
                   <PathText path={s.cwd} />
                   <code title={s.id}>{s.id.slice(0, 8)}</code>
-                  {running && (
-                    <button className="link" onClick={() => setOpenSession(s.id)}>
+                  {status !== 'ended' && (
+                    <button className="link" onClick={() => onOpenSession(s.id)}>
                       Open
                     </button>
                   )}
@@ -205,7 +264,7 @@ export function TaskView({ id, onError, onDeleted }: Props) {
           onClose={() => setStartingAgent(false)}
           onStarted={(sessionId) => {
             setStartingAgent(false);
-            setOpenSession(sessionId);
+            onOpenSession(sessionId);
           }}
         />
       </section>

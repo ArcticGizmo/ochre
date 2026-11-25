@@ -1,0 +1,19 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-25T11:30:00Z" },
+  "title": "Ochre UI pass and Today",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 1060, "title": "Today", "expand": "fill", "is_interactive": true },
+    "Tasks.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 1060, "title": "Tasks: list and detail", "expand": "fill", "is_interactive": true },
+    "Board.dc.html": { "x": 0, "y": 1180, "w": 1280, "h": 780, "title": "Tasks: board", "expand": "fill", "is_interactive": true },
+    "Thread.dc.html": { "x": 1360, "y": 1180, "w": 1280, "h": 900, "title": "Agent thread, opened from Today", "expand": "fill", "is_interactive": true },
+    "States.dc.html": { "x": 2720, "y": 1180, "w": 560, "h": 640, "title": "States and status colours" }
+  },
+  "order": ["Main.dc.html", "Tasks.dc.html", "Board.dc.html", "Thread.dc.html", "States.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "Ochre: UI pass and Today (M2 slice 3)", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

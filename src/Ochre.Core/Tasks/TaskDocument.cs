@@ -377,7 +377,10 @@ public sealed partial class TaskDocument
             items.Count(i => i.Done),
             items.Count,
             items.FirstOrDefault(i => !i.Done)?.Text,
-            Park?.Note);
+            Park?.Note,
+            Park?.At,
+            Links,
+            Sessions);
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------

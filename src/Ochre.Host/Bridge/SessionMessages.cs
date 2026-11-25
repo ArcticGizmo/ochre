@@ -83,15 +83,24 @@ public enum ResolutionDto
     AnsweredElsewhere,
 }
 
+/// <param name="Description">What it was asked to do.</param>
+/// <param name="Progress">Its latest progress line, for a background agent that reports one.</param>
+public sealed record SubagentDto(string Description, string? Progress);
+
 /// <param name="Id">The id the session was launched with (also its id on the task).</param>
+/// <param name="Activity">What it's doing in the current turn (the running tool, "thinking", "writing"); null when idle.</param>
 public sealed record SessionSummary(
     string Id,
     string TaskId,
     string Cwd,
     string? Role,
     SessionStatusDto Status,
-    string StartedAt);
+    string StartedAt,
+    string? Activity,
+    IReadOnlyList<SubagentDto> Subagents);
 
+/// <param name="Model">The model the user picked, else the one the CLI reported; empty before either.</param>
+/// <param name="Effort">The effort level the user picked, or "auto".</param>
 public sealed record SessionHeader(
     string Id,
     string TaskId,
@@ -99,10 +108,13 @@ public sealed record SessionHeader(
     string? Role,
     SessionStatusDto Status,
     string Model,
+    string Effort,
     string PermissionMode,
     double CostUsd,
     long ContextTokens,
-    int QueuedPrompts);
+    int QueuedPrompts,
+    string? Activity,
+    IReadOnlyList<SubagentDto> Subagents);
 
 /// <param name="Diff">For an edit or write: the change as diff lines ("+", "-" or " " followed by the text).</param>
 public sealed record AssistantPartDto(
@@ -156,6 +168,12 @@ public sealed record StartSessionRequest(string TaskId, string Cwd, string? Role
 public sealed record StartSessionResult(string? SessionId, bool NeedsTrust);
 
 public sealed record SendPromptRequest(string Id, string Text);
+
+/// <param name="Model">A Claude model id such as <c>claude-opus-5-5</c>, or an alias the CLI accepts.</param>
+public sealed record SetModelRequest(string Id, string Model);
+
+/// <param name="Effort">"auto" or one of the CLI's levels (low, medium, high, xhigh, max).</param>
+public sealed record SetEffortRequest(string Id, string Effort);
 
 public sealed record QuestionAnswerDto(string Question, IReadOnlyList<string> Labels);
 

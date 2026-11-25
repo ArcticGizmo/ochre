@@ -31,6 +31,8 @@ public static class BridgeContract
         new("sessions.interrupt", typeof(SessionIdRequest), typeof(Ack)),
         new("sessions.stop", typeof(SessionIdRequest), typeof(Ack)),
         new("sessions.respond", typeof(RespondRequest), typeof(Ack)),
+        new("sessions.setModel", typeof(SetModelRequest), typeof(Ack)),
+        new("sessions.setEffort", typeof(SetEffortRequest), typeof(Ack)),
     ];
 
     public static IReadOnlyList<EventContract> Events { get; } =

@@ -10,7 +10,7 @@ namespace Ochre.Host.Bridge;
 /// Session messages from the UI: start an agent on a task, read its thread, send to it, answer its prompts. The
 /// renderer is untrusted, so every path, mode and length is checked here before it reaches a process.
 /// </summary>
-internal static class SessionApi
+internal static partial class SessionApi
 {
     private const int MaxPrompt = 100_000;
     private const int MaxRole = 40;
@@ -118,7 +118,25 @@ internal static class SessionApi
                 throw new BridgeRejectException("that prompt is no longer waiting for an answer");
             return new Ack();
         });
+
+        bridge.Handle("sessions.setModel", j.SetModelRequest, j.Ack, r =>
+        {
+            if (!ModelId().IsMatch(r.Model)) throw new BridgeRejectException("not a model id");
+            sessions.SetModel(Find(sessions, r.Id), r.Model);
+            return new Ack();
+        });
+
+        bridge.Handle("sessions.setEffort", j.SetEffortRequest, j.Ack, r =>
+        {
+            if (r.Effort != "auto" && !ClaudeSessionController.IsEffortLevel(r.Effort)) throw new BridgeRejectException("unknown effort level");
+            sessions.SetEffort(Find(sessions, r.Id), r.Effort);
+            return new Ack();
+        });
     }
+
+    // Ids like claude-opus-5-5 or aliases like opus; it rides the command line on resume, so nothing else gets through.
+    [System.Text.RegularExpressions.GeneratedRegex(@"^[a-z][a-z0-9.\-]{0,63}$")]
+    private static partial System.Text.RegularExpressions.Regex ModelId();
 
     /// <summary>The broadcast for a flushed batch of changes. Reads the items under the session's gate.</summary>
     public static SessionUpdateEvent Update(LiveSession s, SessionChanges changes)
@@ -133,7 +151,9 @@ internal static class SessionApi
 
     public static SessionSummary Summary(LiveSession s)
     {
-        lock (s.Gate) return new SessionSummary(s.Id, s.TaskId, s.Cwd, s.Role, Status(s), s.StartedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        lock (s.Gate)
+            return new SessionSummary(s.Id, s.TaskId, s.Cwd, s.Role, Status(s), s.StartedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+                Activity(s), Subagents(s));
     }
 
     private static LiveSession Find(SessionManager sessions, string id) =>
@@ -143,7 +163,43 @@ internal static class SessionApi
     private static SessionHeader Header(LiveSession s)
     {
         var c = s.Conversation;
-        return new SessionHeader(s.Id, s.TaskId, s.Cwd, s.Role, Status(s), c.Model, c.PermissionMode, c.TotalCostUsd, c.ContextTokens, c.QueuedPrompts);
+        return new SessionHeader(s.Id, s.TaskId, s.Cwd, s.Role, Status(s), s.Model ?? c.Model, s.Effort ?? "auto", c.PermissionMode, c.TotalCostUsd,
+            c.ContextTokens, c.QueuedPrompts, Activity(s), Subagents(s));
+    }
+
+    private static bool IsAgentTool(string name) => name is "Agent" or "Task";
+
+    // Callers hold the session's gate. The latest assistant message is where the current turn's tools are.
+    private static IReadOnlyList<AssistantPart> CurrentParts(SessionConversation c) =>
+        c.TurnActive && c.Items.LastOrDefault(i => i is AssistantMessageItem) is AssistantMessageItem a ? a.Parts : [];
+
+    private static string? Activity(LiveSession s)
+    {
+        var c = s.Conversation;
+        if (s.Dormant || !c.TurnActive) return null;
+        if (c.PendingPermission is { } p) return $"asking to use {p.Request.ToolName}";
+        var parts = CurrentParts(c);
+        if (parts.OfType<ToolCallPart>().LastOrDefault(t => t.Status == ToolCallStatus.Running && !IsAgentTool(t.ToolName)) is { } tool) return tool.Summary;
+        return parts.LastOrDefault() switch
+        {
+            ThinkingPart => "thinking",
+            TextPart => "writing",
+            ToolCallPart t when IsAgentTool(t.ToolName) && t.Status == ToolCallStatus.Running => "waiting on a subagent",
+            _ => "working",
+        };
+    }
+
+    private static IReadOnlyList<SubagentDto> Subagents(LiveSession s)
+    {
+        if (s.Dormant) return [];
+        var c = s.Conversation;
+        var foreground = CurrentParts(c).OfType<ToolCallPart>()
+            .Where(t => IsAgentTool(t.ToolName) && t.Status == ToolCallStatus.Running && t.BackgroundTaskId is null)
+            .Select(t => new SubagentDto(t.Input?["description"]?.GetValueKind() == System.Text.Json.JsonValueKind.String ? t.Input["description"]!.GetValue<string>() : t.Summary, null));
+        var background = c.BackgroundTasks.Running
+            .Where(t => t.Kind == BackgroundTaskKind.Agent)
+            .Select(t => new SubagentDto(t.Description, t.Progress));
+        return [.. foreground, .. background];
     }
 
     private static SessionStatusDto Status(LiveSession s) =>

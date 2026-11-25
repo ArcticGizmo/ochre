@@ -7,6 +7,8 @@ namespace Ochre.Core.Sessions;
 
 /// <param name="Id">The id the session was launched with; the key the task knows it by.</param>
 /// <param name="ClaudeId">The Claude session to resume: the launch id until a <c>/clear</c> moves it to a new one.</param>
+/// <param name="Model">The model the user picked for it, so a resume keeps it; null is Claude's default.</param>
+/// <param name="Effort">The effort level the user picked; null is Claude's default ("auto").</param>
 public sealed record LedgerEntry(
     string Id,
     string TaskId,
@@ -15,7 +17,9 @@ public sealed record LedgerEntry(
     string? Role,
     string? PermissionMode,
     string ClaudeId,
-    DateTimeOffset StartedAt);
+    DateTimeOffset StartedAt,
+    string? Model = null,
+    string? Effort = null);
 
 /// <summary>
 /// What the host needs to bring a launched session back after a restart that the task file doesn't hold: how it was
@@ -38,6 +42,17 @@ public sealed class SessionLedger(string path)
         lock (_gate)
         {
             Entries()[entry.Id] = entry;
+            Save();
+        }
+    }
+
+    /// <summary>The user picked a model or effort for the session; later resumes launch with them.</summary>
+    public void SetChoices(string id, string? model, string? effort)
+    {
+        lock (_gate)
+        {
+            if (!Entries().TryGetValue(id, out var e) || (e.Model == model && e.Effort == effort)) return;
+            Entries()[id] = e with { Model = model, Effort = effort };
             Save();
         }
     }
@@ -67,7 +82,7 @@ public sealed class SessionLedger(string path)
                 string? S(string key) => TranscriptJson.AsString(node?[key]);
                 if (S("id") is not { Length: > 0 } id || S("task") is not { Length: > 0 } task || S("cwd") is not { Length: > 0 } cwd) continue;
                 var started = DateTimeOffset.TryParse(S("started"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : DateTimeOffset.MinValue;
-                entries[id] = new LedgerEntry(id, task, cwd, S("configDir"), S("role"), S("mode"), S("claudeId") ?? id, started);
+                entries[id] = new LedgerEntry(id, task, cwd, S("configDir"), S("role"), S("mode"), S("claudeId") ?? id, started, S("model"), S("effort"));
             }
         }
         catch (JsonException)
@@ -93,6 +108,8 @@ public sealed class SessionLedger(string path)
             if (e.ConfigDir is not null) o["configDir"] = e.ConfigDir;
             if (e.Role is not null) o["role"] = e.Role;
             if (e.PermissionMode is not null) o["mode"] = e.PermissionMode;
+            if (e.Model is not null) o["model"] = e.Model;
+            if (e.Effort is not null) o["effort"] = e.Effort;
             list.Add((JsonNode)o);
         }
         try

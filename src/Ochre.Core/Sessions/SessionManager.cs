@@ -41,6 +41,12 @@ internal sealed class LiveSession
     /// <summary>The Claude session a resume continues.</summary>
     public string ClaudeId { get; set; }
 
+    /// <summary>The model the user picked; null leaves Claude's default.</summary>
+    public string? Model { get; set; }
+
+    /// <summary>The effort level the user picked; null is "auto".</summary>
+    public string? Effort { get; set; }
+
     /// <summary>No process: it ended, or the host started after it ran. Sending resumes it.</summary>
     public bool Dormant { get; set; }
 
@@ -121,6 +127,8 @@ internal sealed class SessionManager : IDisposable
                 var entry = _ledger.Get(s.Id);
                 var session = Create(s.Id, summary.Id, s.Cwd, s.Role, entry?.PermissionMode, entry?.ClaudeId ?? s.Id, entry?.StartedAt ?? DateTimeOffset.MinValue);
                 session.Dormant = true;
+                session.Model = entry?.Model;
+                session.Effort = entry?.Effort;
                 lock (_gate) _sessions.TryAdd(s.Id, session);
             }
         }
@@ -241,6 +249,39 @@ internal sealed class SessionManager : IDisposable
 
     public void Stop(LiveSession session) => session.Controller.Stop();
 
+    /// <summary>Switches the model now if the agent is running, and for every later resume.</summary>
+    public void SetModel(LiveSession session, string model)
+    {
+        string? effort;
+        lock (session.Gate)
+        {
+            if (session.Model == model) return;
+            session.Model = model;
+            effort = session.Effort;
+            if (!session.Dormant) session.Controller.SetModel(model);
+            session.Conversation.AddNote($"model → {model}");
+            session.HeaderDirty = true;
+        }
+        _ledger.SetChoices(session.Id, model, effort);
+    }
+
+    /// <summary>Sets the effort now if the agent is running, and for every later resume. "auto" clears it.</summary>
+    public void SetEffort(LiveSession session, string level)
+    {
+        var effort = level == "auto" ? null : level;
+        string? model;
+        lock (session.Gate)
+        {
+            if (session.Effort == effort) return;
+            session.Effort = effort;
+            model = session.Model;
+            if (!session.Dormant) session.Controller.SetEffort(level);
+            session.Conversation.AddNote($"effort → {level}");
+            session.HeaderDirty = true;
+        }
+        _ledger.SetChoices(session.Id, model, effort);
+    }
+
     /// <summary>Answers the pending permission, question or plan approval with id <paramref name="requestId"/>.
     /// False when that prompt is no longer pending (answered elsewhere, or the turn moved on).</summary>
     public bool Respond(LiveSession session, string requestId, bool allow, string? switchMode,
@@ -298,6 +339,8 @@ internal sealed class SessionManager : IDisposable
         return new SessionStartOptions(session.Cwd)
         {
             PermissionMode = session.PermissionMode,
+            Model = session.Model,
+            Effort = session.Effort,
             AppendSystemPrompt = note,
             AllowedTools = allowed,
             Environment = env,

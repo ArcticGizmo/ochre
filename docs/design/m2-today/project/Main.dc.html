@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.muted{color:#a39d96}
+.label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#a39d96;width:64px;flex:none;padding-top:5px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.s-backlog{color:#b3ada6;border-color:rgba(179,173,166,.35);background:rgba(179,173,166,.10)}
+.s-active{color:#e8974a;border-color:rgba(232,151,74,.4);background:rgba(232,151,74,.12)}
+.s-parked{color:#8fb3e0;border-color:rgba(143,179,224,.4);background:rgba(143,179,224,.12)}
+.s-done{color:#86b572;border-color:rgba(134,181,114,.4);background:rgba(134,181,114,.12)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.btn{font:inherit;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:5px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:#2e2c2a;color:#e8e4df}
+.btn.primary{background:#cc7722;border-color:#cc7722;color:#1b1a19;font-weight:600}
+.btn.primary:hover{background:#d98530;color:#1b1a19}
+.agent{display:inline-flex;align-items:center;gap:7px;padding:3px 11px;border:1px solid #3a3836;border-radius:999px;color:#e8e4df;text-decoration:none;background:#242322;font-size:13px}
+.agent:hover{border-color:#cc7722;color:#e8e4df}
+.agent .st{font-size:12px;color:#a39d96}
+.a-busy .dot{background:#e8974a}
+.a-idle .dot{background:#86b572}
+.a-waiting{border-color:rgba(217,180,74,.6)}
+.a-waiting .dot{background:#d9b44a}
+.a-waiting .st{color:#d9b44a}
+.a-dormant .dot{background:transparent;border:1.5px solid #a39d96}
+.a-ended{color:#a39d96}
+.a-ended .dot{background:#5c5854}
+.card{background:#242322;border:1px solid #3a3836;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.ttl{font-size:16px;font-weight:600;color:#e8e4df;text-decoration:none}
+.ttl:hover{color:#e8974a}
+.row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.vals{display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:1;min-width:0}
+.box{width:14px;height:14px;border:1.5px solid #7a746e;border-radius:3px;flex:none;display:inline-block;margin-top:3px;box-sizing:border-box}
+.bar-bg{width:64px;height:4px;border-radius:2px;background:#3a3836;display:inline-block;overflow:hidden;vertical-align:middle}
+.bar-fg{height:4px;background:#a39d96;display:block}
+.note{background:#1f1e1d;border:1px solid #33312f;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.lnk{display:inline-flex;gap:6px;align-items:baseline;text-decoration:none;color:#e8e4df;font-size:13px}
+.lnk .k{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#a39d96}
+.lnk:hover{color:#e8974a}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="Main.dc.html" class="nav on" aria-current="page">Today</a>
+      <a href="Tasks.dc.html" class="nav">Tasks</a>
+    </nav>
+    <span style="flex: 1"></span>
+    <span class="muted" style="font-size: 12px">v0.1.0</span>
+  </header>
+
+  <main style="max-width: 880px; margin: 0 auto; padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 6px">
+      <div style="flex: 1; min-width: 240px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 600">Today</h1>
+        <div class="muted" style="margin-top: 2px">Thursday 26 November</div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+        <span class="pill s-active"><span class="dot"></span>Active 2</span>
+        <span class="pill s-parked"><span class="dot"></span>Parked 2</span>
+        <button class="btn" type="button">New task</button>
+      </div>
+    </div>
+
+    <article class="card">
+      <div class="row" style="align-items: flex-start">
+        <div style="flex: 1; min-width: 0">
+          <a href="Tasks.dc.html" class="ttl">M2 slice 3: Today screen</a>
+          <div class="mono muted" style="margin-top: 2px">T-0012</div>
+        </div>
+        <span class="pill s-active"><span class="dot"></span>Active</span>
+        <span class="muted" style="font-size: 12px; padding-top: 3px">12 min ago</span>
+      </div>
+      <div class="row">
+        <span class="label">Next</span>
+        <div class="vals">
+          <span class="box" aria-hidden="true"></span>
+          <span style="flex: 1; min-width: 200px">Add tasks.today to the bridge contract and regenerate types</span>
+          <span class="muted" style="font-size: 12px">2 / 7</span>
+          <span class="bar-bg" aria-hidden="true"><span class="bar-fg" style="width: 28%"></span></span>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Agents</span>
+        <div class="vals">
+          <a href="Thread.dc.html" class="agent a-busy" title="Open alpha's thread"><span class="dot"></span>alpha<span class="st">working</span></a>
+          <a href="Thread.dc.html" class="agent a-waiting" title="Open beta's thread"><span class="dot"></span>beta<span class="st">needs you</span></a>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Links</span>
+        <div class="vals">
+          <a href="#links" class="lnk"><span class="k">PR</span>#41 Today screen</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="row">
+        <div style="flex: 1; min-width: 0">
+          <a href="Tasks.dc.html" class="ttl">Observed sessions and binding suggestions</a>
+          <div class="mono muted" style="margin-top: 2px">T-0011</div>
+        </div>
+        <span class="pill s-parked"><span class="dot"></span>Parked</span>
+        <span class="muted" style="font-size: 12px; padding-top: 3px">yesterday 18:42</span>
+      </div>
+      <div class="note">
+        <div class="label" style="width: auto; padding: 0">Where you left off</div>
+        <div>Tail reader is in. Start on the sessions list tomorrow; check how slow the scan is with 200 transcripts.</div>
+        <div class="muted"><strong style="color: #e8e4df; font-weight: 600">alpha:</strong> Ported TranscriptTailReader with its tests, all green. Next: list live sessions from the sessions folder in SessionManager and show them under the task list.</div>
+      </div>
+      <div class="row">
+        <span class="label">Next</span>
+        <div class="vals">
+          <span class="box" aria-hidden="true"></span>
+          <span style="flex: 1; min-width: 200px">List live sessions Ochre didn't start</span>
+          <span class="muted" style="font-size: 12px">3 / 8</span>
+          <span class="bar-bg" aria-hidden="true"><span class="bar-fg" style="width: 37%"></span></span>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Agents</span>
+        <div class="vals">
+          <a href="Thread.dc.html" class="agent a-dormant" title="Open alpha's thread, ready to resume"><span class="dot"></span>alpha<span class="st">dormant</span></a>
+        </div>
+        <button class="btn" type="button">Resume task</button>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="row">
+        <div style="flex: 1; min-width: 0">
+          <a href="Tasks.dc.html" class="ttl">Park timeout test is flaky on CI</a>
+          <div class="mono muted" style="margin-top: 2px">T-0010</div>
+        </div>
+        <span class="pill s-active"><span class="dot"></span>Active</span>
+        <span class="muted" style="font-size: 12px; padding-top: 3px">yesterday 16:05</span>
+      </div>
+      <div class="row">
+        <span class="label">Next</span>
+        <div class="vals">
+          <span class="box" aria-hidden="true"></span>
+          <span style="flex: 1; min-width: 200px">Replace the wall-clock wait with a fake time provider</span>
+          <span class="muted" style="font-size: 12px">1 / 3</span>
+          <span class="bar-bg" aria-hidden="true"><span class="bar-fg" style="width: 33%"></span></span>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Agents</span>
+        <div class="vals">
+          <a href="Thread.dc.html" class="agent a-idle" title="Open gamma's thread"><span class="dot"></span>gamma<span class="st">ready</span></a>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Links</span>
+        <div class="vals">
+          <a href="#links" class="lnk"><span class="k">Issue</span>#37 SessionLifecycleTests times out</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="row">
+        <div style="flex: 1; min-width: 0">
+          <a href="Tasks.dc.html" class="ttl">Auto-park on shutdown</a>
+          <div class="mono muted" style="margin-top: 2px">T-0009</div>
+        </div>
+        <span class="pill s-parked"><span class="dot"></span>Parked</span>
+        <span class="muted" style="font-size: 12px; padding-top: 3px">Tue 24 Nov</span>
+      </div>
+      <div class="note">
+        <div class="label" style="width: auto; padding: 0">Where you left off</div>
+        <div class="muted"><strong style="color: #e8e4df; font-weight: 600">alpha:</strong> WM_QUERYENDSESSION handler stamps the ledger. Next: undo the stamp when the heartbeat shows the shutdown was cancelled.</div>
+      </div>
+      <div class="row">
+        <span class="label">Next</span>
+        <div class="vals">
+          <span class="box" aria-hidden="true"></span>
+          <span style="flex: 1; min-width: 200px">Undo the shutdown stamp on a later heartbeat</span>
+          <span class="muted" style="font-size: 12px">2 / 5</span>
+          <span class="bar-bg" aria-hidden="true"><span class="bar-fg" style="width: 40%"></span></span>
+        </div>
+      </div>
+      <div class="row">
+        <span class="label">Agents</span>
+        <div class="vals">
+          <a href="Thread.dc.html" class="agent a-dormant" title="Open alpha's thread, ready to resume"><span class="dot"></span>alpha<span class="st">dormant</span></a>
+          <a href="Thread.dc.html" class="agent a-ended" title="Open beta's transcript (read only)"><span class="dot"></span>beta<span class="st">ended</span></a>
+        </div>
+        <button class="btn" type="button">Resume task</button>
+      </div>
+      <div class="row">
+        <span class="label">Links</span>
+        <div class="vals">
+          <a href="#links" class="lnk"><span class="k">Jira</span>PROJ-142 Graceful shutdown</a>
+        </div>
+      </div>
+    </article>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

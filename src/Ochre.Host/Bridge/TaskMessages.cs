@@ -28,7 +28,10 @@ public sealed record TaskListItem(
     int PlanDone,
     int PlanTotal,
     string? NextStep,
-    string? ParkNote);
+    string? ParkNote,
+    string? ParkedAt,
+    IReadOnlyList<LinkDto> Links,
+    IReadOnlyList<SessionRefDto> Sessions);
 
 public sealed record PlanItemDto(string Id, string Text, bool Done, IReadOnlyList<PlanItemDto> Children);
 

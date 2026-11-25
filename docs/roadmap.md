@@ -35,6 +35,7 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 - ConPTY in the host, xterm.js tabs, restore (tabs, cwd, scrollback, command).
 - Terminals attachable to a task.
 - Escape-sequence gating.
+- To look at (2026-11-25): a "view as terminal" option on an agent's thread, drawing the same conversation in Claude Code's terminal style. A real Claude TUI in a tab can't drive the same session at once, because Ochre holds it over stream-json, so this is a rendering of the thread rather than a second client.
 
 **Exit:** run a dev server in a tab, close all windows, reopen: still running. Quit and relaunch: tabs restored with scrollback.
 
@@ -72,6 +73,7 @@ Until then, don't build anything that assumes a single window: per-window UI sta
 ## M7: widgets and plugins
 
 - Declarative widgets.
+- User-defined status widgets in a pane to the right of an agent's thread (requested 2026-11-25, inspired by Claude mods).
 - Out-of-process plugin host (port from Perch's `pluggability-plan` branch): manifest, consent, Job Object sandbox, sandboxed iframe UI.
 
 ## M8: preview pane
@@ -81,6 +83,7 @@ Until then, don't build anything that assumes a single window: per-window UI sta
 ## Later
 
 - Per-task usage/cost/time.
+- Plan usage (5-hour and weekly limits) in place of the API-equivalent cost, which means little on a Pro or Max plan. Perch reads it from Claude's OAuth usage endpoint (`UsageMonitor`), which needs the user's OAuth token, so it would be opt-in.
 - MCP server mirroring the agent CLI, if a client that can't run a shell needs task access.
 - Other agents behind `AgentAdapter`.
 - macOS head.

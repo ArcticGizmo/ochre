@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>States and status colours</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.muted{color:#a39d96}
+.h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#a39d96;font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.s-backlog{color:#b3ada6;border-color:rgba(179,173,166,.35);background:rgba(179,173,166,.10)}
+.s-active{color:#e8974a;border-color:rgba(232,151,74,.4);background:rgba(232,151,74,.12)}
+.s-parked{color:#8fb3e0;border-color:rgba(143,179,224,.4);background:rgba(143,179,224,.12)}
+.s-done{color:#86b572;border-color:rgba(134,181,114,.4);background:rgba(134,181,114,.12)}
+.opt{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;font-size:13px;font:inherit;background:none;border:none;color:#e8e4df;width:100%;text-align:left;cursor:pointer}
+.opt:hover{background:#2e2c2a}
+.opt .c{flex:1}
+.opt.cur{background:#2e2c2a}
+.agent{display:inline-flex;align-items:center;gap:7px;padding:3px 11px;border:1px solid #3a3836;border-radius:999px;color:#e8e4df;background:#242322;font-size:13px}
+.agent .st{font-size:12px;color:#a39d96}
+.a-busy .dot{background:#e8974a}
+.a-idle .dot{background:#86b572}
+.a-waiting{border-color:rgba(217,180,74,.6)}
+.a-waiting .dot{background:#d9b44a}
+.a-waiting .st{color:#d9b44a}
+.a-dormant .dot{background:transparent;border:1.5px solid #a39d96}
+.a-ended{color:#a39d96}
+.a-ended .dot{background:#5c5854}
+.key{display:grid;grid-template-columns:max-content 1fr;gap:8px 14px;align-items:center;font-size:13px}
+</style>
+</helmet>
+<div style="width: 560px; min-height: 640px; box-sizing: border-box; padding: 28px 32px; background: #1b1a19; color: #e8e4df; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.45; display: flex; flex-direction: column; gap: 26px">
+  <div>
+    <h2 class="h3">Task state: one colour everywhere</h2>
+    <div class="key">
+      <span class="pill s-backlog"><span class="dot"></span>Backlog</span><span class="muted">Warm grey. Not started.</span>
+      <span class="pill s-active"><span class="dot"></span>Active</span><span class="muted">Ochre, the brand accent.</span>
+      <span class="pill s-parked"><span class="dot"></span>Parked</span><span class="muted">Cool blue. Waiting with a note.</span>
+      <span class="pill s-done"><span class="dot"></span>Done</span><span class="muted">Quiet green, darker than Parked.</span>
+    </div>
+  </div>
+
+  <div>
+    <h2 class="h3">Status dropdown, open</h2>
+    <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+      <button class="pill s-parked" type="button" aria-haspopup="listbox" aria-expanded="true" style="font: inherit; font-size: 13px; font-weight: 600; padding: 4px 10px 4px 12px; cursor: pointer"><span class="dot"></span>Parked<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+      <div role="listbox" aria-label="State" style="width: 220px; background: #242322; border: 1px solid #3a3836; border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.4)">
+        <button class="opt" type="button" role="option"><span class="dot" style="color: #b3ada6"></span><span class="c">Backlog</span></button>
+        <button class="opt" type="button" role="option"><span class="dot" style="color: #e8974a"></span><span class="c">Active</span></button>
+        <button class="opt cur" type="button" role="option" aria-selected="true"><span class="dot" style="color: #8fb3e0"></span><span class="c">Parked</span><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.5l2.5 2.5 5.5-6" fill="none" stroke="#a39d96" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+        <div style="height: 1px; background: #3a3836; margin: 4px 6px"></div>
+        <button class="opt" type="button" role="option"><span class="dot" style="color: #86b572"></span><span class="c">Done…</span></button>
+      </div>
+      <div class="muted" style="font-size: 12px; max-width: 420px">Done asks for confirmation (a terminal action). Parked from here opens the Park dialog, so agents still get asked for notes.</div>
+    </div>
+  </div>
+
+  <div>
+    <h2 class="h3">Agent status: running, dormant, ended</h2>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <span class="agent a-busy"><span class="dot"></span>alpha<span class="st">working</span></span>
+      <span class="agent a-idle"><span class="dot"></span>alpha<span class="st">ready</span></span>
+      <span class="agent a-waiting"><span class="dot"></span>alpha<span class="st">needs you</span></span>
+      <span class="agent a-dormant"><span class="dot"></span>alpha<span class="st">dormant</span></span>
+      <span class="agent a-ended"><span class="dot"></span>alpha<span class="st">ended</span></span>
+    </div>
+    <div class="muted" style="font-size: 12px; margin-top: 8px">Host statuses busy / idle / waiting read as working / ready / needs you. A hollow dot means no process; dormant resumes on send, ended opens read-only.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":560,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

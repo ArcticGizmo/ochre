@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { on, request, type SessionSummary } from '../bridge';
 
-/** The host's live sessions, kept current from sessions.update events. */
+/** The host's sessions with their status and current activity, kept current from sessions.update events. */
 export function useSessions(): SessionSummary[] {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
 
@@ -20,9 +20,11 @@ export function useSessions(): SessionSummary[] {
           load();
           return list;
         }
-        if (list[i].status === e.header.status) return list;
+        const h = e.header;
+        const s = list[i];
+        if (s.status === h.status && s.activity === h.activity && JSON.stringify(s.subagents) === JSON.stringify(h.subagents)) return list;
         const next = [...list];
-        next[i] = { ...list[i], status: e.header.status };
+        next[i] = { ...s, status: h.status, activity: h.activity, subagents: h.subagents };
         return next;
       });
     });

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tasks: list and detail</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.muted{color:#a39d96}
+.h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#a39d96;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.mini{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;flex:none}
+.s-backlog{color:#b3ada6;border-color:rgba(179,173,166,.35);background:rgba(179,173,166,.10)}
+.s-active{color:#e8974a;border-color:rgba(232,151,74,.4);background:rgba(232,151,74,.12)}
+.s-parked{color:#8fb3e0;border-color:rgba(143,179,224,.4);background:rgba(143,179,224,.12)}
+.s-done{color:#86b572;border-color:rgba(134,181,114,.4);background:rgba(134,181,114,.12)}
+.mini.s-backlog,.mini.s-active,.mini.s-parked,.mini.s-done{background:none}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.btn{font:inherit;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:5px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:#2e2c2a;color:#e8e4df}
+.btn.primary{background:#cc7722;border-color:#cc7722;color:#1b1a19;font-weight:600}
+.btn.primary:hover{background:#d98530;color:#1b1a19}
+.btn.ghost{background:none;border-color:transparent;color:#a39d96}
+.btn.ghost:hover{color:#e8e4df;background:#242322}
+.field{font:inherit;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:6px 10px;min-width:0}
+.chip{font:inherit;font-size:12px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:999px;padding:2px 10px;cursor:pointer;display:inline-flex;gap:5px}
+.chip .n{color:#a39d96}
+.chip.on{border-color:#cc7722;color:#e8974a}
+.chip.on .n{color:#e8974a}
+.seg{display:inline-flex;border:1px solid #3a3836;border-radius:6px;overflow:hidden;flex:none}
+.seg a{padding:5px 12px;color:#a39d96;text-decoration:none;font-size:13px}
+.seg a.on{background:#2e2c2a;color:#e8e4df}
+.item{display:block;padding:8px 10px;border-radius:8px;text-decoration:none;color:#e8e4df}
+.item:hover{background:#242322;color:#e8e4df}
+.item.sel{background:#2e2c2a}
+.item .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .m{display:flex;gap:8px;font-size:12px;color:#a39d96;margin-top:2px}
+.item .x{font-size:12px;color:#a39d96;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note{background:#242322;border:1px solid #3a3836;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+.plan label{display:inline-flex;gap:9px;align-items:baseline}
+.plan .done span{color:#a39d96;text-decoration:line-through}
+.plan .sub{padding-left:24px}
+.agentrow{display:flex;gap:12px;align-items:center;padding:4px 0;flex-wrap:wrap}
+.agentrow .st{font-size:10px;text-transform:uppercase;letter-spacing:.04em;min-width:80px;display:inline-flex;gap:6px;align-items:center}
+.a-busy{color:#e8974a}
+.a-idle{color:#86b572}
+.a-waiting{color:#d9b44a}
+.a-dormant{color:#a39d96}
+.a-dormant .dot{background:transparent;border:1.5px solid #a39d96}
+.a-ended{color:#7a746e}
+section{margin:22px 0 0}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="Main.dc.html" class="nav">Today</a>
+      <a href="Tasks.dc.html" class="nav on" aria-current="page">Tasks</a>
+    </nav>
+    <span style="flex: 1"></span>
+    <span class="muted" style="font-size: 12px">v0.1.0</span>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; flex: 1; min-height: 0">
+    <aside style="flex: 1 1 300px; max-width: 340px; border-right: 1px solid #3a3836; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; gap: 8px">
+        <button class="btn primary" type="button" style="flex: 1; justify-content: center">New task</button>
+        <div class="seg" role="group" aria-label="View">
+          <a href="Tasks.dc.html" class="on" aria-current="page">List</a>
+          <a href="Board.dc.html">Board</a>
+        </div>
+      </div>
+      <input class="field" type="search" placeholder="Search tasks" aria-label="Search tasks">
+      <div style="display: flex; flex-wrap: wrap; gap: 4px" role="group" aria-label="Filter">
+        <button class="chip on" type="button">Open <span class="n">6</span></button>
+        <button class="chip" type="button">Active <span class="n">2</span></button>
+        <button class="chip" type="button">Parked <span class="n">2</span></button>
+        <button class="chip" type="button">Backlog <span class="n">2</span></button>
+        <button class="chip" type="button">Done <span class="n">5</span></button>
+      </div>
+      <nav style="display: flex; flex-direction: column; gap: 2px" aria-label="Tasks">
+        <a href="Tasks.dc.html" class="item">
+          <div style="display: flex; gap: 8px; align-items: baseline"><span class="mini s-active"><span class="dot"></span>Active</span><span class="t">M2 slice 3: Today screen</span></div>
+          <div class="m"><span>T-0012</span><span>2/7</span><span>12 min ago</span></div>
+          <div class="x">Next: Add tasks.today to the bridge contract</div>
+        </a>
+        <a href="Tasks.dc.html" class="item">
+          <div style="display: flex; gap: 8px; align-items: baseline"><span class="mini s-active"><span class="dot"></span>Active</span><span class="t">Park timeout test is flaky on CI</span></div>
+          <div class="m"><span>T-0010</span><span>1/3</span><span>yesterday</span></div>
+          <div class="x">Next: Replace the wall-clock wait with a fake time provider</div>
+        </a>
+        <a href="Tasks.dc.html" class="item sel" aria-current="true">
+          <div style="display: flex; gap: 8px; align-items: baseline"><span class="mini s-parked"><span class="dot"></span>Parked</span><span class="t">Observed sessions and binding suggestions</span></div>
+          <div class="m"><span>T-0011</span><span>3/8</span><span>yesterday</span></div>
+          <div class="x">Tail reader is in. Start on the sessions list tomorrow</div>
+        </a>
+        <a href="Tasks.dc.html" class="item">
+          <div style="display: flex; gap: 8px; align-items: baseline"><span class="mini s-parked"><span class="dot"></span>Parked</span><span class="t">Auto-park on shutdown</span></div>
+          <div class="m"><span>T-0009</span><span>2/5</span><span>Tue</span></div>
+          <div class="x">alpha: WM_QUERYENDSESSION handler stamps the ledger</div>
+        </a>
+        <a href="Tasks.dc.html" class="item">
+          <div style="display: flex; gap: 8px; align-items: baseline"><span class="mini s-backlog"><span class="dot"></span>Backlog</span><span class="t">Terminal tabs with ConPTY</span></div>
+          <div class="m"><span>T-0013</span><span>0/4</span><span>Tue</span></div>
+          <div class="x">Next: Port the spike's PTY host</div>
+        </a>
+        <a href="Tasks.dc.html" class="item">
+          <div style="display: flex; gap: 8px; align-items: baseline"><span class="mini s-backlog"><span class="dot"></span>Backlog</span><span class="t">Git module: branch and worktree state</span></div>
+          <div class="m"><span>T-0014</span><span>Mon</span></div>
+        </a>
+      </nav>
+    </aside>
+
+    <main style="flex: 999 1 560px; min-width: 0; padding: 24px 24px 56px">
+      <article style="max-width: 820px; margin: 0 auto">
+        <header style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap">
+          <div style="flex: 1; min-width: 260px">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 600; line-height: 1.3">Observed sessions and binding suggestions</h1>
+            <div class="mono muted" style="margin-top: 4px">T-0011 <span style="font-family: 'Segoe UI', system-ui, sans-serif">· created Fri 21 Nov · updated yesterday 18:42</span></div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <button class="pill s-parked" type="button" aria-haspopup="listbox" aria-label="State: Parked" style="font: inherit; font-size: 13px; font-weight: 600; padding: 4px 10px 4px 12px; cursor: pointer"><span class="dot"></span>Parked<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button class="btn primary" type="button">Resume</button>
+            <button class="btn ghost" type="button" aria-label="More actions" style="padding: 5px 8px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"></circle><circle cx="8" cy="8" r="1.3" fill="currentColor"></circle><circle cx="12.5" cy="8" r="1.3" fill="currentColor"></circle></svg></button>
+          </div>
+        </header>
+
+        <section class="note" style="margin-top: 18px">
+          <div class="h3" style="margin: 0">Where you left off <span style="text-transform: none; letter-spacing: 0; font-weight: 400">· parked yesterday 18:42</span></div>
+          <div>Tail reader is in. Start on the sessions list tomorrow; check how slow the scan is with 200 transcripts.</div>
+          <div class="muted"><strong style="color: #e8e4df; font-weight: 600">alpha:</strong> Ported TranscriptTailReader with its tests, all green. Next: list live sessions from the sessions folder in SessionManager and show them under the task list.</div>
+        </section>
+
+        <section>
+          <h2 class="h3">Plan <span style="text-transform: none; letter-spacing: 0; font-weight: 400">3 / 8</span></h2>
+          <ul class="plan">
+            <li><label class="done"><input type="checkbox" defaultChecked="{{ yes }}"><span>Port TranscriptTailReader with tests</span></label></li>
+            <li><label class="done"><input type="checkbox" defaultChecked="{{ yes }}"><span>Read ~/.claude/sessions/*.json for live sessions</span></label></li>
+            <li><label class="done"><input type="checkbox" defaultChecked="{{ yes }}"><span>Accept ADR 0006</span></label></li>
+            <li><label><input type="checkbox"><span>List live sessions Ochre didn't start</span></label>
+              <ul class="plan sub">
+                <li><label><input type="checkbox"><span>Read-only thread by tailing</span></label></li>
+              </ul>
+            </li>
+            <li><label><input type="checkbox"><span>Suggest a binding from the cwd</span></label></li>
+            <li><label><input type="checkbox"><span>Suggest a binding from a Jira key in the branch</span></label></li>
+            <li><label><input type="checkbox"><span>One click binds (binding: confirmed)</span></label></li>
+          </ul>
+          <input class="field" type="text" placeholder="Add a step" aria-label="Add a step" style="margin-top: 8px; width: 100%; max-width: 480px">
+        </section>
+
+        <section>
+          <h2 class="h3">Notes</h2>
+          <p style="margin: 0 0 6px">Observed sessions stay read-only in M2: they have no <code class="mono">OCHRE_SESSION</code>, so only launched agents write to tasks.</p>
+          <button class="btn ghost" type="button" style="padding: 2px 4px">Edit notes</button>
+        </section>
+
+        <section>
+          <h2 class="h3">Repos</h2>
+          <div style="display: flex; gap: 10px; align-items: center"><span class="mono" title="C:\src\ochre">C:\src\ochre</span><button class="btn ghost" type="button" style="padding: 2px 4px">Remove</button></div>
+        </section>
+
+        <section>
+          <h2 class="h3">Agents</h2>
+          <div class="agentrow">
+            <span class="st a-dormant"><span class="dot"></span>dormant</span>
+            <span style="font-weight: 600">alpha</span>
+            <span class="mono muted" title="C:\src\ochre">ochre</span>
+            <span class="mono muted">5e8c2a0c</span>
+            <a href="Thread.dc.html">Open</a>
+          </div>
+          <button class="btn" type="button" style="margin-top: 8px">Start agent</button>
+        </section>
+
+        <section>
+          <h2 class="h3">Links</h2>
+          <span class="muted">None yet.</span>
+        </section>
+
+        <section>
+          <details>
+            <summary class="muted" style="cursor: pointer">Log (14)</summary>
+          </details>
+        </section>
+      </article>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { yes: true };
+  }
+}
+</script>
+</body>
+</html>

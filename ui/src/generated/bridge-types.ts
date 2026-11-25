@@ -128,10 +128,13 @@ export interface SessionHeader {
   role: string | null;
   status: SessionStatusDto;
   model: string;
+  effort: string;
   permissionMode: string;
   costUsd: number;
   contextTokens: number;
   queuedPrompts: number;
+  activity: string | null;
+  subagents: SubagentDto[];
 }
 
 export interface SessionIdRequest {
@@ -168,6 +171,8 @@ export interface SessionSummary {
   role: string | null;
   status: SessionStatusDto;
   startedAt: string;
+  activity: string | null;
+  subagents: SubagentDto[];
 }
 
 export interface SessionUpdateEvent {
@@ -176,6 +181,16 @@ export interface SessionUpdateEvent {
   header: SessionHeader;
   turnActive: boolean;
   items: SessionItemDto[];
+}
+
+export interface SetEffortRequest {
+  id: string;
+  effort: string;
+}
+
+export interface SetModelRequest {
+  id: string;
+  model: string;
 }
 
 export interface SetStateRequest {
@@ -195,6 +210,11 @@ export interface StartSessionRequest {
 export interface StartSessionResult {
   sessionId: string | null;
   needsTrust: boolean;
+}
+
+export interface SubagentDto {
+  description: string;
+  progress: string | null;
 }
 
 export interface TaskChangedEvent {
@@ -233,6 +253,9 @@ export interface TaskListItem {
   planTotal: number;
   nextStep: string | null;
   parkNote: string | null;
+  parkedAt: string | null;
+  links: LinkDto[];
+  sessions: SessionRefDto[];
 }
 
 export interface UpdateTaskRequest {
@@ -262,6 +285,8 @@ export interface Requests {
   'sessions.interrupt': { req: SessionIdRequest; res: Ack };
   'sessions.stop': { req: SessionIdRequest; res: Ack };
   'sessions.respond': { req: RespondRequest; res: Ack };
+  'sessions.setModel': { req: SetModelRequest; res: Ack };
+  'sessions.setEffort': { req: SetEffortRequest; res: Ack };
 }
 
 export interface Events {

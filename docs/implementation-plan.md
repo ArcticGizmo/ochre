@@ -106,7 +106,7 @@ Exit (from the roadmap): create a task, launch two agents on it, both tick plan 
 
 ### UI design pass (after slice 5)
 
-The rest of the conventions (filter counts, search, a board view, ID under the title, a coloured status dropdown, centred content) are applied in one pass from a design artefact agreed first. It comes after the thread view so the artefact covers the task list, task detail and session thread together.
+The rest of the conventions (filter counts, search, a board view, ID under the title, a coloured status dropdown, centred content) are applied in one pass from a design artefact agreed first. It comes after the thread view so the artefact covers the task list, task detail and session thread together. Done with M2 slice 3.
 - Edits from the UI go through the store like any other writer, with author `user`.
 
 ### Slice 4: controlled sessions (host side)
@@ -177,6 +177,7 @@ Planned 2026-11-25 from a survey of Perch main at `9275e0b`. Findings that shape
 
 - A new screen: every Active and Parked task with title, park note, next unchecked step, agents (running / dormant / ended), links; sorted by last activity. One click on an agent opens its thread ready to resume. Git and worktree state wait for the git module (M4).
 - Larger visual change, so it starts from a design artefact. Fold in the pending M1 "UI design pass" (filter counts, search, board view, ID under the title, coloured status dropdown, centred content) so one artefact covers list, detail, thread and Today.
+- Done 2026-11-25; see `docs/testing/m2-today-testing.md`. Design in `docs/design/m2-today/`. The window opens on Today; Today and Tasks are tabs in the title bar. `TaskListItem` now carries the task's sessions, links and park time, so Today needs no new bridge call. In the status dropdown, Parked opens the Park dialog (so agents still write notes) and Done is confirmed. The board has no drag and drop; state changes go through the dropdown until dogfooding says otherwise. After the first review: Board became a title-bar tab, the thread took Perch's bubble layout, model and effort pickers went into the thread header (kept in the ledger so a resume keeps them), the cost went into a tooltip, and the task list expands to show each task's agents, their current activity and running subagents.
 
 ### Slice 4: observed sessions and binding suggestions
 

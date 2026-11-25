@@ -39,6 +39,9 @@ public sealed record TaskSummary(
     int PlanDone,
     int PlanTotal,
     string? NextStep,
-    string? ParkNote);
+    string? ParkNote,
+    DateTimeOffset? ParkedAt,
+    IReadOnlyList<TaskLink> Links,
+    IReadOnlyList<TaskSessionRef> Sessions);
 
 public sealed class TaskFormatException(string message) : Exception(message);

@@ -3,15 +3,33 @@ import { on, request, type AssistantPartDto, type PermissionDto, type SessionHea
 import { ConfirmDialog } from '../Dialog';
 import { renderMarkdown } from '../markdown';
 import { PathText } from '../PathText';
+import { Menu } from '../Menu';
+import { agentWord, parkNoteLines } from '../tasks/present';
+
+// The latest of each family. The host accepts any model id, so this list is only what's offered.
+const models = [
+  { id: 'claude-fable-5-2', label: 'Fable 5.2' },
+  { id: 'claude-opus-5-5', label: 'Opus 5.5' },
+  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
+  { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
+];
+
+const efforts = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+const modelLabel = (id: string) => models.find((m) => m.id === id)?.label ?? (id || 'Default model');
 
 interface Props {
   id: string;
+  /** Where the back button returns to, e.g. the task id or "Today". */
+  backLabel: string;
+  /** The task's park note; this agent's line from it is shown above the composer while it's dormant. */
+  parkNote: string | null;
   onBack: () => void;
   onError: (message: string) => void;
 }
 
 /** The thread of one controlled session: messages, tool cards, prompts that need an answer, and a composer. */
-export function SessionView({ id, onBack, onError }: Props) {
+export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props) {
   const [header, setHeader] = useState<SessionHeader | null>(null);
   const [items, setItems] = useState<SessionItemDto[]>([]);
   const [turnActive, setTurnActive] = useState(false);
@@ -64,7 +82,7 @@ export function SessionView({ id, onBack, onError }: Props) {
     return (
       <div className="session">
         <button className="link back" onClick={onBack}>
-          ← Back to task
+          ← {backLabel}
         </button>
         <p className="empty">Ochre doesn't know this agent. It may belong to a task that was deleted.</p>
       </div>
@@ -73,16 +91,52 @@ export function SessionView({ id, onBack, onError }: Props) {
   if (!header) return <p className="empty">Loading...</p>;
 
   const dormant = header.status === 'dormant';
+  const ownNote = dormant && parkNote ? parkNoteLines(parkNote).find((l) => l.role !== null && l.role === header.role) : undefined;
 
   return (
     <div className="session">
       <header className="session-header">
         <button className="link back" onClick={onBack}>
-          ← {header.taskId}
+          ← {backLabel}
         </button>
         <span className="session-title">{header.role ?? 'Agent'}</span>
-        <span className={`status status-${header.status}`}>{header.status}</span>
+        <span className={`status status-${header.status}`}>
+          <span className="dot" />
+          {agentWord(header.status)}
+        </span>
         <span className="spacer" />
+        <Menu
+          ariaLabel={`Model: ${modelLabel(header.model)}`}
+          buttonClass="picker"
+          label={
+            <>
+              {modelLabel(header.model)}
+              <span className="chevron" aria-hidden="true" />
+            </>
+          }
+          items={models.map((m) => ({
+            key: m.id,
+            label: <span className="grow">{m.label}</span>,
+            current: m.id === header.model,
+            onSelect: () => request('sessions.setModel', { id, model: m.id }).catch((e: Error) => onError(e.message)),
+          }))}
+        />
+        <Menu
+          ariaLabel={`Effort: ${header.effort}`}
+          buttonClass="picker"
+          label={
+            <>
+              effort {header.effort}
+              <span className="chevron" aria-hidden="true" />
+            </>
+          }
+          items={efforts.map((level) => ({
+            key: level,
+            label: <span className="grow">{level}</span>,
+            current: level === header.effort,
+            onSelect: () => request('sessions.setEffort', { id, effort: level }).catch((e: Error) => onError(e.message)),
+          }))}
+        />
         {!dormant && turnActive && <button onClick={() => request('sessions.interrupt', { id }).catch((e: Error) => onError(e.message))}>Interrupt</button>}
         {!dormant && (
           <button className="link danger" onClick={() => setConfirmStop(true)}>
@@ -92,10 +146,12 @@ export function SessionView({ id, onBack, onError }: Props) {
       </header>
       <div className="session-meta">
         <PathText path={header.cwd} />
-        {header.model && <span>{header.model}</span>}
-        <span>{header.permissionMode}</span>
-        {header.costUsd > 0 && <span>${header.costUsd.toFixed(2)}</span>}
-        {header.contextTokens > 0 && <span>{Math.round(header.contextTokens / 1000)}k context</span>}
+        <span>{header.permissionMode} mode</span>
+        {header.contextTokens > 0 && (
+          <span title={header.costUsd > 0 ? `≈ $${header.costUsd.toFixed(2)} at API prices. On a Pro or Max plan nothing is billed per token.` : undefined}>
+            {Math.round(header.contextTokens / 1000)}k context
+          </span>
+        )}
         <code title={header.id}>{header.id.slice(0, 8)}</code>
       </div>
 
@@ -111,10 +167,15 @@ export function SessionView({ id, onBack, onError }: Props) {
         {items.map((item) => (
           <Item key={item.index} sessionId={id} item={item} onError={onError} />
         ))}
-        {turnActive && <p className="working">working...</p>}
+        {turnActive && <div className="msg assistant working">working…</div>}
       </div>
 
-      <Composer sessionId={id} queued={header.queuedPrompts} dormant={dormant} onError={onError} />
+      {ownNote && (
+        <p className="own-note muted">
+          <strong className="who">{ownNote.role}'s park note:</strong> {ownNote.text}
+        </p>
+      )}
+      <Composer sessionId={id} queued={header.queuedPrompts} dormant={dormant} autoFocus={dormant || header.status === 'idle'} onError={onError} />
 
       <ConfirmDialog
         open={confirmStop}
@@ -314,7 +375,7 @@ function Permission({ sessionId, p, onError }: { sessionId: string; p: Permissio
   );
 }
 
-function Composer({ sessionId, queued, dormant, onError }: { sessionId: string; queued: number; dormant: boolean; onError: (m: string) => void }) {
+function Composer({ sessionId, queued, dormant, autoFocus, onError }: { sessionId: string; queued: number; dormant: boolean; autoFocus: boolean; onError: (m: string) => void }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -336,6 +397,8 @@ function Composer({ sessionId, queued, dormant, onError }: { sessionId: string; 
     <div className="composer">
       <textarea
         rows={3}
+        autoFocus={autoFocus}
+        aria-label="Message the agent"
         value={text}
         placeholder={dormant ? 'This agent is dormant. Sending resumes it with its conversation.' : 'Message the agent. Enter sends, Shift+Enter adds a line.'}
         onChange={(e) => setText(e.target.value)}

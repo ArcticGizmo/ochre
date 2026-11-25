@@ -1,12 +1,12 @@
 # Reuse from Perch
 
-Nidus copies code from Perch where it helps ([ADR 0003](decisions/0003-separate-repo-copy-and-own.md)). Copied code is owned here and may diverge. When copying, note the source path and Perch commit in the commit message so fixes can be compared later.
+Ochre copies code from Perch where it helps ([ADR 0003](decisions/0003-separate-repo-copy-and-own.md)). Copied code is owned here and may diverge. When copying, note the source path and Perch commit in the commit message so fixes can be compared later.
 
 Reference point: Perch `main` at `9275e0b` (2026-11-25). Paths are relative to the Perch repo.
 
 ## Strong candidates (UI-free logic in `src/Perch.Core`)
 
-| Area | Perch source | Use in Nidus |
+| Area | Perch source | Use in Ochre |
 |---|---|---|
 | Controlled sessions | `Data/Control/ClaudeSessionController.cs`, `StreamJsonParser.cs`, `ControlProtocol.cs`, `SessionEvents.cs`, `SessionConversation.cs`, `ControlledSessions.cs` | Launch and drive Claude Code over stream-json (M1) |
 | Interaction inputs | `Data/Control/AskUserQuestionInput.cs`, `PlanApprovalInput.cs`, `SessionAttention.cs` | Question and plan cards, attention states |

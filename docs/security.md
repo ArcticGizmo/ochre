@@ -1,6 +1,6 @@
 # Security
 
-Nidus runs agents that can execute anything, holds Jira/GitHub tokens, persists terminal scrollback and transcripts, renders untrusted text (agent output, Jira tickets, web pages) and will host third-party code. Most of the risk comes from what the app *does*, not the stack.
+Ochre runs agents that can execute anything, holds Jira/GitHub tokens, persists terminal scrollback and transcripts, renders untrusted text (agent output, Jira tickets, web pages) and will host third-party code. Most of the risk comes from what the app *does*, not the stack.
 
 ## Assets
 

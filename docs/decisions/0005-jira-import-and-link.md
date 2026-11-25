@@ -9,7 +9,7 @@ Tasks often relate to several Jira issues, plus PRs, Confluence pages and docs. 
 
 ## Decision
 
-Jira issues are imported (to create a task) or linked (to an existing task). A task can reference any number of links of any kind. Status changes are pushed to Jira only on an explicit action. Each link kind has a `LinkResolver` that gives agents a title and summary up front and full detail on demand (`nidus task fetch`).
+Jira issues are imported (to create a task) or linked (to an existing task). A task can reference any number of links of any kind. Status changes are pushed to Jira only on an explicit action. Each link kind has a `LinkResolver` that gives agents a title and summary up front and full detail on demand (`ochre task fetch`).
 
 ## Consequences
 

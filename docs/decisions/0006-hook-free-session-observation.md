@@ -5,11 +5,11 @@
 
 ## Context
 
-Perch observes sessions partly through `perch-hook`, which also launches the `perch` tray by process name. Perch has since moved most signals to Claude-native sources (session files, transcripts, `history.jsonl`). Nidus must work whether or not Perch is installed.
+Perch observes sessions partly through `perch-hook`, which also launches the `perch` tray by process name. Perch has since moved most signals to Claude-native sources (session files, transcripts, `history.jsonl`). Ochre must work whether or not Perch is installed.
 
 ## Decision
 
-Nidus observes externally started sessions using Claude's own files only: `~/.claude/sessions/{pid}.json`, transcripts under `~/.claude/projects/`, and `history.jsonl` (for each configured config dir). Controlled sessions are observed directly through stream-json. A Nidus hook binary is added only if a concrete gap appears, and it must never launch or depend on Perch.
+Ochre observes externally started sessions using Claude's own files only: `~/.claude/sessions/{pid}.json`, transcripts under `~/.claude/projects/`, and `history.jsonl` (for each configured config dir). Controlled sessions are observed directly through stream-json. A Ochre hook binary is added only if a concrete gap appears, and it must never launch or depend on Perch.
 
 ## Consequences
 

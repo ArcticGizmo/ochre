@@ -1,14 +1,14 @@
-# Nidus
+# Ochre
 
-*nidus (Latin): a nest; the place where something develops.*
+*ochre: an earth pigment, among the oldest colours people have used.*
 
-Nidus is a task-first **agent development environment** (ADE) for Claude Code. It is a command center where the durable unit of work is the **task**, not the agent session. Sessions, worktrees, terminals, PRs and Jira issues attach to a task, come and go, and the task remembers where you got to.
+Ochre is a task-first **agent development environment** (ADE) for Claude Code. It is a command center where the durable unit of work is the **task**, not the agent session. Sessions, worktrees, terminals, PRs and Jira issues attach to a task, come and go, and the task remembers where you got to.
 
 > **Status:** pre-code. This repo holds the vision, architecture, decisions and roadmap. The first code is the stack spike (M0) in [docs/spike-stack.md](docs/spike-stack.md).
 
 ## Why
 
-Claude sessions end up being the to-do list, and that list disappears every time they restart. At the end of a day the agents reach a sensible stopping point, and the next morning there is no record of where to start. Nidus fixes that by making tasks outlive sessions, and by having agents leave a "state + next step" note when a task is parked.
+Claude sessions end up being the to-do list, and that list disappears every time they restart. At the end of a day the agents reach a sensible stopping point, and the next morning there is no record of where to start. Ochre fixes that by making tasks outlive sessions, and by having agents leave a "state + next step" note when a task is parked.
 
 ## Principles
 
@@ -30,7 +30,7 @@ Claude sessions end up being the to-do list, and that list disappears every time
 | [docs/roadmap.md](docs/roadmap.md) | Milestones M0 onwards with exit criteria |
 | [docs/spike-stack.md](docs/spike-stack.md) | M0: the stack spike that settles the UI technology |
 | [docs/reuse-from-perch.md](docs/reuse-from-perch.md) | What to copy from Perch and where it lives |
-| [docs/landscape.md](docs/landscape.md) | Other ADEs as of Nov 2026 and where Nidus differs |
+| [docs/landscape.md](docs/landscape.md) | Other ADEs as of Nov 2026 and where Ochre differs |
 | [docs/decisions/](docs/decisions/) | Architecture decision records |
 
 ## Getting started
@@ -46,4 +46,4 @@ Start with [docs/roadmap.md](docs/roadmap.md), then the spike plan.
 
 ## Related tools
 
-Nidus is designed to compose with, never require: **Perch** (tray watcher for Claude Code sessions, and the source of much reusable code), **sprig** (worktree slots with isolated ports and env), **Hypertree** (spatial compartmentalisation) and **flamingle** (terminal layouts).
+Ochre is designed to compose with, never require: **Perch** (tray watcher for Claude Code sessions, and the source of much reusable code), **sprig** (worktree slots with isolated ports and env), **Hypertree** (spatial compartmentalisation) and **flamingle** (terminal layouts).

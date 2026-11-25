@@ -13,9 +13,9 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 - Solution skeleton: host (tray, single-instance), web UI, CLI shim, Core library, tests.
 - Task store (format in [task-model.md](task-model.md)), atomic writes, watcher, log.
 - Task list + task detail window.
-- Start a controlled Claude session **from a task** (port Perch's `ClaudeSessionController` + stream-json parser), with `NIDUS_TASK` binding.
+- Start a controlled Claude session **from a task** (port Perch's `ClaudeSessionController` + stream-json parser), with `OCHRE_TASK` binding.
 - Session thread view for controlled sessions.
-- `nidus task show/check/add-step/note` over a named pipe.
+- `ochre task show/check/add-step/note` over a named pipe.
 
 **Exit:** create a task, launch two agents on it, both tick plan items, quit and relaunch, and the task is intact.
 

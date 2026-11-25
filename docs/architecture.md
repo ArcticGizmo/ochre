@@ -5,7 +5,7 @@ Status: proposed. The UI technology is settled by the M0 spike ([spike-stack.md]
 ## Overview
 
 ```
-┌────────────────────────── nidus (tray / host process, .NET 10) ──────────────────────────┐
+┌────────────────────────── ochre (tray / host process, .NET 10) ──────────────────────────┐
 │                                                                                          │
 │  Kernel                                  Modules (each can be turned off)                │
 │  ├─ Task store (markdown files)          ├─ Git graph / worktrees                        │
@@ -21,7 +21,7 @@ Status: proposed. The UI technology is settled by the M0 spike ([spike-stack.md]
 └───────────────▲───────────────────────────────────────▲──────────────────────────────────┘
                 │ typed bridge (validated on host)        │ named pipe (ACL'd)
       ┌─────────┴──────────┐                    ┌─────────┴──────────┐
-      │ Windows (WebView)  │  × N, any monitor  │ nidus CLI / MCP    │ ← used by agents
+      │ Windows (WebView)  │  × N, any monitor  │ ochre CLI / MCP    │ ← used by agents
       │ web UI: tasks,     │                    │ (NativeAOT shim)   │
       │ Monaco, xterm.js   │                    └────────────────────┘
       └────────────────────┘
@@ -29,10 +29,10 @@ Status: proposed. The UI technology is settled by the M0 spike ([spike-stack.md]
 
 ## Process model
 
-- **One host process** (`nidus`), single-instance, with a tray icon. It owns everything stateful: the task store, controlled Claude sessions, terminal PTYs, module services, file watchers.
+- **One host process** (`ochre`), single-instance, with a tray icon. It owns everything stateful: the task store, controlled Claude sessions, terminal PTYs, module services, file watchers.
 - **Windows are views.** Closing every window leaves agents and terminals running; they only stop when the app exits. That gives terminal persistence across window closes for free.
 - The host keeps its services behind an in-process service boundary so it *could* split into a separate process later (crash isolation). Don't split until there's a reason.
-- **CLI/MCP shim** (`nidus.com` / `nidus` NativeAOT, the Perch `perch.com` pattern) talks to the host over a named pipe. Agents use it to read and update their task.
+- **CLI/MCP shim** (`ochre.com` / `ochre` NativeAOT, the Perch `perch.com` pattern) talks to the host over a named pipe. Agents use it to read and update their task.
 
 ## Kernel
 
@@ -41,16 +41,16 @@ The kernel must work with **zero modules enabled**: plain repos, no worktrees, n
 | Part | Responsibility |
 |---|---|
 | Task store | Markdown + frontmatter files under the app data dir; single writer (the host); file watcher picks up external edits. See [task-model.md](task-model.md). |
-| Session registry | Every Claude Code session Nidus knows about: **controlled** (launched by Nidus over stream-json, fully interactive) or **observed** (read from `~/.claude/sessions/*.json` + transcripts, read-only). Bindings to tasks. Dormant sessions (resume on first send). |
+| Session registry | Every Claude Code session Ochre knows about: **controlled** (launched by Ochre over stream-json, fully interactive) or **observed** (read from `~/.claude/sessions/*.json` + transcripts, read-only). Bindings to tasks. Dormant sessions (resume on first send). |
 | Workspace | Known repos, plus the active **WorktreeProvider**: `none` (just a cwd), `git-worktree`, or `sprig` (module). |
 | Event bus | Session state changes, task changes, git changes, module events. |
 | Module host | Loads modules, resolves their contributions, enforces on/off. |
 | Window/layout manager | N top-level windows, each a saved layout of panels, with per-monitor placement (corner-relative, as Perch's `PlacementMath`). |
-| Agent surface | `nidus task …` CLI and an MCP server exposing the same operations. |
+| Agent surface | `ochre task …` CLI and an MCP server exposing the same operations. |
 
 ### Observing sessions without a hook
 
-Nidus starts **hook-free** ([ADR 0006](decisions/0006-hook-free-session-observation.md)): it reads Claude's own files (`sessions/{pid}.json`, transcripts, `history.jsonl`) as Perch does after its hook slimming. A Nidus hook binary is added only if a real gap appears. Perch's hook launches a process named `perch`, so Nidus must never depend on it.
+Ochre starts **hook-free** ([ADR 0006](decisions/0006-hook-free-session-observation.md)): it reads Claude's own files (`sessions/{pid}.json`, transcripts, `history.jsonl`) as Perch does after its hook slimming. A Ochre hook binary is added only if a real gap appears. Perch's hook launches a process named `perch`, so Ochre must never depend on it.
 
 ## Modules and extension points
 
@@ -61,7 +61,7 @@ First-party features are modules built against the same contracts as plugins. Tu
 | `TaskSource` | Import items as tasks or links | Jira; later GitHub Issues, Linear |
 | `LinkResolver` | Turn a link into a title, summary and on-demand detail for agents | Jira, GitHub PR, URL, file |
 | `WorktreeProvider` | Create/list/remove isolated checkouts | git worktree, sprig |
-| `SessionLauncher` | Start an agent or process | Nidus-controlled Claude, terminal tab, Windows Terminal, flamingle layout |
+| `SessionLauncher` | Start an agent or process | Ochre-controlled Claude, terminal tab, Windows Terminal, flamingle layout |
 | `AgentAdapter` | Launch/observe a kind of agent | Claude Code only for now ([ADR 0004](decisions/0004-claude-code-only.md)) |
 | `Panel` | A view inside a window | git graph, Roost grid, sprig logs, usage, Hypertree map |
 | `TaskAction` | A command on a task | Implement with agent, Park, Open PR, Transition in Jira |
@@ -103,17 +103,17 @@ An embedded WebView in a **separate profile with no bridge**, scoped to previews
 
 | Data | Windows | macOS |
 |---|---|---|
-| Tasks | `%APPDATA%\Nidus\tasks\` | `~/Library/Application Support/Nidus/tasks/` |
-| Settings | `%APPDATA%\Nidus\settings.json` | `…/Nidus/settings.json` |
-| Terminal state | `%LOCALAPPDATA%\Nidus\terminals\` (encrypted scrollback) | `~/Library/Caches/Nidus/terminals/` |
+| Tasks | `%APPDATA%\Ochre\tasks\` | `~/Library/Application Support/Ochre/tasks/` |
+| Settings | `%APPDATA%\Ochre\settings.json` | `…/Ochre/settings.json` |
+| Terminal state | `%LOCALAPPDATA%\Ochre\terminals\` (encrypted scrollback) | `~/Library/Caches/Ochre/terminals/` |
 | Secrets | Credential Manager (DPAPI) | Keychain |
-| Logs | `%LOCALAPPDATA%\Nidus\logs\` | `~/Library/Logs/Nidus/` |
+| Logs | `%LOCALAPPDATA%\Ochre\logs\` | `~/Library/Logs/Ochre/` |
 
 ## Glossary
 
 - **Task**: the durable unit of work; a markdown file with a plan, links and history.
-- **Controlled session**: a Claude Code session Nidus launched over stream-json; interactive.
-- **Observed session**: a session started elsewhere; read-only in Nidus.
+- **Controlled session**: a Claude Code session Ochre launched over stream-json; interactive.
+- **Observed session**: a session started elsewhere; read-only in Ochre.
 - **Dormant session**: a session shown with its conversation but not running; it resumes when you send something.
 - **Binding**: the link between a session and a task.
 - **Park**: pause a task, collecting a "state + next step" note from its agents.

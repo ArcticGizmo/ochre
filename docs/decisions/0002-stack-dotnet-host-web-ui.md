@@ -5,7 +5,7 @@
 
 ## Context
 
-Nidus needs an editor, a terminal, user widgets, plugins and a preview pane. On the web these are mature libraries (Monaco, xterm.js, sandboxed iframes); natively in Avalonia they are either immature (terminal controls at 0.x) or impossible to sandbox (in-process plugins). Agents also write React/TypeScript more reliably than owner-drawn Avalonia. On the other hand, Perch's large, tested C# logic (session control, transcripts, git, recovery) is worth reusing, and that logic is UI-free.
+Ochre needs an editor, a terminal, user widgets, plugins and a preview pane. On the web these are mature libraries (Monaco, xterm.js, sandboxed iframes); natively in Avalonia they are either immature (terminal controls at 0.x) or impossible to sandbox (in-process plugins). Agents also write React/TypeScript more reliably than owner-drawn Avalonia. On the other hand, Perch's large, tested C# logic (session control, transcripts, git, recovery) is worth reusing, and that logic is UI-free.
 
 Options considered:
 

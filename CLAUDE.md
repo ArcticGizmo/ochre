@@ -1,4 +1,4 @@
-# Nidus
+# Ochre
 
 A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray host plus a web UI in a system WebView (proposed; see `docs/decisions/0002-stack-dotnet-host-web-ui.md`). The durable unit of work is the **task**; sessions, worktrees, terminals and links attach to it.
 
@@ -6,13 +6,13 @@ A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray
 
 ## Layout (planned, settled after M0)
 
-- `src/Nidus.Core/`: UI-free core (task store, session registry, transcript parsing, git, module contracts). Plain `net10.0`.
-- `src/Nidus.Host/`: the tray host process (`nidus`), WebView shell, bridge, module host, PTYs.
-- `src/Nidus.Cli/`: NativeAOT CLI/MCP shim that talks to the host over a named pipe.
-- `src/Nidus.Platform.Windows/` (later `.Mac/`): OS implementations of Core interfaces.
+- `src/Ochre.Core/`: UI-free core (task store, session registry, transcript parsing, git, module contracts). Plain `net10.0`.
+- `src/Ochre.Host/`: the tray host process (`ochre`), WebView shell, bridge, module host, PTYs.
+- `src/Ochre.Cli/`: NativeAOT CLI/MCP shim that talks to the host over a named pipe.
+- `src/Ochre.Platform.Windows/` (later `.Mac/`): OS implementations of Core interfaces.
 - `ui/`: TypeScript + React + Vite web UI (Monaco, xterm.js).
 - `modules/`: first-party modules (git, jira, sprig, terminal, …).
-- `tests/Nidus.Tests/`: xUnit over Core, with fixtures.
+- `tests/Ochre.Tests/`: xUnit over Core, with fixtures.
 - `spikes/`: throwaway experiments; never referenced by `src/`.
 - `docs/`: vision, architecture, decisions (ADRs), roadmap, testing docs.
 

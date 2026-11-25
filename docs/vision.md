@@ -8,7 +8,7 @@ One test for every feature: *does it help me know where to start tomorrow, and g
 
 ## Lesson from Perch
 
-Perch shipped "work items" (grouping sessions into named pieces of work) and removed them because nobody used them. Grouping after the fact is homework. In Nidus the task is the **entry point**: agents are launched from it, it holds the plan, and the agents write to it. If a task isn't load-bearing, it won't be used.
+Perch shipped "work items" (grouping sessions into named pieces of work) and removed them because nobody used them. Grouping after the fact is homework. In Ochre the task is the **entry point**: agents are launched from it, it holds the plan, and the agents write to it. If a task isn't load-bearing, it won't be used.
 
 ## Requirements
 
@@ -49,4 +49,4 @@ Perch shipped "work items" (grouping sessions into named pieces of work) and rem
 - A general-purpose browser (tabs, extensions, passwords). Links open in the real browser; middle click opens a new browser window.
 - Two-way Jira sync.
 - Requiring sprig, Hypertree, flamingle, Perch or any particular workflow.
-- Cloud-hosted agents. Nidus drives local Claude Code.
+- Cloud-hosted agents. Ochre drives local Claude Code.

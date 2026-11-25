@@ -1,6 +1,6 @@
 # Landscape (Nov 2026)
 
-Other agent development environments and where Nidus differs. Most details come from vendor pages and vendor-written comparisons, so treat feature claims as self-reported. Researched 2026-11-25.
+Other agent development environments and where Ochre differs. Most details come from vendor pages and vendor-written comparisons, so treat feature claims as self-reported. Researched 2026-11-25.
 
 | Tool | Platform | Licence | Task model | Worktrees | Notable |
 |---|---|---|---|---|---|
@@ -23,10 +23,10 @@ Other agent development environments and where Nidus differs. Most details come 
 | Kiro | Win, mac, Linux | Proprietary | Spec → `tasks.md`, agent checks off | — | Hooks |
 | Beads / Gas Town | CLI | OSS | Git-backed issue graph for agents | — | v1.0 Apr 2026 |
 
-## Where Nidus differs
+## Where Ochre differs
 
-- **Tasks outlive sessions and worktrees.** Almost every tool models task = worktree = agent = PR, and the task ends when the PR merges. Nidus tasks are sagas with many agents, worktrees and days, and a lifecycle you own.
-- **Observes what it didn't launch.** Most tools must start the agent themselves. Nidus shows externally started sessions read-only and binds them to tasks.
+- **Tasks outlive sessions and worktrees.** Almost every tool models task = worktree = agent = PR, and the task ends when the PR merges. Ochre tasks are sagas with many agents, worktrees and days, and a lifecycle you own.
+- **Observes what it didn't launch.** Most tools must start the agent themselves. Ochre shows externally started sessions read-only and binds them to tasks.
 - **Composable.** Turn off worktrees, Jira, the terminal; the rest still works.
 - **Windows-first.** Several competitors are mac-only or reached Windows late.
 - **Volatility is a reason to own it:** Conductor was acquired and shut its cloud; Vibe Kanban's company reportedly shut down.

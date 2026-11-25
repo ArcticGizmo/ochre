@@ -2,7 +2,7 @@
 
 ## Storage
 
-- One markdown file per task under the app data dir (`%APPDATA%\Nidus\tasks\T-0042.md`). App-local by decision ([ADR 0001](decisions/0001-app-local-tasks.md)): a task can span several repos.
+- One markdown file per task under the app data dir (`%APPDATA%\Ochre\tasks\T-0042.md`). App-local by decision ([ADR 0001](decisions/0001-app-local-tasks.md)): a task can span several repos.
 - **The host is the only writer.** Agents and UI change tasks through the host (CLI/MCP/bridge), which serialises writes, so two agents never race on one file. External edits (you, in an editor) are picked up by a file watcher and merged on the next read.
 - Writes are atomic (write temp, then rename) and every change is appended to the task's log with its author.
 
@@ -78,18 +78,18 @@ For every Active and Parked task: title, park note, next unchecked plan item, at
 
 ## Agent surface
 
-Agents reach their task through the `nidus` CLI (and an MCP server with the same operations). A session launched from a task gets `NIDUS_TASK=T-0042` and `NIDUS_SESSION=<id>` in its environment.
+Agents reach their task through the `ochre` CLI (and an MCP server with the same operations). A session launched from a task gets `OCHRE_TASK=T-0042` and `OCHRE_SESSION=<id>` in its environment.
 
 | Command | Effect |
 |---|---|
-| `nidus task current` | The task id for this session (env, else binding lookup) |
-| `nidus task show [--plan]` | Title, state, plan, notes, park note |
-| `nidus task links` | The links index (kind, ref, title, summary) |
-| `nidus task fetch <link-id>` | Detail for one link through its resolver (marked as untrusted content) |
-| `nidus task check <item-id>` / `uncheck` | Tick a plan item |
-| `nidus task add-step "<text>" [--under <item-id>]` | Add a plan item |
-| `nidus task note "<text>"` | Append to notes |
-| `nidus task park-note "<text>"` | Write this session's state + next step (used during park) |
+| `ochre task current` | The task id for this session (env, else binding lookup) |
+| `ochre task show [--plan]` | Title, state, plan, notes, park note |
+| `ochre task links` | The links index (kind, ref, title, summary) |
+| `ochre task fetch <link-id>` | Detail for one link through its resolver (marked as untrusted content) |
+| `ochre task check <item-id>` / `uncheck` | Tick a plan item |
+| `ochre task add-step "<text>" [--under <item-id>]` | Add a plan item |
+| `ochre task note "<text>"` | Append to notes |
+| `ochre task park-note "<text>"` | Write this session's state + next step (used during park) |
 
 Rules:
 - An agent can only write to the task it is bound to.
@@ -99,5 +99,5 @@ Rules:
 ## Session binding
 
 - **Launched** from a task: bound automatically (`binding: launched`).
-- **Observed** sessions (started elsewhere): Nidus **suggests** a binding from cwd, worktree, branch name, or a Jira key in the branch, and you confirm with one click (`binding: confirmed`). It never binds silently.
+- **Observed** sessions (started elsewhere): Ochre **suggests** a binding from cwd, worktree, branch name, or a Jira key in the branch, and you confirm with one click (`binding: confirmed`). It never binds silently.
 - A session can be bound to one task at a time. Rebinding is explicit.

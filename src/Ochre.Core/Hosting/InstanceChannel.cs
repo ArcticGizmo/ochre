@@ -33,6 +33,13 @@ public sealed class InstanceChannel : IDisposable
         return null;
     }
 
+    public static bool IsRunning(OchreProfile profile)
+    {
+        if (!Mutex.TryOpenExisting($@"Local\{profile.MachineName("instance")}", out var mutex)) return false;
+        mutex.Dispose();
+        return true;
+    }
+
     /// <summary>Sends a command to the running instance. Returns its reply, or null if none answered.</summary>
     public static string? Send(OchreProfile profile, string command, string? argument, TimeSpan timeout)
     {

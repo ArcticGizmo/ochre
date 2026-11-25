@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ochre-cli: the console front door to a running Ochre host. ochre.exe is a GUI-subsystem app, so a terminal
+    neither waits for it nor shows what it prints; this console app talks to the host over the per-user instance
+    pipe instead. It will publish as ochre.com beside ochre.exe (cmd and PowerShell resolve a bare `ochre` to the
+    .com first, as Perch does with perch.com), and it is the `ochre task ...` surface agents use.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ochre-cli</AssemblyName>
+    <RootNamespace>Ochre.Cli</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <OptimizationPreference>Size</OptimizationPreference>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ochre.Core\Ochre.Core.csproj" />
+  </ItemGroup>
+</Project>

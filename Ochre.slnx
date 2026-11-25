@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Ochre.Cli/Ochre.Cli.csproj" />
     <Project Path="src/Ochre.Core/Ochre.Core.csproj" />
     <Project Path="src/Ochre.Host/Ochre.Host.csproj" />
     <Project Path="src/Ochre.Platform.Windows/Ochre.Platform.Windows.csproj" />

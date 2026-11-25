@@ -33,7 +33,7 @@ Ochre runs agents that can execute anything, holds Jira/GitHub tokens, persists 
 
 ## Dev builds
 
-Debug builds accept `--dev-eval` (run script in the page) and `--dev-capture` (save a PNG of it) over the same per-user instance pipe, so changes can be checked in the real window unattended. They are compiled out of release builds. Chromium's remote debugging port is deliberately not used for this: infostealers use it to read browser cookies, and EDR watches for it.
+Debug builds of the host answer `dev-eval` (run script in the page) and `dev-capture` (save a PNG of it), sent by `ochre-cli dev ...` over the same per-user instance pipe, so changes can be checked in the real window unattended. They are compiled out of release builds. Chromium's remote debugging port is deliberately not used for this: infostealers use it to read browser cookies, and EDR watches for it.
 
 ## Endpoint security (EDR)
 

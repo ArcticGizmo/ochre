@@ -29,4 +29,4 @@ What changed: tasks can be created and worked on in the window. The host exposes
 
 ## Dev aids used to verify this slice
 
-Debug builds accept `ochre --dev-eval "<js>"` (runs in the page, prints the result) and `ochre --dev-capture <png>` (saves what the page shows), sent to the running instance over its per-user pipe. With `OCHRE_DEV_DESKTOP=<virtual desktop guid>` set on the first launch, the window opens unfocused on that desktop.
+Dev builds accept `cli dev eval "<js>"` (runs in the page, prints the result) and `cli dev capture <png>` (saves what the page shows), sent to the running instance over its per-user pipe. With `OCHRE_DEV_DESKTOP=<virtual desktop guid>` set on the first launch, the window opens unfocused on that desktop.

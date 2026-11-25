@@ -1,0 +1,93 @@
+﻿using System.Text.Json.Nodes;
+
+namespace Ochre.Core.Claude;
+
+/// <summary>
+/// Maps a Claude Code tool call (name + its JSON <c>input</c>) to a short, present-tense phrase
+/// ("Reading Foo.cs", "Running: npm test", "Editing Bar.cs"). Shared by the live-activity reader
+/// (<see cref="TranscriptReader"/>) and the history viewer so both surfaces describe tools the same way.
+/// </summary>
+internal static class ToolSummary
+{
+    /// <summary>True for the built-in Claude Code tools this class describes with a bespoke phrase (the
+    /// <see cref="Describe"/> switch's cases). The session UI uses it to decide a tool card is worth
+    /// formatting rather than falling back to a raw-JSON dump — an unknown tool is the only case where the
+    /// raw input is still shown, because it's all we have.</summary>
+    public static bool IsKnown(string tool) => tool is
+        "Read" or "Edit" or "MultiEdit" or "Write" or "NotebookEdit" or
+        "Bash" or "PowerShell" or "Grep" or "Glob" or "Task" or "Agent" or
+        "WebFetch" or "WebSearch" or "TodoWrite" or "AskUserQuestion" or
+        "Monitor" or "TaskStop" or "TaskOutput";
+
+    /// <summary>Maps a tool name + its input to a short present-tense phrase.</summary>
+    public static string Describe(string tool, JsonNode? input)
+    {
+        string? Str(string key) => input?[key]?.GetValue<string>();
+
+        switch (tool)
+        {
+            case "Read":
+                return "Reading " + FileLabel(Str("file_path"));
+            case "Edit":
+            case "MultiEdit":
+                return "Editing " + FileLabel(Str("file_path"));
+            case "Write":
+                return "Writing " + FileLabel(Str("file_path"));
+            case "NotebookEdit":
+                return "Editing " + FileLabel(Str("notebook_path"));
+            case "Bash":
+            case "PowerShell":
+                return "Running: " + Clip(Str("command") ?? "command");
+            case "Grep":
+                return "Searching: " + Clip(Str("pattern") ?? "");
+            case "Glob":
+                return "Finding: " + Clip(Str("pattern") ?? "");
+            case "Monitor":
+                return "Watching: " + Clip(Str("description") ?? Str("command") ?? "a command");
+            case "TaskStop":
+                return "Stopping: " + Clip(Str("task_id") ?? Str("shell_id") ?? "a task");
+            case "TaskOutput":
+                return "Checking: " + Clip(Str("task_id") ?? "a task");
+            case "Task":
+            case "Agent":
+                return "Delegating: " + Clip(Str("description") ?? "sub-agent");
+            case "WebFetch":
+                return "Fetching " + Clip(Str("url") ?? "");
+            case "WebSearch":
+                return "Searching web: " + Clip(Str("query") ?? "");
+            case "TodoWrite":
+                return "Updating todos";
+            case "AskUserQuestion":
+                var first = input?["questions"] is JsonArray { Count: > 0 } qs ? qs[0]?["question"]?.GetValue<string>() : null;
+                return "Asking: " + Clip(first ?? "a question");
+            default:
+                return tool;
+        }
+    }
+
+    public static string FileLabel(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "file";
+        try
+        {
+            // Split on both separators, not Path.GetFileName: transcripts carry paths from whatever OS
+            // wrote them, so a Windows path (C:\a\Foo.cs) must resolve to its leaf on a macOS/Linux host too.
+            var trimmed = path.TrimEnd('/', '\\');
+            int cut = trimmed.LastIndexOfAny(['/', '\\']);
+            var name = cut >= 0 ? trimmed[(cut + 1)..] : trimmed;
+            return string.IsNullOrEmpty(name) ? Clip(path) : name;
+        }
+        catch
+        {
+            return Clip(path);
+        }
+    }
+
+    public static string Clip(string s)
+    {
+        s = s.Replace("\r", " ").Replace("\n", " ").Trim();
+        const int max = 60;
+        return s.Length <= max ? s : s[..max].TrimEnd() + "…";
+    }
+}

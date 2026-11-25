@@ -1,0 +1,999 @@
+namespace Ochre.Core.Claude.Control;
+
+/// <summary>How a <see cref="SessionConversation"/> item changed, for incremental UI updates.</summary>
+internal enum ConversationChange { Added, Updated }
+
+/// <summary>One composed unit in the conversation: a user message, an assistant message (with its ordered
+/// parts), a permission prompt, or a system note. The rich session UI binds one control per item.</summary>
+internal abstract class ConversationItem;
+
+internal sealed class UserMessageItem(string text, IReadOnlyList<MessageAttachment>? attachments = null) : ConversationItem
+{
+    public string Text { get; } = text;
+
+    /// <summary>Files/images the user attached to this message (empty when none). Display-only — the file
+    /// paths and image content blocks are already on their way to the CLI by the time this is recorded.</summary>
+    public IReadOnlyList<MessageAttachment> Attachments { get; } = attachments ?? [];
+
+    /// <summary>The transcript record's uuid, when known: set for prompts loaded from a transcript, and for live
+    /// ones once a rewind has placed them (<see cref="RewindPoints"/>). The anchor a rewind or fork names.</summary>
+    public string? Uuid { get; set; }
+}
+
+internal enum NoteKind { Info, Error }
+
+/// <summary>A quiet system line: "permission mode → plan", "session ended", a launch failure.</summary>
+internal sealed class NoteItem(string text, NoteKind kind = NoteKind.Info) : ConversationItem
+{
+    public string Text { get; } = text;
+    public NoteKind Kind { get; } = kind;
+}
+
+/// <summary>A <c>/compact</c> in progress (and then complete): a live row with a progress meter. The CLI
+/// runs compaction as a turn and streams <c>status</c> records; <see cref="Percent"/> follows them when a
+/// figure can be read, and the UI always shows its own elapsed timer from <see cref="StartedUtc"/> so it
+/// reads as progress even when no percentage arrives. Finalised by the compaction turn's result.</summary>
+internal sealed class CompactionItem(string? instructions) : ConversationItem
+{
+    public string? Instructions { get; } = instructions;
+    public DateTime StartedUtc { get; } = DateTime.UtcNow;
+    /// <summary>Completion percentage from the CLI's status records, or null → indeterminate (timer-driven).</summary>
+    public int? Percent { get; internal set; }
+    public bool IsDone { get; internal set; }
+    /// <summary>The compaction was interrupted or errored (nothing reclaimed) — a canceled state, not a
+    /// green success. Set when finalising if the user interrupted, the turn errored, or no context was freed.</summary>
+    public bool Failed { get; internal set; }
+    /// <summary>Context tokens reclaimed (before − after), known only once the turn's result lands.</summary>
+    public long FreedTokens { get; internal set; }
+}
+
+/// <summary>An assistant turn: streamed prose, thinking, and tool calls in the order they arrived.
+/// Closed by the turn's <c>result</c> record, after which the next assistant event opens a new item.</summary>
+internal sealed class AssistantMessageItem : ConversationItem
+{
+    private readonly List<AssistantPart> _parts = new();
+    public IReadOnlyList<AssistantPart> Parts => _parts;
+    public bool IsComplete { get; internal set; }
+    public TurnResultEvent? Result { get; internal set; }
+    internal void Add(AssistantPart part) => _parts.Add(part);
+    internal AssistantPart? Last => _parts.Count > 0 ? _parts[^1] : null;
+}
+
+internal abstract class AssistantPart;
+
+/// <summary>Prose. <see cref="IsStreaming"/> while deltas accumulate; the completed block replaces the
+/// accumulated text (so the UI can swap a plain streaming block for a Markdown render). Deltas append to a
+/// builder and <see cref="Text"/> materialises (and caches) the string only when read, so a long reply costs
+/// one copy per read rather than one whole-reply copy per delta.</summary>
+internal sealed class TextPart : AssistantPart
+{
+    private readonly System.Text.StringBuilder _sb = new();
+    private string? _text = "";   // cached materialisation of _sb; null when a delta has landed since
+
+    public string Text
+    {
+        get => _text ??= _sb.ToString();
+        internal set { _sb.Clear().Append(value); _text = value; }
+    }
+
+    /// <summary>Characters accumulated so far (no materialisation).</summary>
+    public int Length => _sb.Length;
+
+    public bool IsStreaming { get; internal set; } = true;
+
+    internal void Append(string delta)
+    {
+        if (delta.Length == 0) return;
+        _sb.Append(delta);
+        _text = null;
+    }
+}
+
+internal sealed class ThinkingPart(string text) : AssistantPart
+{
+    public string Text { get; } = text;
+}
+
+internal enum ToolCallStatus { Running, Done, Failed }
+
+internal sealed class ToolCallPart(string toolUseId, string toolName, string summary, string inputJson) : AssistantPart
+{
+    public string ToolUseId { get; } = toolUseId;
+    public string ToolName { get; } = toolName;
+    public string Summary { get; } = summary;
+    public string InputJson { get; } = inputJson;
+    public ToolCallStatus Status { get; internal set; } = ToolCallStatus.Running;
+    /// <summary>The tool's result as text (capped at ~8k chars), or empty until it lands. The card shows a
+    /// one-line summary of it collapsed and the whole thing on expand.</summary>
+    public string ResultText { get; internal set; } = "";
+    /// <summary>The background task this call started (a <c>run_in_background</c> shell, a Monitor, an async agent),
+    /// looked up in <see cref="SessionConversation.BackgroundTasks"/>. Null for an ordinary call.</summary>
+    public string? BackgroundTaskId { get; internal set; }
+
+    // A card is rebuilt from its part on every hydrate, rebind and theme change, and the input never changes once the
+    // call lands, so the parse and (for an edit) the O(n·m) line diff are worked out once here (perf review PF17).
+    private System.Text.Json.Nodes.JsonNode? _input;
+    private bool _inputParsed;
+    private IReadOnlyList<GitDiffLine>? _diff;
+    private bool _diffBuilt;
+
+    /// <summary>The parsed <see cref="InputJson"/>, or null when it isn't JSON. Shared: treat it as read-only.</summary>
+    public System.Text.Json.Nodes.JsonNode? Input
+    {
+        get
+        {
+            if (_inputParsed) return _input;
+            try { _input = System.Text.Json.Nodes.JsonNode.Parse(InputJson); } catch { _input = null; }
+            _inputParsed = true;
+            return _input;
+        }
+    }
+
+    /// <summary>The unified diff of an Edit/MultiEdit/Write call (see <see cref="EditDiff.Build"/>), else null.</summary>
+    public IReadOnlyList<GitDiffLine>? Diff
+    {
+        get
+        {
+            if (_diffBuilt) return _diff;
+            _diff = EditDiff.IsEditTool(ToolName) ? EditDiff.Build(ToolName, Input) : null;
+            _diffBuilt = true;
+            return _diff;
+        }
+    }
+}
+
+/// <summary>A background task ended (or a Monitor delivered an event): a quiet one-line notice in the thread, never
+/// the user bubble the raw <c>&lt;task-notification&gt;</c> would otherwise make. <see cref="Task"/> is live, so the
+/// view can read its current status/exit code; <see cref="EventText"/> is set for a Monitor event.</summary>
+internal sealed class TaskNoticeItem(BackgroundTask task, string? eventText = null) : ConversationItem
+{
+    public BackgroundTask Task { get; } = task;
+    public string? EventText { get; } = eventText;
+    public bool IsEvent => EventText is not null;
+}
+
+/// <summary><see cref="AnsweredElsewhere"/>: the CLI withdrew the prompt because another client (Remote Control's
+/// claude.ai / phone side) answered it first.</summary>
+internal enum PermissionResolution { Pending, Allowed, Denied, Expired, AnsweredElsewhere }
+
+/// <summary>A <c>can_use_tool</c> prompt as a first-class item. The turn is paused until it resolves. When the
+/// tool is <c>AskUserQuestion</c> (<see cref="IsQuestion"/>) it is Claude asking the user something, not a
+/// permission — the UI shows a question card and "allows" with the answers folded into the input.</summary>
+internal sealed class PermissionItem(PermissionRequestEvent request) : ConversationItem
+{
+    public PermissionRequestEvent Request { get; } = request;
+    public PermissionResolution Resolution { get; internal set; } = PermissionResolution.Pending;
+    /// <summary>The mode the user switched to when allowing (the CLI's suggestion), if any.</summary>
+    public string? SwitchedMode { get; internal set; }
+    public bool IsQuestion => Request.ToolName == AskUserQuestionInput.ToolName;
+    /// <summary>True when this is an <c>ExitPlanMode</c> approval — Claude presenting a plan to carry out, not
+    /// a tool-run permission. The UI shows a plan-approval card.</summary>
+    public bool IsPlan => Request.ToolName == PlanApprovalInput.ToolName;
+    /// <summary>For a question: what was answered, as a one-line receipt.</summary>
+    public string? AnswerSummary { get; internal set; }
+}
+
+/// <summary>
+/// The message/turn model behind the rich session UI: folds the flat <see cref="SessionEvent"/> stream
+/// (plus the user's own prompts and answers) into composed <see cref="ConversationItem"/>s, and tracks the
+/// session-level state a header shows (id, model, mode, cost, running/queued turns, the pending permission).
+/// UI-free and deterministic so the grouping rules are unit-testable; the window binds one control per item
+/// and re-syncs an item's parts on <see cref="ConversationChange.Updated"/>. Single-threaded: call from the
+/// UI thread (the controller's events are marshalled there by the window).
+/// </summary>
+internal sealed class SessionConversation
+{
+    private readonly List<ConversationItem> _items = new();
+    private readonly Dictionary<string, (AssistantMessageItem Owner, ToolCallPart Part)> _toolCalls = new();
+    // Launch cards of background tasks, by task id, so a task's progress re-syncs the card that started it.
+    private readonly Dictionary<string, (AssistantMessageItem Owner, ToolCallPart Part)> _launchCards = new();
+    // The notice each ended task posted, by task id, so a report arriving after it re-renders the notice.
+    private readonly Dictionary<string, TaskNoticeItem> _endNotices = new();
+
+    public SessionConversation()
+    {
+        BackgroundTasks.Changed += OnBackgroundTaskChanged;
+    }
+
+    /// <summary>The session's background work (shells, monitors, async agents), from the stream's <c>task_*</c>
+    /// records or the transcript's launches + notifications. See <c>docs/background-tasks-plan.md</c>.</summary>
+    public BackgroundTaskTracker BackgroundTasks { get; } = new();
+
+    /// <summary>A background task started, progressed or ended. Raised after the launch card re-synced.</summary>
+    public event Action<BackgroundTask>? BackgroundTaskChanged;
+
+    // The session id a history load is for, so an image-bearing user line can resolve its cached image files
+    // (~/.claude/image-cache/{sessionId}/{N}.ext). Set by a read-only viewer (UseHistorySession); null live.
+    private string? _historySessionId;
+
+    // The /compact currently running (its progress row), and the context size just before it, so the freed
+    // amount can be reported when the compaction turn's result lands. Null when no compaction is in flight.
+    private CompactionItem? _activeCompaction;
+    private long _contextBeforeCompaction;
+    private bool _compactionInterrupted;
+    // Set by a compact_boundary so the compact turn's own (misleadingly large) result can't overwrite the
+    // corrected post-compaction occupancy; consumed by the next result, and cleared by the next user prompt.
+    private bool _suppressNextResultContext;
+
+    public IReadOnlyList<ConversationItem> Items => _items;
+
+    /// <summary>An item was appended or changed in place.</summary>
+    public event Action<ConversationItem, ConversationChange>? Changed;
+
+    /// <summary>The whole item list changed shape (history was loaded in front of the live items) — rebuild.</summary>
+    public event Action? Reset;
+
+    /// <summary>Session-level state (id/model/mode/cost/turn bookkeeping) changed.</summary>
+    public event Action? StateChanged;
+
+    public string? SessionId { get; private set; }
+    public string Model { get; private set; } = "";
+    public string PermissionMode { get; private set; } = "default";
+    public int ToolCount { get; private set; }
+    public IReadOnlyList<string> SlashCommands { get; private set; } = [];
+    /// <summary>The MCP servers the CLI reported at init (name + status), backing the <c>/mcp</c> view.</summary>
+    public IReadOnlyList<McpServerInfo> McpServers { get; private set; } = [];
+    /// <summary>Cumulative session cost (the CLI's <c>total_cost_usd</c> is a running total).</summary>
+    public double TotalCostUsd { get; private set; }
+    public TurnResultEvent? LastTurn { get; private set; }
+
+    /// <summary>The most recent turn's prompt size (all input buckets summed) — the session's current
+    /// context occupancy, to weigh against the model's context window. Zero until the first turn lands.</summary>
+    public long ContextTokens { get; private set; }
+    /// <summary>Cumulative output tokens the model has generated across the session.</summary>
+    public long TotalOutputTokens { get; private set; }
+    /// <summary>Cumulative input tokens actually re-billed across the session (fresh input + cache writes;
+    /// cache reads excluded, since those bill at ~0.1×). The honest "tokens in" figure.</summary>
+    public long TotalFreshInputTokens { get; private set; }
+    /// <summary>A turn is running (prompt sent, no result yet).</summary>
+    public bool TurnActive { get; private set; }
+    /// <summary>Prompts sent while a turn was running. The CLI may absorb them into that turn or run them as a
+    /// turn of their own; a result clears the count either way.</summary>
+    public int QueuedPrompts { get; private set; }
+    public PermissionItem? PendingPermission { get; private set; }
+    /// <summary>The CLI's last reported turn state (<c>idle</c> / <c>running</c> / <c>requires_action</c>), or null
+    /// when it hasn't reported one (an older CLI, or a tailed transcript).</summary>
+    public string? CliState { get; private set; }
+    /// <summary>The CLI is blocked on an answer Perch wasn't asked for — a prompt only a Remote Control client
+    /// sees. Still "waiting", just not on Perch.</summary>
+    public bool WaitingElsewhere => CliState == "requires_action" && PendingPermission is null;
+    /// <summary>The last result closed a turn during which prompts were sent. The CLI either absorbed them into
+    /// that turn or runs them as a turn of its own next, and stdout doesn't say which; cleared when that turn
+    /// starts or a later turn settles with nothing sent mid-turn.</summary>
+    public bool MayHaveQueuedTurn { get; private set; }
+    /// <summary>A turn has completed and nothing is running, queued, possibly queued or awaiting a permission
+    /// answer — the only state in which Perch may send a prompt of its own (auto-compaction).</summary>
+    public bool IsSettled =>
+        LastTurn is not null && !TurnActive && QueuedPrompts == 0 && !MayHaveQueuedTurn && PendingPermission is null;
+
+    /// <summary>Seeds the context occupancy from a resumed session's transcript, so the context gauge reads
+    /// true before the first new turn lands (the CLI replays no usage on <c>--resume</c>). A live turn's own
+    /// figure supersedes it. No-op for a non-positive count.</summary>
+    public void SeedContextTokens(long tokens)
+    {
+        if (tokens <= 0 || ContextTokens > 0) return;
+        ContextTokens = tokens;
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>Seeds the identity before <c>init</c> arrives (the id is known at launch when pinned).</summary>
+    public void SetSessionId(string? sessionId)
+    {
+        SessionId = sessionId;
+        StateChanged?.Invoke();
+    }
+
+    public void Apply(SessionEvent ev)
+    {
+        // A sub-agent's own work (its text, thinking, tool calls and their results, its context size) belongs to its
+        // agent tab, which reads the agent's transcript, not to this thread: appended here it reads as the parent's.
+        // Only what the parent needs survives: a background launch it makes, and the report it hands back.
+        if (ev.FromSubagent && ev is TextDeltaEvent or AssistantTextEvent or AssistantThinkingEvent or ToolUseEvent
+                or ToolResultEvent or AssistantUsageEvent)
+        {
+            if (ev is ToolUseEvent { ToolName: var name } call && CanLaunchBackground(name))
+                BackgroundTasks.NoteToolUse(call.ToolUseId, name, LaunchDescription(call.InputJson));
+            return;
+        }
+
+        // Main-thread output after a result means the CLI started a queued prompt as its own turn.
+        if (ev is TextDeltaEvent or AssistantTextEvent or AssistantThinkingEvent or ToolUseEvent && ReopenTurn(ev))
+            StateChanged?.Invoke();
+
+        switch (ev)
+        {
+            case AgentReportEvent report:
+                BackgroundTasks.Reported(report.TaskId, report.ToolUseId, report.Report);
+                break;
+
+            case SessionInitEvent init:
+            {
+                // A second init with a *different* id means the session was re-based mid-process — the CLI's
+                // response to `/clear` (a fresh session id + wiped context). The id is seeded before the first
+                // init and matches it, so a genuine first init never trips this. Reset the thread to match the
+                // now-empty conversation. (The controller separately migrates the lock + registry to the new id.)
+                bool cleared = SessionId is { Length: > 0 } prev && init.SessionId.Length > 0 && init.SessionId != prev;
+                SessionId = init.SessionId;
+                Model = init.Model;
+                if (init.PermissionMode.Length > 0) PermissionMode = init.PermissionMode;
+                ToolCount = init.ToolCount;
+                SlashCommands = init.SlashCommands ?? [];
+                if (init.McpServers is { Count: > 0 }) McpServers = init.McpServers;
+                if (cleared) ClearForNewConversation();
+                else ReopenTurn(ev);   // the CLI emits init at the start of every turn, queued ones included
+                StateChanged?.Invoke();
+                break;
+            }
+
+            case TextDeltaEvent delta:
+            {
+                var owner = OpenAssistant();
+                if (owner.Last is TextPart { IsStreaming: true } streaming) streaming.Append(delta.Text);
+                else owner.Add(new TextPart { Text = delta.Text });
+                Changed?.Invoke(owner, ConversationChange.Updated);
+                break;
+            }
+
+            case AssistantTextEvent text:
+            {
+                var owner = OpenAssistant();
+                if (owner.Last is TextPart { IsStreaming: true } streaming)
+                {
+                    streaming.Text = text.Text;
+                    streaming.IsStreaming = false;
+                }
+                else owner.Add(new TextPart { Text = text.Text, IsStreaming = false });
+                Changed?.Invoke(owner, ConversationChange.Updated);
+                break;
+            }
+
+            case AssistantThinkingEvent thinking:
+            {
+                var owner = OpenAssistant();
+                FreezeStreaming(owner);   // a new block starting means the streamed one has ended
+                owner.Add(new ThinkingPart(thinking.Text));
+                Changed?.Invoke(owner, ConversationChange.Updated);
+                break;
+            }
+
+            case ToolUseEvent tool:
+            {
+                var owner = OpenAssistant();
+                FreezeStreaming(owner);
+                var part = new ToolCallPart(tool.ToolUseId, tool.ToolName, tool.Summary, tool.InputJson);
+                owner.Add(part);
+                if (tool.ToolUseId.Length > 0) _toolCalls[tool.ToolUseId] = (owner, part);
+                if (CanLaunchBackground(tool.ToolName))
+                    BackgroundTasks.NoteToolUse(tool.ToolUseId, tool.ToolName, LaunchDescription(tool.InputJson));
+                Changed?.Invoke(owner, ConversationChange.Updated);
+                break;
+            }
+
+            case ToolResultEvent result:
+                if (_toolCalls.Remove(result.ToolUseId, out var call))
+                {
+                    call.Part.Status = result.IsError ? ToolCallStatus.Failed : ToolCallStatus.Done;
+                    call.Part.ResultText = result.Text;
+                    if (result.Launch is { } launch)
+                    {
+                        call.Part.BackgroundTaskId = launch.TaskId;
+                        _launchCards[launch.TaskId] = call;
+                        BackgroundTasks.Launched(result.ToolUseId, launch.TaskId, launch.Kind, launch.At, launch.Persistent,
+                            launch.OutputFile);
+                    }
+                    Changed?.Invoke(call.Owner, ConversationChange.Updated);
+                }
+                break;
+
+            case TaskStartedEvent started:
+                BackgroundTasks.Started(started.TaskId, started.ToolUseId, started.TaskType, started.Description,
+                    started.IsBackgrounded, started.OwnedBySubagent);
+                break;
+
+            case TaskProgressEvent progress:
+                BackgroundTasks.Progressed(progress.TaskId, progress.Description);
+                break;
+
+            case TaskUpdatedEvent updated:
+                BackgroundTasks.Updated(updated.TaskId, updated.Status, updated.EndUtc);
+                break;
+
+            case BackgroundTasksChangedEvent changed:
+                BackgroundTasks.Reconcile(changed.Tasks);
+                break;
+
+            case TaskNotificationEvent notified:
+                // A task ending (once) or a Monitor event becomes a quiet notice. Never a user bubble.
+                if (BackgroundTasks.Notified(notified.Notification, notified.At, notified.Delivered) is { } task)
+                {
+                    var notice = new TaskNoticeItem(task, notified.Notification.IsEvent ? notified.Notification.EventText : null);
+                    if (!notice.IsEvent) _endNotices[task.TaskId] = notice;   // re-rendered if its report lands later
+                    Append(notice);
+                }
+                break;
+
+            case PermissionRequestEvent request:
+            {
+                var item = new PermissionItem(request);
+                PendingPermission = item;
+                Append(item);
+                StateChanged?.Invoke();
+                break;
+            }
+
+            case ControlRequestCancelledEvent cancelled:
+            {
+                // Only a still-pending prompt can be withdrawn; one the user already answered here stays as it is.
+                var item = _items.OfType<PermissionItem>().LastOrDefault(p => p.Request.RequestId == cancelled.RequestId);
+                if (item is not { Resolution: PermissionResolution.Pending }) break;
+                item.Resolution = PermissionResolution.AnsweredElsewhere;
+                if (ReferenceEquals(PendingPermission, item)) PendingPermission = null;
+                Changed?.Invoke(item, ConversationChange.Updated);
+                StateChanged?.Invoke();
+                break;
+            }
+
+            case SessionStateEvent state:
+                ApplyCliState(state.State);
+                StateChanged?.Invoke();
+                break;
+
+            case StatusEvent status:
+                // Only meaningful while a /compact is running: advance its meter when a percentage is read.
+                if (_activeCompaction is { IsDone: false } running && status.Percent is int pct)
+                {
+                    running.Percent = pct;
+                    Changed?.Invoke(running, ConversationChange.Updated);
+                }
+                break;
+
+            case CompactionCompletedEvent done:
+            {
+                // The authoritative success signal (only emitted when a compaction actually completed): settle
+                // the progress row with the exact freed amount and correct the context occupancy to the post
+                // size. Turn bookkeeping is left to the turn's own `result`; but that result reports the
+                // summarisation's (large) input, which would clobber the corrected occupancy — so suppress the
+                // next result's context update. (New user prompts clear the flag, so it can't linger.)
+                if (done.PostTokens > 0) { ContextTokens = done.PostTokens; _suppressNextResultContext = true; }
+                long freed = Math.Max(0, done.PreTokens - done.PostTokens);
+                if (_activeCompaction is { IsDone: false } compaction)
+                {
+                    compaction.IsDone = true;
+                    compaction.Failed = false;
+                    compaction.Percent = 100;
+                    compaction.FreedTokens = freed;
+                    Changed?.Invoke(compaction, ConversationChange.Updated);
+                    _activeCompaction = null;
+                    _compactionInterrupted = false;
+                    // The boundary IS the compaction turn's completion — a manual /compact that then idles may
+                    // emit no `result`, so settle the turn here (unless prompts were sent behind it; the result
+                    // settles those). Otherwise TurnActive stays stuck "working…" and the next prompt queues
+                    // behind a phantom turn, leaving the composer's context/token pills stale. A later result
+                    // for this turn is idempotent (it sets TurnActive false again).
+                    if (QueuedPrompts == 0) TurnActive = false;
+                }
+                else
+                {
+                    // No progress row — this is the CLI's own auto-compaction near the limit, which the user
+                    // didn't initiate. Leave a quiet note so the context drop isn't a mystery.
+                    Append(new NoteItem(freed > 0
+                        ? $"context auto-compacted by Claude Code — freed {freed:N0} tokens"
+                        : "context auto-compacted by Claude Code"));
+                }
+                StateChanged?.Invoke();
+                break;
+            }
+
+            case ModeChangedEvent mode:
+                if (mode.Mode != PermissionMode)
+                {
+                    PermissionMode = mode.Mode;
+                    Append(new NoteItem($"permission mode → {mode.Mode}"));
+                }
+                StateChanged?.Invoke();
+                break;
+
+            case AssistantUsageEvent usage:
+                // The newest single message's prompt size is the current context occupancy. Honour the
+                // compaction suppression flag: the summarisation message's usage is the (large) pre-compaction
+                // context, and a following compact_boundary sets the true post size — don't let a late
+                // summary message clobber it.
+                if (usage.ContextTokens > 0 && !_suppressNextResultContext)
+                {
+                    ContextTokens = usage.ContextTokens;
+                    StateChanged?.Invoke();
+                }
+                break;
+
+            case TurnResultEvent turn:
+            {
+                // Close every open assistant item of this turn — a permission prompt splits a turn into two
+                // items, and both belong to the result that just arrived. A block still streaming when the
+                // turn ends is what we have; freeze it.
+                for (int i = _items.Count - 1; i >= 0; i--)
+                {
+                    if (_items[i] is UserMessageItem) break;   // the previous turn's boundary
+                    if (_items[i] is not AssistantMessageItem { IsComplete: false } open) continue;
+                    FreezeStreaming(open);
+                    open.IsComplete = true;
+                    open.Result = turn;
+                    Changed?.Invoke(open, ConversationChange.Updated);
+                }
+                LastTurn = turn;
+                if (turn.CostUsd > 0) TotalCostUsd = turn.CostUsd;
+                // Occupancy is normally NOT read from the result: its usage aggregates every round-trip in the
+                // turn, so an agentic turn's result reads as a multiple of the real prompt size. The per-message
+                // AssistantUsageEvent carries the honest occupancy instead. The sole exception is a compaction
+                // turn that emitted no compact_boundary — there the result is the only post-compaction size we
+                // get, so let it set occupancy (which also drives FreedTokens below). A boundary, when present,
+                // already set the true post size and raised the suppress flag, so this is skipped then.
+                if (_activeCompaction is { IsDone: false } && turn.ContextTokens > 0 && !_suppressNextResultContext)
+                    ContextTokens = turn.ContextTokens;
+                _suppressNextResultContext = false;
+                // The result still supplies the cumulative session totals (per-turn amounts, correct to sum).
+                TotalOutputTokens += turn.OutputTokens;
+                TotalFreshInputTokens += turn.FreshInputTokens;
+                // One result can close several prompts: the CLI absorbs a prompt sent mid-turn into the running
+                // turn. If it instead runs a queued prompt as its own turn, that turn's output reopens it.
+                MayHaveQueuedTurn = QueuedPrompts > 0;
+                QueuedPrompts = 0;
+                TurnActive = false;
+                // A compaction still active at the result normally means its `compact_boundary` (the success
+                // signal, handled above) hasn't been seen — so judge it only by hard signals: the user
+                // interrupted, or the turn errored. A clean result settles it as done either way. NEVER infer
+                // failure from freed tokens — a successful compaction's result doesn't necessarily report a
+                // reduced context, which is exactly what made a real success look like a failure.
+                if (_activeCompaction is { IsDone: false } compaction)
+                {
+                    compaction.IsDone = true;
+                    compaction.FreedTokens = Math.Max(0, _contextBeforeCompaction - ContextTokens);
+                    compaction.Failed = _compactionInterrupted || turn.IsError;
+                    if (!compaction.Failed) compaction.Percent = 100;
+                    Changed?.Invoke(compaction, ConversationChange.Updated);
+                    _activeCompaction = null;
+                    _compactionInterrupted = false;
+                }
+                if (turn.IsError) Append(new NoteItem($"turn failed ({turn.Subtype})", NoteKind.Error));
+                StateChanged?.Invoke();
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads a resumed session's past conversation from its transcript (<c>{sessionId}.jsonl</c> lines) in
+    /// front of whatever live items exist — the CLI replays nothing on <c>--resume</c>, only <c>init</c>.
+    /// Transcript records share the stream-json record shapes, so assistant/tool lines go through
+    /// <see cref="StreamJsonParser"/>; genuine user prompts (plain text, not tool results, not slash-command
+    /// echoes) become user items. Everything loaded is closed (no turn bookkeeping) and <see cref="Reset"/>
+    /// is raised once. Returns how many items were added. Never throws on a bad line.
+    /// </summary>
+    public int LoadHistory(IEnumerable<string> transcriptLines, string? sessionId = null) =>
+        LoadHistory(ParseHistory(transcriptLines, sessionId));
+
+    /// <summary>Decodes a resumed session's transcript lines for <see cref="LoadHistory(IReadOnlyList{ParsedTranscriptLine})"/>.
+    /// The JSON parse and any image recovery are most of a resume's cost, and they touch no conversation state, so a
+    /// session window runs this on a worker and applies the result on the UI thread (perf review PF12).
+    /// <paramref name="sessionId"/> is the image-cache id. Thread-agnostic. Never throws on a bad line.</summary>
+    internal static IReadOnlyList<ParsedTranscriptLine> ParseHistory(IEnumerable<string> transcriptLines, string? sessionId)
+    {
+        var parsed = new List<ParsedTranscriptLine>();
+        foreach (var line in transcriptLines)
+            if (ParseTranscriptLine(line, sessionId) is { } p) parsed.Add(p);
+        return parsed;
+    }
+
+    /// <summary><see cref="LoadHistory(IEnumerable{string}, string?)"/> for lines already decoded by
+    /// <see cref="ParseHistory"/>.</summary>
+    internal int LoadHistory(IReadOnlyList<ParsedTranscriptLine> history)
+    {
+        var scratch = new SessionConversation();
+        foreach (var parsed in history)
+        {
+            try { scratch.ApplyParsed(parsed); }
+            catch { /* a malformed line is skipped, never fatal */ }
+        }
+        foreach (var item in scratch._items)
+            if (item is AssistantMessageItem { IsComplete: false } a)
+            {
+                FreezeStreaming(a);
+                a.IsComplete = true;
+            }
+        foreach (var (_, part) in scratch._toolCalls.Values)
+            if (part.Status == ToolCallStatus.Running) part.Status = ToolCallStatus.Done;   // result not recorded
+        // The history's background tasks belonged to the earlier process, so none still runs. Adopt them so the
+        // history's launch cards and notices resolve their task ids here.
+        scratch.BackgroundTasks.FinalizeHistory();
+        BackgroundTasks.Adopt(scratch.BackgroundTasks);
+
+        if (scratch._items.Count == 0) return 0;
+        _items.InsertRange(0, scratch._items);
+        Reset?.Invoke();
+        return scratch._items.Count;
+    }
+
+    /// <summary>Read-only viewer: sets the session id used to recover a transcript's pasted-image attachments
+    /// (<c>~/.claude/image-cache/{sessionId}/…</c>). Call once before feeding lines with
+    /// <see cref="AppendTranscriptLine"/>.</summary>
+    public void UseHistorySession(string? sessionId) => _historySessionId = sessionId;
+
+    /// <summary>Read-only viewer: folds one transcript line into the conversation <em>in order</em>, appending
+    /// (unlike <see cref="LoadHistory"/>'s front-insert) and raising <see cref="Changed"/> so a bound view adds
+    /// it incrementally — no rebuild, so an active session can be tailed without losing the view's scroll
+    /// position or its expanded tool cards. Same per-line rules as <see cref="LoadHistory"/> (sidechain skip,
+    /// genuine user-prompt detection, image recovery). Never throws on a bad line.</summary>
+    public void AppendTranscriptLine(string line)
+    {
+        try { ApplyTranscriptLine(line); } catch { /* a malformed line is skipped, never fatal */ }
+    }
+
+    /// <summary>Read-only viewer: marks a tailed transcript as mid-turn (or not), so a bound view shows its
+    /// "working" row while the agent behind it runs. A transcript records no turn boundaries of its own, so the
+    /// viewer says so from what it knows (a sub-agent tab is only open while that sub-agent works).</summary>
+    public void SetLiveTail(bool active)
+    {
+        if (TurnActive == active) return;
+        TurnActive = active;
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>Read-only viewer: settle a fully-loaded, <em>inactive</em> transcript. A transcript records no
+    /// <c>result</c>, so assistant items stay open and a tool whose result was never written stays "running";
+    /// this closes them so a finished history reads as closed (no live spinners) rather than mid-turn. Do NOT
+    /// call while tailing an active session — its last tool may still be genuinely running.</summary>
+    public void FinalizeHistory()
+    {
+        foreach (var (owner, part) in _toolCalls.Values)
+        {
+            if (part.Status == ToolCallStatus.Running) part.Status = ToolCallStatus.Done;
+            Changed?.Invoke(owner, ConversationChange.Updated);
+        }
+        _toolCalls.Clear();
+        for (int i = _items.Count - 1; i >= 0; i--)
+            if (_items[i] is AssistantMessageItem { IsComplete: false } a)
+            {
+                FreezeStreaming(a);
+                a.IsComplete = true;
+            }
+        BackgroundTasks.FinalizeHistory();
+        // A closed transcript has no live turn — settle the bookkeeping so the view shows no "working" row.
+        TurnActive = false;
+        QueuedPrompts = 0;
+        MayHaveQueuedTurn = false;
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// One transcript line, decoded but not yet applied: either a genuine user prompt (with any recovered image
+    /// attachments) or the stream-json events it carries. Decoding touches no conversation state, so a viewer can
+    /// run it on a worker thread (the JSON parse and any base64 image decode are the costly part) and then apply
+    /// the result on the UI thread with <see cref="AppendParsedTranscriptLine"/>. Review fixes CP24.
+    /// </summary>
+    internal sealed record ParsedTranscriptLine(string? Prompt, IReadOnlyList<MessageAttachment>? Images,
+        IReadOnlyList<SessionEvent> Events, string? Uuid = null);
+
+    /// <summary>Decodes one transcript line (see <see cref="ParsedTranscriptLine"/>); null for a line that adds
+    /// nothing (blank, malformed, or a sub-agent's). <paramref name="sessionId"/> is the image-cache id, as for
+    /// <see cref="UseHistorySession"/>. <paramref name="includeSidechain"/> keeps sub-agent lines, for reading a
+    /// sub-agent's own transcript (every line of which is a sidechain). Thread-agnostic. Never throws.</summary>
+    public static ParsedTranscriptLine? ParseTranscriptLine(string line, string? sessionId, bool includeSidechain = false)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(line)) return null;
+            if (System.Text.Json.Nodes.JsonNode.Parse(line) is not { } root) return null;
+            if (!includeSidechain && root["isSidechain"]?.GetValue<bool>() == true) return null;   // a sub-agent's line, not this thread
+            if (TranscriptJson.AsString(root["type"]) == "user" && GenuineUserPrompt(root) is { } prompt)
+            {
+                // A resumed message that carried a pasted image: recover the image as an attachment. The "[Image #N]"
+                // placeholder is kept in the text (it gives context, and the view makes the token itself hover/click
+                // to the image) — the k-th token pairs with the k-th image attachment.
+                var images = TranscriptImages.Extract(TranscriptJson.ContentArray(root), prompt, sessionId);
+                return new ParsedTranscriptLine(prompt, images.Count > 0 ? images : null, [],
+                    TranscriptJson.AsString(root["uuid"]));
+            }
+            var events = StreamJsonParser.Parse(root);
+            return events.Count > 0 ? new ParsedTranscriptLine(null, null, events) : null;
+        }
+        catch
+        {
+            return null;   // a malformed line is skipped, never fatal
+        }
+    }
+
+    /// <summary>Read-only viewer: <see cref="AppendTranscriptLine"/> for a line already decoded by
+    /// <see cref="ParseTranscriptLine"/>. Never throws on a bad line.</summary>
+    public void AppendParsedTranscriptLine(ParsedTranscriptLine parsed)
+    {
+        try { ApplyParsed(parsed); } catch { /* as AppendTranscriptLine */ }
+    }
+
+    private void ApplyTranscriptLine(string line)
+    {
+        if (ParseTranscriptLine(line, _historySessionId) is { } parsed) ApplyParsed(parsed);
+    }
+
+    private void ApplyParsed(ParsedTranscriptLine parsed)
+    {
+        if (parsed.Prompt is { } prompt)
+        {
+            Append(new UserMessageItem(prompt, parsed.Images) { Uuid = parsed.Uuid });
+            return;
+        }
+        foreach (var ev in parsed.Events) Apply(ev);
+    }
+
+    // A typed prompt: string content, or an array with text blocks and no tool_result — minus slash-command
+    // echoes (<command-name>…) and their captured stdout, which the TUI shows but a reader shouldn't. Shared with
+    // TranscriptSearch, so a search finds exactly the prompts the viewer shows.
+    internal static string? GenuineUserPrompt(System.Text.Json.Nodes.JsonNode root)
+    {
+        if (root["isMeta"]?.GetValue<bool>() == true) return null;
+        var content = root["message"]?["content"];
+        string? text = TranscriptJson.AsString(content);
+        if (text is null && content is System.Text.Json.Nodes.JsonArray arr)
+        {
+            if (arr.Any(b => TranscriptJson.BlockType(b) == "tool_result")) return null;
+            text = string.Join("\n", arr
+                .Where(b => TranscriptJson.BlockType(b) == "text")
+                .Select(b => TranscriptJson.AsString(b?["text"]))
+                .Where(t => !string.IsNullOrEmpty(t)));
+        }
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var trimmed = text.TrimStart();
+        if (trimmed.StartsWith("<command-name>", StringComparison.Ordinal)
+            || trimmed.StartsWith("<local-command-stdout>", StringComparison.Ordinal)
+            || trimmed.StartsWith("<local-command-caveat>", StringComparison.Ordinal)
+            || trimmed.StartsWith("<system-reminder>", StringComparison.Ordinal)
+            // A background task's notification is delivered as a plain user record (no isMeta). It becomes a
+            // TaskNoticeItem via StreamJsonParser instead.
+            || trimmed.StartsWith("<task-notification>", StringComparison.Ordinal))
+            return null;
+        return text;
+    }
+
+    // The tools whose call can start background work; only their inputs are parsed for a description.
+    private static bool CanLaunchBackground(string toolName) =>
+        toolName is "Bash" or "PowerShell" or "Monitor" or "Agent" or "Task";
+
+    // The launch's own description ("Run the dev server"), else its command, for naming the task before the CLI does.
+    private static string? LaunchDescription(string inputJson)
+    {
+        try
+        {
+            var input = System.Text.Json.Nodes.JsonNode.Parse(inputJson);
+            return TranscriptJson.AsString(input?["description"]) is { Length: > 0 } d ? d
+                 : TranscriptJson.AsString(input?["command"]);
+        }
+        catch { return null; }
+    }
+
+    // A task changed: re-sync the card that launched it (its live status) and tell the window (chips, counts).
+    private void OnBackgroundTaskChanged(BackgroundTask task)
+    {
+        if (_launchCards.TryGetValue(task.TaskId, out var card)) Changed?.Invoke(card.Owner, ConversationChange.Updated);
+        if (_endNotices.TryGetValue(task.TaskId, out var notice)) Changed?.Invoke(notice, ConversationChange.Updated);
+        BackgroundTaskChanged?.Invoke(task);
+    }
+
+    /// <summary>Every user prompt in the thread, oldest first, for the composer's ↑/↓ input-history recall.
+    /// Includes resumed history (it reads the same <see cref="UserMessageItem"/>s) and skips blank entries
+    /// (an image-only message whose text stripped to nothing).</summary>
+    public IReadOnlyList<string> UserPromptHistory() =>
+        _items.OfType<UserMessageItem>()
+              .Select(u => u.Text)
+              .Where(t => !string.IsNullOrWhiteSpace(t))
+              .ToList();
+
+    /// <summary>Records a prompt the user sent (the controller already wrote it to the CLI), with any
+    /// attachments for display.</summary>
+    public void AddUserPrompt(string text, IReadOnlyList<MessageAttachment>? attachments = null)
+    {
+        Append(new UserMessageItem(text, attachments));
+        _suppressNextResultContext = false;   // a genuine new turn: its result's context is real again
+        if (TurnActive) QueuedPrompts++; else TurnActive = true;
+        // `/compact` runs as an ordinary turn, but its effect is to shrink the context rather than to answer,
+        // so drop a marker that explains the upcoming context drop — the CLI itself emits only progress
+        // `status` system records, which the parser ignores (see docs/slash-command-actions.md, Group B). The
+        // optional [instructions] ride through in the sent text; echo them so the marker says what was kept.
+        // Context/usage figures self-correct on the compaction turn's result (ContextTokens = latest prompt).
+        // `/compact` runs as an ordinary turn, but its effect is to shrink the context rather than to answer,
+        // so it becomes a live progress row (the CLI streams status while it works; the row's meter follows
+        // and its result finalises it below). Snapshot the context size to report how much was freed.
+        // (`/autocompact` is a native command handled by SessionWindow — it opens the auto-compaction modal.)
+        if (SlashCommandCatalog.CommandName(text) == "compact")
+        {
+            var item = new CompactionItem(CompactInstructions(text));
+            _activeCompaction = item;
+            _contextBeforeCompaction = ContextTokens;
+            _compactionInterrupted = false;
+            Append(item);
+        }
+        StateChanged?.Invoke();
+    }
+
+    // The text after `/compact` (the summarisation instructions), or null when none were given.
+    private static string? CompactInstructions(string text)
+    {
+        var t = text.TrimStart();
+        int sp = t.IndexOf(' ');
+        if (sp < 0) return null;
+        var rest = t[(sp + 1)..].Trim();
+        return rest.Length > 0 ? rest : null;
+    }
+
+    public void AddNote(string text, NoteKind kind = NoteKind.Info) => Append(new NoteItem(text, kind));
+
+    /// <summary>The user asked to interrupt the turn. If a <c>/compact</c> is running, remember it so its
+    /// progress row settles to a canceled state (not a green success) when the aborted result lands.</summary>
+    public void NoteInterrupt()
+    {
+        if (_activeCompaction is { IsDone: false }) _compactionInterrupted = true;
+    }
+
+    // `/clear` re-based the session onto a new id with wiped context: drop every conversation item and the
+    // per-conversation turn/context bookkeeping, leaving a marker, and rebuild the view via Reset. Cumulative
+    // process-level spend (cost, total tokens) is kept — it's the same process and billing window.
+    private void ClearForNewConversation()
+    {
+        _items.Clear();
+        _toolCalls.Clear();
+        _launchCards.Clear();   // the tasks keep running in the same process; only their cards are gone
+        _endNotices.Clear();
+        PendingPermission = null;
+        TurnActive = false;
+        QueuedPrompts = 0;
+        MayHaveQueuedTurn = false;
+        LastTurn = null;
+        ContextTokens = 0;
+        _activeCompaction = null;
+        _items.Add(new NoteItem("conversation cleared"));
+        Reset?.Invoke();
+    }
+
+    /// <summary>The prompts a rewind or fork can anchor on, oldest first: every user prompt in the thread (a
+    /// <c>/clear</c> already dropped the earlier conversation's), minus slash commands, which the transcript
+    /// records as command echoes rather than prompts.</summary>
+    public IReadOnlyList<UserMessageItem> RewindCandidates() =>
+        _items.OfType<UserMessageItem>().Where(u => !SlashCommandCatalog.LooksLikeCommand(u.Text)).ToList();
+
+    /// <summary>A conversation rewind landed: drop <paramref name="prompt"/> and everything after it, with the
+    /// per-turn bookkeeping that went with them, leaving a marker. Called once the truncating restart is up, so
+    /// the restart's own notes (which follow the prompt) go too. No-op for a prompt not in the thread.</summary>
+    public void TruncateFrom(UserMessageItem prompt)
+    {
+        int at = _items.IndexOf(prompt);
+        if (at < 0) return;
+        _items.RemoveRange(at, _items.Count - at);
+        _toolCalls.Clear();
+        _launchCards.Clear();
+        _endNotices.Clear();
+        PendingPermission = null;
+        TurnActive = false;
+        QueuedPrompts = 0;
+        MayHaveQueuedTurn = false;
+        _activeCompaction = null;
+        _items.Add(new NoteItem($"rewound to before “{Preview(prompt.Text)}”"));
+        Reset?.Invoke();
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>A prompt cut to one short line, for notes and the rewind bar.</summary>
+    internal static string Preview(string text, int max = 60)
+    {
+        var line = text.ReplaceLineEndings(" ").Trim();
+        return line.Length <= max ? line : line[..(max - 1)].TrimEnd() + "…";
+    }
+
+    /// <summary>Marks the pending permission answered (the controller already replied to the CLI).</summary>
+    public void ResolvePermission(PermissionItem item, bool allowed, string? switchedMode = null, string? answerSummary = null)
+    {
+        if (item.Resolution != PermissionResolution.Pending) return;
+        item.Resolution = allowed ? PermissionResolution.Allowed : PermissionResolution.Denied;
+        item.SwitchedMode = allowed ? switchedMode : null;
+        item.AnswerSummary = answerSummary;
+        if (ReferenceEquals(PendingPermission, item)) PendingPermission = null;
+        Changed?.Invoke(item, ConversationChange.Updated);
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>The process ended: settle every in-flight thing so the UI shows a quiet, closed state.</summary>
+    public void SessionEnded(int exitCode, string stderrTail)
+    {
+        if (PendingPermission is { } pending)
+        {
+            pending.Resolution = PermissionResolution.Expired;
+            PendingPermission = null;
+            Changed?.Invoke(pending, ConversationChange.Updated);
+        }
+        foreach (var (owner, part) in _toolCalls.Values)
+        {
+            if (part.Status == ToolCallStatus.Running) part.Status = ToolCallStatus.Failed;
+            Changed?.Invoke(owner, ConversationChange.Updated);
+        }
+        _toolCalls.Clear();
+        for (int i = _items.Count - 1; i >= 0; i--)
+            if (_items[i] is AssistantMessageItem { IsComplete: false } a)
+            {
+                FreezeStreaming(a);
+                a.IsComplete = true;
+                Changed?.Invoke(a, ConversationChange.Updated);
+            }
+        // A compaction still in flight didn't get its result — settle its meter (as canceled) so it doesn't
+        // spin forever.
+        if (_activeCompaction is { IsDone: false } compaction)
+        {
+            compaction.IsDone = true;
+            compaction.Failed = true;
+            Changed?.Invoke(compaction, ConversationChange.Updated);
+            _activeCompaction = null;
+        }
+        TurnActive = false;
+        QueuedPrompts = 0;
+        MayHaveQueuedTurn = false;
+        CliState = null;
+        BackgroundTasks.SessionEnded();   // the CLI's background work dies with it
+        Append(new NoteItem(
+            exitCode == 0 ? "session ended" : $"claude exited ({exitCode}) {stderrTail}".TrimEnd(),
+            exitCode == 0 ? NoteKind.Info : NoteKind.Error));
+        StateChanged?.Invoke();
+    }
+
+    // The CLI's own turn state, the only signal for a turn a Remote Control client started or answered. It corrects
+    // what Perch inferred rather than replacing it: results and output still settle/reopen turns as before, which
+    // is all an older CLI (no state events) has.
+    private void ApplyCliState(string state)
+    {
+        CliState = state;
+        if (state != "idle")
+        {
+            TurnActive = true;
+            MayHaveQueuedTurn = false;
+            return;
+        }
+        // Idle: nothing runs or is queued, so no prompt can still be waiting on Perch — a card the CLI never
+        // withdrew is stale. (stdout is ordered, so a request it still held would have come before this.)
+        if (PendingPermission is { } stale)
+        {
+            stale.Resolution = PermissionResolution.Expired;
+            PendingPermission = null;
+            Changed?.Invoke(stale, ConversationChange.Updated);
+        }
+        TurnActive = false;
+        QueuedPrompts = 0;
+        MayHaveQueuedTurn = false;
+    }
+
+    // A turn starting (init) or main-thread output after a result settled the turn means the CLI started a queued
+    // prompt as its own turn. A sub-agent's messages don't count: a background agent keeps streaming after the
+    // result. Only a live stream has results, so a tailed transcript never reopens. The caller raises StateChanged.
+    private bool ReopenTurn(SessionEvent ev)
+    {
+        if (TurnActive || LastTurn is null || ev.FromSubagent) return false;
+        TurnActive = true;
+        MayHaveQueuedTurn = false;
+        return true;
+    }
+
+    // The assistant item events accumulate into: the trailing open one, else a fresh one. A user message or a
+    // permission prompt in between starts a new assistant item, which is what makes turns read as units.
+    private AssistantMessageItem OpenAssistant()
+    {
+        if (_items.Count > 0 && _items[^1] is AssistantMessageItem { IsComplete: false } open) return open;
+        var item = new AssistantMessageItem();
+        Append(item);
+        return item;
+    }
+
+    private static void FreezeStreaming(AssistantMessageItem item)
+    {
+        foreach (var part in item.Parts)
+            if (part is TextPart { IsStreaming: true } t) t.IsStreaming = false;
+    }
+
+    private void Append(ConversationItem item)
+    {
+        _items.Add(item);
+        Changed?.Invoke(item, ConversationChange.Added);
+    }
+}

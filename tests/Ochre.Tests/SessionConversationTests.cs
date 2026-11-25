@@ -1,0 +1,969 @@
+using Ochre.Core.Claude.Control;
+using Xunit;
+
+namespace Ochre.Tests;
+
+/// <summary>
+/// The message/turn model behind the rich session UI (docs/session-ui-plan.md, Phase 1): how the flat
+/// stream-json events group into user / assistant / permission items, how streaming text finalises, and
+/// the turn/queue/permission bookkeeping the header shows.
+/// </summary>
+public class SessionConversationTests
+{
+    private static (SessionConversation Conv, List<(ConversationItem Item, ConversationChange Change)> Log) Make()
+    {
+        var conv = new SessionConversation();
+        var log = new List<(ConversationItem, ConversationChange)>();
+        conv.Changed += (item, change) => log.Add((item, change));
+        return (conv, log);
+    }
+
+    [Fact]
+    public void AddUserPrompt_CarriesAttachments()
+    {
+        var (conv, _) = Make();
+        var attachments = new List<MessageAttachment>
+        {
+            new() { Kind = AttachmentKind.Image, Path = Path.Combine(Path.GetTempPath(), "shot.png"), MediaType = "image/png" },
+            new() { Kind = AttachmentKind.File, Path = Path.Combine(Path.GetTempPath(), "notes.txt") },
+        };
+        conv.AddUserPrompt("look at these", attachments);
+
+        var item = Assert.IsType<UserMessageItem>(Assert.Single(conv.Items));
+        Assert.Equal("look at these", item.Text);
+        Assert.Equal(2, item.Attachments.Count);
+        Assert.Equal("shot.png", item.Attachments[0].DisplayName);
+        Assert.Equal(AttachmentKind.File, item.Attachments[1].Kind);
+    }
+
+    [Fact]
+    public void AddUserPrompt_NoAttachments_IsEmptyNotNull()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("plain");
+        Assert.Empty(Assert.IsType<UserMessageItem>(Assert.Single(conv.Items)).Attachments);
+    }
+
+    [Fact]
+    public void Init_SeedsIdentity()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "acceptEdits", 16, ["/model", "/compact"]));
+        Assert.Equal("sid-1", conv.SessionId);
+        Assert.Equal("claude-opus-5", conv.Model);
+        Assert.Equal("acceptEdits", conv.PermissionMode);
+        Assert.Equal(16, conv.ToolCount);
+        Assert.Equal(new[] { "/model", "/compact" }, conv.SlashCommands);
+        Assert.Empty(conv.Items);
+    }
+
+    [Fact]
+    public void SecondInitWithNewId_ClearsConversation()
+    {
+        var (conv, _) = Make();
+        // A live conversation under the first id: a turn with prose, a per-message usage (the occupancy), plus
+        // a result seeding cost.
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        conv.AddUserPrompt("remember BANANA");
+        conv.Apply(new AssistantTextEvent("OK"));
+        conv.Apply(new AssistantUsageEvent(5000));
+        conv.Apply(new TurnResultEvent(false, "success", 0.12, InputTokens: 5000, OutputTokens: 20, DurationMs: 900));
+        Assert.NotEmpty(conv.Items);
+        Assert.True(conv.ContextTokens > 0);
+
+        bool reset = false;
+        conv.Reset += () => reset = true;
+
+        // `/clear` re-bases the session onto a new id with wiped context (a fresh init).
+        conv.Apply(new SessionInitEvent("sid-2", "claude-opus-5", "default", 16));
+
+        Assert.True(reset);
+        Assert.Equal("sid-2", conv.SessionId);
+        var note = Assert.IsType<NoteItem>(Assert.Single(conv.Items));   // only the marker remains
+        Assert.Equal("conversation cleared", note.Text);
+        Assert.Equal(0, conv.ContextTokens);
+        Assert.False(conv.TurnActive);
+        Assert.Null(conv.LastTurn);
+        Assert.Equal(0.12, conv.TotalCostUsd);   // cumulative process spend is kept
+    }
+
+    [Fact]
+    public void TruncateFrom_DropsThePromptAndEverythingAfter()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        conv.AddUserPrompt("first");
+        conv.Apply(new AssistantTextEvent("one"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, InputTokens: 10, OutputTokens: 5, DurationMs: 100));
+        conv.AddUserPrompt("/compact");
+        conv.AddUserPrompt("second");
+        conv.Apply(new AssistantTextEvent("two"));
+
+        var candidates = conv.RewindCandidates();
+        Assert.Equal(["first", "second"], candidates.Select(c => c.Text));   // slash commands aren't anchors
+
+        bool reset = false;
+        conv.Reset += () => reset = true;
+        conv.TruncateFrom(candidates[1]);
+
+        Assert.True(reset);
+        Assert.False(conv.TurnActive);
+        Assert.DoesNotContain(conv.Items, i => i is UserMessageItem { Text: "second" });
+        Assert.Contains(conv.Items, i => i is UserMessageItem { Text: "first" });
+        var marker = Assert.IsType<NoteItem>(conv.Items[^1]);
+        Assert.Equal("rewound to before “second”", marker.Text);
+    }
+
+    [Fact]
+    public void LoadHistory_SetsPromptUuids()
+    {
+        var (conv, _) = Make();
+        conv.LoadHistory(["""{"type":"user","uuid":"u-1","parentUuid":null,"message":{"role":"user","content":"hello"}}"""]);
+        Assert.Equal("u-1", Assert.IsType<UserMessageItem>(Assert.Single(conv.Items)).Uuid);
+    }
+
+    [Fact]
+    public void FirstInit_MatchingSeededId_DoesNotClear()
+    {
+        var (conv, _) = Make();
+        conv.SetSessionId("sid-1");            // seeded at launch, before init
+        conv.AddUserPrompt("hi");
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));   // same id → not a clear
+        Assert.IsType<UserMessageItem>(Assert.Single(conv.Items));   // the user prompt survives
+    }
+
+    [Fact]
+    public void ContextTokens_TrackLatestMessage_NotTheTurnAggregate()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        conv.AddUserPrompt("do a big agentic task");
+
+        // An agentic turn with many tool-use round-trips, each re-reading the ~127k cached context. Every
+        // assistant message's usage reports that single prompt's size — the true current occupancy.
+        for (int i = 0; i < 9; i++)
+        {
+            conv.Apply(new ToolUseEvent($"t{i}", "Read", "Reading", "{}"));
+            conv.Apply(new AssistantUsageEvent(127_000));
+            conv.Apply(new ToolResultEvent($"t{i}", "…", false));
+        }
+
+        // The result's usage is the turn AGGREGATE — every round-trip's cache reads summed (~1.14M). Reading
+        // that as occupancy is the bug that made the pill show "1.2M · 59%"; occupancy must stay the latest
+        // message's size.
+        conv.Apply(new TurnResultEvent(false, "success", 0.4,
+            InputTokens: 20, OutputTokens: 3_000, DurationMs: 5000,
+            CacheReadTokens: 1_143_000, CacheCreationTokens: 5_000));
+
+        Assert.Equal(127_000, conv.ContextTokens);            // the latest message, not the ~1.14M aggregate
+        Assert.True(conv.TotalFreshInputTokens >= 5_000);     // cumulative totals still come from the result
+    }
+
+    [Fact]
+    public void Compact_ShowsAProgressRowThenFinalises()
+    {
+        var (conv, _) = Make();
+        // Seed some context (from a real per-message usage) so the freed-tokens figure is meaningful.
+        conv.Apply(new AssistantUsageEvent(60_000));
+
+        conv.AddUserPrompt("/compact keep the failing test details");
+        Assert.Equal("/compact keep the failing test details", Assert.IsType<UserMessageItem>(conv.Items[^2]).Text);
+        var progress = Assert.IsType<CompactionItem>(conv.Items[^1]);
+        Assert.Equal("keep the failing test details", progress.Instructions);
+        Assert.Null(progress.Percent);       // indeterminate until the CLI reports one
+        Assert.False(progress.IsDone);
+
+        // A status record advances the meter.
+        conv.Apply(new StatusEvent(42, "Compacting conversation…"));
+        Assert.Equal(42, progress.Percent);
+
+        // The compaction turn's result finalises the row and reports what it reclaimed.
+        conv.Apply(new TurnResultEvent(false, "success", 0.06, InputTokens: 8_000, OutputTokens: 5, DurationMs: 1200));
+        Assert.True(progress.IsDone);
+        Assert.Equal(100, progress.Percent);
+        Assert.Equal(52_000, progress.FreedTokens);   // 60k before − 8k after
+        Assert.Equal(8_000, conv.ContextTokens);
+        Assert.False(conv.TurnActive);
+    }
+
+    [Fact]
+    public void Compact_CompactBoundary_FinalisesAsSuccessWithExactFreedTokens()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new TurnResultEvent(false, "success", 0.05, InputTokens: 8_281, OutputTokens: 10, DurationMs: 900));
+        conv.AddUserPrompt("/compact");
+        var progress = Assert.IsType<CompactionItem>(conv.Items[^1]);
+
+        // The authoritative success signal (only emitted on a real compaction) carries pre/post tokens.
+        conv.Apply(new CompactionCompletedEvent(PreTokens: 8_281, PostTokens: 5_350, Trigger: "manual"));
+
+        Assert.True(progress.IsDone);
+        Assert.False(progress.Failed);                 // a real success, not the false failure we shipped
+        Assert.Equal(100, progress.Percent);
+        Assert.Equal(2_931, progress.FreedTokens);      // 8281 − 5350
+        Assert.Equal(5_350, conv.ContextTokens);        // context corrected to the post size
+        Assert.False(conv.TurnActive);                  // the boundary settles the turn (no phantom "working")
+
+        // The compact turn's own result then lands: it must NOT re-open/re-fail the settled row, must keep the
+        // turn settled, and its (large summarisation) input must NOT clobber the corrected occupancy.
+        conv.Apply(new TurnResultEvent(false, "success", 0.06, InputTokens: 90_000, OutputTokens: 3, DurationMs: 100));
+        Assert.False(progress.Failed);
+        Assert.False(conv.TurnActive);
+        Assert.Equal(5_350, conv.ContextTokens);        // suppressed — still the post size, not 90k
+    }
+
+    [Fact]
+    public void Compact_AfterBoundary_NextPromptRunsInsteadOfQueuing()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new TurnResultEvent(false, "success", 0.05, InputTokens: 8_281, OutputTokens: 10, DurationMs: 900));
+        conv.AddUserPrompt("/compact");
+        conv.Apply(new CompactionCompletedEvent(PreTokens: 8_281, PostTokens: 5_350, Trigger: "manual"));
+
+        // With the turn settled at the boundary, a follow-up prompt starts its own turn (not queued behind a
+        // phantom "working" compaction) — so its result will refresh the composer's context/token pills.
+        conv.AddUserPrompt("now what?");
+        Assert.True(conv.TurnActive);
+        Assert.Equal(0, conv.QueuedPrompts);
+    }
+
+    [Fact]
+    public void Compact_Interrupted_SettlesToCanceledNotSuccess()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new AssistantUsageEvent(60_000));
+        conv.AddUserPrompt("/compact");
+        var progress = Assert.IsType<CompactionItem>(conv.Items[^1]);
+
+        // The user interrupts; the aborted turn returns with the context unchanged (nothing reclaimed).
+        conv.NoteInterrupt();
+        conv.Apply(new TurnResultEvent(false, "success", 0.05, InputTokens: 60_000, OutputTokens: 2, DurationMs: 500));
+
+        Assert.True(progress.IsDone);
+        Assert.True(progress.Failed);          // canceled, not a green success
+        Assert.NotEqual(100, progress.Percent ?? 0);
+        Assert.Equal(0, progress.FreedTokens);
+    }
+
+    [Fact]
+    public void Status_WithoutAnActiveCompaction_IsIgnored()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new StatusEvent(30, "some status"));
+        Assert.Empty(conv.Items);   // a stray status record adds nothing
+    }
+
+    [Fact]
+    public void OrdinaryPrompt_DropsNoCompactionMarker()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("please compact the layout");   // not a /compact command
+        Assert.IsType<UserMessageItem>(Assert.Single(conv.Items));
+    }
+
+    [Fact]
+    public void StreamingDeltas_AccumulateThenFinalise()
+    {
+        var (conv, log) = Make();
+        conv.AddUserPrompt("hi");
+        conv.Apply(new TextDeltaEvent("Hel"));
+        conv.Apply(new TextDeltaEvent("lo"));
+
+        var assistant = Assert.IsType<AssistantMessageItem>(conv.Items[1]);
+        var text = Assert.IsType<TextPart>(Assert.Single(assistant.Parts));
+        Assert.Equal("Hello", text.Text);
+        Assert.True(text.IsStreaming);
+
+        conv.Apply(new AssistantTextEvent("Hello **world**"));
+        Assert.Single(assistant.Parts);   // finalised in place, not appended
+        Assert.Equal("Hello **world**", text.Text);
+        Assert.False(text.IsStreaming);
+
+        // One Added for the assistant item, then Updated per delta/final.
+        Assert.Equal(ConversationChange.Added, log.First(e => ReferenceEquals(e.Item, assistant)).Change);
+        Assert.Equal(3, log.Count(e => ReferenceEquals(e.Item, assistant) && e.Change == ConversationChange.Updated));
+    }
+
+    [Fact]
+    public void ThinkingToolsAndText_StayOrderedInOneAssistantItem()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("fix it");
+        conv.Apply(new AssistantThinkingEvent("thinking…"));
+        conv.Apply(new ToolUseEvent("t1", "Read", "Reading Foo.cs", "{\"file_path\":\"Foo.cs\"}"));
+        conv.Apply(new ToolResultEvent("t1", "class Foo {}", false));
+        conv.Apply(new AssistantTextEvent("Done."));
+        conv.Apply(new TurnResultEvent(false, "success", 0.02, 10, 20, 900));
+
+        Assert.Equal(2, conv.Items.Count);
+        var a = Assert.IsType<AssistantMessageItem>(conv.Items[1]);
+        Assert.Collection(a.Parts,
+            p => Assert.Equal("thinking…", Assert.IsType<ThinkingPart>(p).Text),
+            p =>
+            {
+                var tool = Assert.IsType<ToolCallPart>(p);
+                Assert.Equal("Read", tool.ToolName);
+                Assert.Equal(ToolCallStatus.Done, tool.Status);
+                Assert.Equal("class Foo {}", tool.ResultText);
+                Assert.Contains("Foo.cs", tool.InputJson);
+            },
+            p => Assert.Equal("Done.", Assert.IsType<TextPart>(p).Text));
+        Assert.True(a.IsComplete);
+        Assert.Equal(0.02, a.Result!.CostUsd);
+        Assert.Equal(0.02, conv.TotalCostUsd);
+        Assert.False(conv.TurnActive);
+    }
+
+    [Fact]
+    public void ToolError_MarksFailed()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new ToolUseEvent("t1", "Bash", "Running: false", "{}"));
+        conv.Apply(new ToolResultEvent("t1", "exit 1", true));
+        var tool = Assert.IsType<ToolCallPart>(Assert.IsType<AssistantMessageItem>(conv.Items[0]).Parts[0]);
+        Assert.Equal(ToolCallStatus.Failed, tool.Status);
+        Assert.Equal("exit 1", tool.ResultText);
+    }
+
+    [Fact]
+    public void Permission_IsItsOwnItem_AndSplitsTheAssistantTurn()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("commit");
+        conv.Apply(new ToolUseEvent("t1", "Bash", "Running: git commit", "{}"));
+        var request = new PermissionRequestEvent("req1", "Bash", "git commit -am x", "{\"command\":\"git commit\"}", "acceptEdits");
+        conv.Apply(request);
+
+        var perm = Assert.IsType<PermissionItem>(conv.Items[2]);
+        Assert.Same(perm, conv.PendingPermission);
+        Assert.Equal(PermissionResolution.Pending, perm.Resolution);
+
+        conv.ResolvePermission(perm, allowed: true, switchedMode: "acceptEdits");
+        Assert.Null(conv.PendingPermission);
+        Assert.Equal(PermissionResolution.Allowed, perm.Resolution);
+        Assert.Equal("acceptEdits", perm.SwitchedMode);
+
+        // The tool result still lands on the ORIGINAL tool card, even though later prose opens a new item.
+        conv.Apply(new ToolResultEvent("t1", "[main abc123] x", false));
+        conv.Apply(new AssistantTextEvent("Committed."));
+        var first = Assert.IsType<AssistantMessageItem>(conv.Items[1]);
+        Assert.Equal(ToolCallStatus.Done, Assert.IsType<ToolCallPart>(first.Parts[0]).Status);
+        var second = Assert.IsType<AssistantMessageItem>(conv.Items[3]);
+        Assert.Equal("Committed.", Assert.IsType<TextPart>(second.Parts[0]).Text);
+
+        // The turn result closes both open assistant items.
+        conv.Apply(new TurnResultEvent(false, "success", 0.05, 1, 2, 3));
+        Assert.True(first.IsComplete);
+        Assert.True(second.IsComplete);
+    }
+
+    // Remote Control (docs/remote-control-sync-plan.md): a client on the bridge answered the prompt first, so the CLI
+    // withdraws it from Perch. The card settles and the session stops reading as "waiting".
+    [Fact]
+    public void CancelledPermission_SettlesAsAnsweredElsewhere()
+    {
+        var (conv, log) = Make();
+        conv.AddUserPrompt("commit");
+        conv.Apply(new PermissionRequestEvent("req1", "Bash", "git commit", "{}", null));
+        var perm = Assert.IsType<PermissionItem>(conv.Items[^1]);
+
+        conv.Apply(new ControlRequestCancelledEvent("req1"));
+
+        Assert.Equal(PermissionResolution.AnsweredElsewhere, perm.Resolution);
+        Assert.Null(conv.PendingPermission);
+        Assert.Contains((perm, ConversationChange.Updated), log);
+        Assert.True(conv.TurnActive);   // the turn carries on with the remote answer
+    }
+
+    [Fact]
+    public void CancelledPermission_UnknownOrAlreadyAnswered_ChangesNothing()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("go");
+        conv.Apply(new PermissionRequestEvent("req1", "Bash", "ls", "{}", null));
+        var perm = Assert.IsType<PermissionItem>(conv.Items[^1]);
+
+        conv.Apply(new ControlRequestCancelledEvent("someone-else"));
+        Assert.Same(perm, conv.PendingPermission);
+
+        conv.ResolvePermission(perm, allowed: false);
+        conv.Apply(new ControlRequestCancelledEvent("req1"));
+        Assert.Equal(PermissionResolution.Denied, perm.Resolution);
+    }
+
+    // A turn a Remote Control client starts sends Perch no prompt: only the CLI's own state says it's running.
+    [Fact]
+    public void CliState_RunningAndIdle_DriveTheTurn_EvenBeforeAnyResult()
+    {
+        var (conv, _) = Make();
+        Assert.Null(conv.CliState);
+
+        conv.Apply(new SessionStateEvent("running"));
+        Assert.True(conv.TurnActive);
+        Assert.False(conv.IsSettled);
+
+        conv.Apply(new SessionStateEvent("idle"));
+        Assert.False(conv.TurnActive);
+        Assert.Equal("idle", conv.CliState);
+    }
+
+    [Fact]
+    public void CliState_Idle_SettlesQueuedBookkeeping()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");   // queued behind the first
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 1, 1, 1));
+        Assert.True(conv.MayHaveQueuedTurn);
+
+        conv.Apply(new SessionStateEvent("idle"));
+        Assert.False(conv.MayHaveQueuedTurn);
+        Assert.Equal(0, conv.QueuedPrompts);
+        Assert.True(conv.IsSettled);
+    }
+
+    [Fact]
+    public void CliState_RequiresActionWithNoPerchPrompt_IsWaitingElsewhere()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionStateEvent("requires_action"));
+        Assert.True(conv.TurnActive);
+        Assert.True(conv.WaitingElsewhere);
+
+        // Once Perch holds the prompt itself it's an ordinary pending permission, not a remote wait.
+        conv.Apply(new PermissionRequestEvent("req1", "Bash", "ls", "{}", null));
+        Assert.False(conv.WaitingElsewhere);
+    }
+
+    [Fact]
+    public void CliState_Idle_ExpiresAPromptTheCliNeverWithdrew()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("go");
+        conv.Apply(new PermissionRequestEvent("req1", "Bash", "ls", "{}", null));
+        var perm = Assert.IsType<PermissionItem>(conv.Items[^1]);
+
+        conv.Apply(new SessionStateEvent("idle"));
+
+        Assert.Equal(PermissionResolution.Expired, perm.Resolution);
+        Assert.Null(conv.PendingPermission);
+        Assert.False(conv.TurnActive);
+    }
+
+    // Claude Code absorbs a prompt sent mid-turn into the running turn (transcript: queue-operation "remove",
+    // reason "absorbed_mid_turn") and emits a single result for both. Captured live from 2.1.282: prompt one
+    // runs `sleep 20`, prompt two arrives during it, and one assistant message answers both.
+    [Fact]
+    public void MidTurnPrompt_AbsorbedIntoRunningTurn_OneResultSettles()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("Run `sleep 20`, then reply DONE.");
+        conv.Apply(new ToolUseEvent("t1", "Bash", "Running: sleep 20"));
+        conv.AddUserPrompt("Also, reply BANANA.");
+        conv.Apply(new ToolResultEvent("t1", "", false));
+        conv.Apply(new AssistantTextEvent("DONE\nBANANA"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 5, 0));
+
+        Assert.False(conv.TurnActive);
+        Assert.Equal(0, conv.QueuedPrompts);
+    }
+
+    [Fact]
+    public void AfterAbsorbedPrompt_NextTurnStillSettlesOnItsResult()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");                                   // absorbed by the CLI
+        conv.Apply(new AssistantTextEvent("both answered"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 5, 0));
+
+        conv.AddUserPrompt("three");
+        Assert.True(conv.TurnActive);
+        Assert.Equal(0, conv.QueuedPrompts);
+        conv.Apply(new AssistantTextEvent("answered"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.02, 0, 162, 0));
+        Assert.False(conv.TurnActive);
+    }
+
+    // When the CLI does run a queued prompt as its own turn, that turn's output re-opens the turn after the
+    // previous result settled it, and its own result settles it again.
+    [Fact]
+    public void QueuedPrompt_RunAsOwnTurn_ReopensOnActivity()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        Assert.Equal(1, conv.QueuedPrompts);
+        conv.Apply(new AssistantTextEvent("first"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        Assert.False(conv.TurnActive);
+
+        conv.Apply(new TextDeltaEvent("sec"));
+        Assert.True(conv.TurnActive);
+        conv.Apply(new AssistantTextEvent("second"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.02, 0, 0, 0));
+        Assert.False(conv.TurnActive);
+        Assert.Equal(0.02, conv.TotalCostUsd);
+    }
+
+    // The CLI emits `system init` at the start of every turn (captured live from 2.1.282, ~20ms after the
+    // previous result), so a queued turn reads as running before its first model output.
+    [Fact]
+    public void InitAfterResult_ReopensTurn()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        Assert.False(conv.TurnActive);
+
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        Assert.True(conv.TurnActive);
+        Assert.False(conv.MayHaveQueuedTurn);
+    }
+
+    [Fact]
+    public void FirstInit_DoesNotOpenATurn()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        Assert.False(conv.TurnActive);
+    }
+
+    [Fact]
+    public void CleanTurn_IsSettled()
+    {
+        var (conv, _) = Make();
+        Assert.False(conv.IsSettled);                                // no completed turn yet
+        conv.AddUserPrompt("one");
+        Assert.False(conv.IsSettled);
+        conv.Apply(new AssistantTextEvent("answer"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        Assert.False(conv.MayHaveQueuedTurn);
+        Assert.True(conv.IsSettled);
+    }
+
+    // After a result that closed a turn with prompts sent mid-turn, the CLI may be about to run them, so the
+    // session must not count as settled (auto-compaction would send /compact into that gap).
+    [Fact]
+    public void ResultAfterMidTurnPrompt_IsNotSettled()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+
+        Assert.False(conv.TurnActive);
+        Assert.True(conv.MayHaveQueuedTurn);
+        Assert.False(conv.IsSettled);
+    }
+
+    [Fact]
+    public void PossiblyQueuedTurn_SettlesAfterItRuns()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        conv.Apply(new AssistantTextEvent("two"));
+        Assert.False(conv.IsSettled);
+        conv.Apply(new TurnResultEvent(false, "success", 0.02, 0, 0, 0));
+        Assert.True(conv.IsSettled);
+    }
+
+    // Absorbed: no queued turn ever runs, so the flag holds until the next turn settles with nothing sent mid-turn.
+    [Fact]
+    public void AbsorbedPrompt_SettlesAfterNextCleanTurn()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        Assert.False(conv.IsSettled);
+
+        conv.AddUserPrompt("three");
+        conv.Apply(new TurnResultEvent(false, "success", 0.02, 0, 0, 0));
+        Assert.True(conv.IsSettled);
+    }
+
+    [Fact]
+    public void Clear_ResetsPossiblyQueuedTurn()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        conv.Apply(new SessionInitEvent("sid-2", "claude-opus-5", "default", 16));
+        Assert.False(conv.MayHaveQueuedTurn);
+        Assert.False(conv.TurnActive);
+    }
+
+    // A background agent keeps streaming after the main turn's result; its messages must not reopen the turn.
+    [Fact]
+    public void SubagentOutputAfterResult_DoesNotReopenTurn()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("launch a background agent");
+        conv.Apply(new AssistantTextEvent("LAUNCHED"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+
+        conv.Apply(new ToolUseEvent("t2", "Bash", "Running: sleep 15") { FromSubagent = true });
+        conv.Apply(new AssistantTextEvent("OK") { FromSubagent = true });
+        Assert.False(conv.TurnActive);
+        Assert.True(conv.IsSettled);
+    }
+
+    [Fact]
+    public void InitReopeningTurn_RaisesStateChangedOnce()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        conv.AddUserPrompt("one");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        int raised = 0;
+        conv.StateChanged += () => raised++;
+
+        conv.Apply(new SessionInitEvent("sid-1", "claude-opus-5", "default", 16));
+        Assert.True(conv.TurnActive);
+        Assert.Equal(1, raised);
+    }
+
+    // A background task (run_in_background Bash, or an async agent) finishing after the turn's result: the CLI hands
+    // its result back in a turn of its own, with nothing sent from Perch and nothing queued. That turn must read busy
+    // — StateChanged is what publishes the overlay's status — and its result settles it, which is the overlay's
+    // busy→idle "done". Before the reopen it stayed idle throughout, so the row read "idle" and no "done" came.
+    [Fact]
+    public void BackgroundTaskHandBack_ReopensTurnAndRaisesStateChanged()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("run the build in the background");
+        conv.Apply(new ToolUseEvent("t1", "PowerShell", "Running: dotnet build"));
+        conv.Apply(new ToolResultEvent("t1", "Command running in background with ID: bcek9ulsc", false));
+        conv.Apply(new AssistantTextEvent("started it"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        Assert.False(conv.TurnActive);
+        Assert.False(conv.MayHaveQueuedTurn);
+        int raised = 0;
+        conv.StateChanged += () => raised++;
+
+        conv.Apply(new ToolUseEvent("t2", "PowerShell", "Running: git remote -v"));
+        Assert.True(conv.TurnActive);
+        Assert.True(raised > 0);
+
+        conv.Apply(new TurnResultEvent(false, "success", 0.02, 0, 0, 0));
+        Assert.False(conv.TurnActive);
+        Assert.True(conv.IsSettled);
+    }
+
+    [Fact]
+    public void SessionEnded_ClearsPossiblyQueuedTurn()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        Assert.True(conv.MayHaveQueuedTurn);
+
+        conv.SessionEnded(0, "");
+        Assert.False(conv.MayHaveQueuedTurn);
+    }
+
+    [Fact]
+    public void FinalizeHistory_ClearsPossiblyQueuedTurn()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+
+        conv.FinalizeHistory();
+        Assert.False(conv.MayHaveQueuedTurn);
+    }
+
+    [Fact]
+    public void QueuedPrompts_RunAsSeparateTurns_EachResultSettles()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("one");
+        conv.AddUserPrompt("two");
+        conv.AddUserPrompt("three");
+        Assert.True(conv.TurnActive);
+        Assert.Equal(2, conv.QueuedPrompts);
+
+        conv.Apply(new TurnResultEvent(false, "success", 0.01, 0, 0, 0));
+        Assert.False(conv.TurnActive);
+        Assert.Equal(0, conv.QueuedPrompts);
+        conv.Apply(new AssistantTextEvent("two"));
+        Assert.True(conv.TurnActive);
+        conv.Apply(new TurnResultEvent(false, "success", 0.02, 0, 0, 0));
+        conv.Apply(new AssistantTextEvent("three"));
+        conv.Apply(new TurnResultEvent(false, "success", 0.03, 0, 0, 0));
+        Assert.False(conv.TurnActive);
+        Assert.Equal(0, conv.QueuedPrompts);
+        Assert.Equal(0.03, conv.TotalCostUsd);
+    }
+
+    [Fact]
+    public void ModeChange_NotesOnlyRealChanges()
+    {
+        var (conv, _) = Make();
+        conv.Apply(new SessionInitEvent("s", "m", "default", 1));
+        conv.Apply(new ModeChangedEvent("default"));
+        Assert.Empty(conv.Items);
+        conv.Apply(new ModeChangedEvent("plan"));
+        var note = Assert.IsType<NoteItem>(Assert.Single(conv.Items));
+        Assert.Contains("plan", note.Text);
+        Assert.Equal("plan", conv.PermissionMode);
+    }
+
+    [Fact]
+    public void LoadHistory_ReplaysTranscriptInFrontOfLiveItems()
+    {
+        var (conv, _) = Make();
+        int resets = 0;
+        conv.Reset += () => resets++;
+        conv.AddNote("resuming session abc…");   // the live item that exists before history lands
+
+        var lines = new[]
+        {
+            """{"type":"user","message":{"role":"user","content":"<command-name>/clear</command-name>"}}""",
+            """{"type":"user","message":{"role":"user","content":"fix the rounding bug"},"timestamp":"2026-09-01T10:00:00Z"}""",
+            """{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hmm"},{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"a.cs"}}]}}""",
+            """{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"class A {}"}]}}""",
+            """{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Fixed."}]}}""",
+            """{"type":"user","isSidechain":true,"message":{"role":"user","content":"sub-agent chatter"}}""",
+            """{"type":"user","message":{"role":"user","content":[{"type":"text","text":"thanks"}]}}""",
+            "not json",
+        };
+        Assert.Equal(3, conv.LoadHistory(lines));
+        Assert.Equal(1, resets);
+
+        Assert.Equal(4, conv.Items.Count);
+        Assert.Equal("fix the rounding bug", Assert.IsType<UserMessageItem>(conv.Items[0]).Text);
+        var a = Assert.IsType<AssistantMessageItem>(conv.Items[1]);
+        Assert.True(a.IsComplete);
+        Assert.Collection(a.Parts,
+            p => Assert.IsType<ThinkingPart>(p),
+            p =>
+            {
+                var t = Assert.IsType<ToolCallPart>(p);
+                Assert.Equal(ToolCallStatus.Done, t.Status);
+                Assert.Equal("class A {}", t.ResultText);
+            },
+            p => Assert.Equal("Fixed.", Assert.IsType<TextPart>(p).Text));
+        Assert.Equal("thanks", Assert.IsType<UserMessageItem>(conv.Items[2]).Text);
+        Assert.IsType<NoteItem>(conv.Items[3]);   // the live note stays after the history
+        Assert.False(conv.TurnActive);            // history never counts as a running turn
+    }
+
+    // A resumed window decodes the transcript on a worker (ParseHistory) and applies it on the UI thread; that split
+    // must give exactly what LoadHistory gives from the raw lines.
+    [Fact]
+    public void ParseHistory_ThenLoad_MatchesLoadingTheLines()
+    {
+        var lines = new[]
+        {
+            "",
+            """{"type":"user","message":{"role":"user","content":"fix the rounding bug"}}""",
+            """{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"dotnet test"}}]}}""",
+            """{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"Passed!","is_error":false}]}}""",
+            """{"type":"user","isSidechain":true,"message":{"role":"user","content":"sub-agent chatter"}}""",
+            "not json",
+            """{"type":"assistant","parent_tool_use_id":"t0","message":{"role":"assistant","content":[{"type":"text","text":"from a sub-agent"}]}}""",
+            """{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Fixed."}]}}""",
+        };
+
+        var parsed = SessionConversation.ParseHistory(lines, null);
+        Assert.Equal(5, parsed.Count);   // blank, malformed and sidechain lines are dropped up front
+
+        var (split, _) = Make();
+        var (direct, _) = Make();
+        Assert.Equal(direct.LoadHistory(lines), split.LoadHistory(parsed));
+        Assert.Equal(Describe(direct), Describe(split));
+
+        static string Describe(SessionConversation c) => string.Join("\n", c.Items.Select(i => i switch
+        {
+            UserMessageItem u => "user:" + u.Text,
+            AssistantMessageItem a => "assistant:" + string.Join("|", a.Parts.Select(p => p switch
+            {
+                TextPart t => "text:" + t.Text,
+                ToolCallPart t => $"tool:{t.ToolName}:{t.Status}:{t.ResultText}",
+                _ => p.GetType().Name,
+            })),
+            _ => i.GetType().Name,
+        }));
+    }
+
+    [Fact]
+    public void AppendTranscriptLine_AppendsInOrder_ForTheReadOnlyViewer()
+    {
+        var (conv, _) = Make();
+        // The history viewer feeds lines one at a time, appending in transcript order (unlike LoadHistory's
+        // front-insert), so a bound thread can grow incrementally as an active session is tailed.
+        conv.AppendTranscriptLine("""{"type":"user","message":{"role":"user","content":"first prompt"}}""");
+        conv.AppendTranscriptLine("""{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"answer one"}]}}""");
+        conv.AppendTranscriptLine("""{"type":"user","message":{"role":"user","content":[{"type":"text","text":"second prompt"}]}}""");
+        conv.AppendTranscriptLine("not json");   // a malformed/partial line is skipped, never fatal
+
+        Assert.Equal(3, conv.Items.Count);
+        Assert.Equal("first prompt", Assert.IsType<UserMessageItem>(conv.Items[0]).Text);
+        Assert.IsType<AssistantMessageItem>(conv.Items[1]);
+        Assert.Equal("second prompt", Assert.IsType<UserMessageItem>(conv.Items[2]).Text);
+    }
+
+    [Fact]
+    public void ParseTranscriptLine_IncludeSidechain_ReadsASubAgentsOwnTranscript()
+    {
+        // A sub-agent's transcript is all sidechain lines: the session window's agent tab opts in to keep them,
+        // while the default still drops them from the parent's thread.
+        var lines = new[]
+        {
+            """{"type":"user","isSidechain":true,"message":{"role":"user","content":"explore the auth flow"}}""",
+            """{"type":"assistant","isSidechain":true,"message":{"role":"assistant","content":[{"type":"tool_use","id":"s1","name":"Read","input":{"file_path":"a.cs"}}]}}""",
+        };
+        Assert.All(lines, l => Assert.Null(SessionConversation.ParseTranscriptLine(l, null)));
+
+        var (conv, _) = Make();
+        foreach (var l in lines)
+            if (SessionConversation.ParseTranscriptLine(l, null, includeSidechain: true) is { } p)
+                conv.AppendParsedTranscriptLine(p);
+
+        Assert.Equal(2, conv.Items.Count);
+        Assert.Equal("explore the auth flow", Assert.IsType<UserMessageItem>(conv.Items[0]).Text);
+        var tool = Assert.IsType<ToolCallPart>(Assert.Single(Assert.IsType<AssistantMessageItem>(conv.Items[1]).Parts));
+        Assert.Equal("Read", tool.ToolName);
+    }
+
+    [Fact]
+    public void ParseTranscriptLine_ThenApply_MatchesAppendTranscriptLine()
+    {
+        // Review fixes CP24: the history viewer decodes lines on a worker (ParseTranscriptLine) and applies them on
+        // the UI thread (AppendParsedTranscriptLine). The two halves must add up to exactly AppendTranscriptLine.
+        var lines = new[]
+        {
+            """{"type":"user","message":{"role":"user","content":"<command-name>/clear</command-name>"}}""",
+            """{"type":"user","message":{"role":"user","content":"fix the rounding bug"},"timestamp":"2026-09-01T10:00:00Z"}""",
+            """{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hmm"},{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"a.cs"}}]}}""",
+            """{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"class A {}"}]}}""",
+            """{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Fixed."}]}}""",
+            """{"type":"user","isSidechain":true,"message":{"role":"user","content":"sub-agent chatter"}}""",
+            """{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Image #1] look"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"aGVsbG8gd29ybGQ="}}]}}""",
+            "",
+            "not json",
+        };
+        var (direct, _) = Make();
+        direct.UseHistorySession("synthetic-session-id");
+        foreach (var l in lines) direct.AppendTranscriptLine(l);
+
+        var parsed = new List<SessionConversation.ParsedTranscriptLine>();
+        var worker = new Thread(() =>
+        {
+            foreach (var l in lines)
+                if (SessionConversation.ParseTranscriptLine(l, "synthetic-session-id") is { } p) parsed.Add(p);
+        });
+        worker.Start();
+        worker.Join();
+        var (split, _) = Make();
+        foreach (var p in parsed) split.AppendParsedTranscriptLine(p);
+
+        Assert.Equal(5, parsed.Count);   // the /clear echo, the sidechain line, the blank and the junk add nothing
+        Assert.Equal(Describe(direct), Describe(split));
+        Assert.Contains("user:[Image #1] look+0", Describe(split));   // no image-cache file for this synthetic id
+
+        static string Describe(SessionConversation c) => string.Join("\n", c.Items.Select(i => i switch
+        {
+            UserMessageItem u => $"user:{u.Text}+{u.Attachments?.Count ?? 0}",
+            AssistantMessageItem a => "assistant:" + string.Join(",", a.Parts.Select(p => p switch
+            {
+                ToolCallPart t => $"tool {t.Status} {t.ResultText}",
+                TextPart t => $"text {t.Text}",
+                _ => p.GetType().Name,
+            })),
+            _ => i.GetType().Name,
+        }));
+    }
+
+    [Fact]
+    public void FinalizeHistory_ClosesAToolThatNeverRecordedItsResult()
+    {
+        var (conv, _) = Make();
+        // A transcript records no `result`, and here the tool_use has no matching tool_result (the session was
+        // interrupted mid-tool). Finalising an inactive transcript settles it so the history reads as closed.
+        conv.AppendTranscriptLine("""{"type":"user","message":{"role":"user","content":"do a thing"}}""");
+        conv.AppendTranscriptLine("""{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"a.cs"}}]}}""");
+
+        var a = Assert.IsType<AssistantMessageItem>(conv.Items[1]);
+        Assert.False(a.IsComplete);
+        Assert.Equal(ToolCallStatus.Running, Assert.IsType<ToolCallPart>(a.Parts[0]).Status);
+
+        conv.FinalizeHistory();
+
+        Assert.True(a.IsComplete);
+        Assert.Equal(ToolCallStatus.Done, Assert.IsType<ToolCallPart>(a.Parts[0]).Status);
+    }
+
+    [Fact]
+    public void LoadHistory_ImageWithoutCacheFile_KeepsPlaceholder_AndAddsNoAttachment()
+    {
+        var (conv, _) = Make();
+        // A resumed user message with a "[Image #1]" token plus the image block. No image-cache file exists for this
+        // synthetic id, and the block's own bytes aren't decoded, so the message keeps its placeholder text only.
+        var line =
+            """{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Image #1] do nothing, just testing"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"aGVsbG8gd29ybGQ="}}]}}""";
+
+        Assert.Equal(1, conv.LoadHistory(new[] { line }, "synthetic-session-id"));
+
+        var u = Assert.IsType<UserMessageItem>(conv.Items[0]);
+        Assert.Equal("[Image #1] do nothing, just testing", u.Text);
+        Assert.Empty(u.Attachments);
+    }
+
+    [Fact]
+    public void UserPromptHistory_IsOldestFirst_SkippingBlanks()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("first prompt");
+        conv.AddUserPrompt("second prompt");
+        conv.AddUserPrompt("", new[] { new MessageAttachment { Kind = AttachmentKind.Image, Path = @"C:\tmp\x.png" } });
+
+        Assert.Equal(new[] { "first prompt", "second prompt" }, conv.UserPromptHistory());
+    }
+
+    [Fact]
+    public void ExitPlanMode_IsAPendingPlanItem_NotAQuestion()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("build a thing");
+        conv.Apply(new PermissionRequestEvent("r1", "ExitPlanMode", "", """{"plan":"## Steps\n1. do it"}""", "acceptEdits"));
+
+        var p = Assert.IsType<PermissionItem>(conv.PendingPermission);
+        Assert.True(p.IsPlan);
+        Assert.False(p.IsQuestion);
+        Assert.Equal(PermissionResolution.Pending, p.Resolution);
+        Assert.Equal("## Steps\n1. do it", PlanApprovalInput.Parse(p.Request.InputJson));
+    }
+
+    [Fact]
+    public void SessionEnded_SettlesEverythingInFlight()
+    {
+        var (conv, _) = Make();
+        conv.AddUserPrompt("go");
+        conv.Apply(new TextDeltaEvent("partial"));
+        conv.Apply(new ToolUseEvent("t1", "Bash", "Running: sleep", "{}"));
+        conv.Apply(new PermissionRequestEvent("r", "Bash", "sleep", "{}", null));
+        conv.SessionEnded(1, "boom");
+
+        var a = Assert.IsType<AssistantMessageItem>(conv.Items[1]);
+        Assert.True(a.IsComplete);
+        Assert.False(Assert.IsType<TextPart>(a.Parts[0]).IsStreaming);
+        Assert.Equal(ToolCallStatus.Failed, Assert.IsType<ToolCallPart>(a.Parts[1]).Status);
+        Assert.Equal(PermissionResolution.Expired, Assert.IsType<PermissionItem>(conv.Items[2]).Resolution);
+        Assert.Null(conv.PendingPermission);
+        Assert.False(conv.TurnActive);
+        var note = Assert.IsType<NoteItem>(conv.Items[^1]);
+        Assert.Equal(NoteKind.Error, note.Kind);
+        Assert.Contains("boom", note.Text);
+    }
+}

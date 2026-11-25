@@ -1,0 +1,91 @@
+﻿using System.Text.Json.Nodes;
+
+namespace Ochre.Core.Claude;
+
+/// <summary>
+/// Small shared helpers for reading the loosely-typed JSON of a Claude Code transcript record.
+/// Centralises the defensive coercions every reader needs — the "tolerate ints-or-doubles" token read
+/// (previously duplicated as <c>TokenLong</c> / <c>LongOf</c>) and the ISO-timestamp parse (duplicated
+/// across <see cref="TranscriptParser"/> and <see cref="SessionStatsService"/>) — plus the two tiny
+/// accessors for walking <c>message.content</c> block arrays.
+/// </summary>
+internal static class TranscriptJson
+{
+    /// <summary>Reads a JSON number as a <see cref="long"/>, tolerating values serialised as doubles;
+    /// returns 0 when the node is absent or unparseable. (Token counts are occasionally written as
+    /// <c>1.0</c> rather than <c>1</c>.)</summary>
+    public static long AsLong(JsonNode? n)
+    {
+        if (n == null) return 0;
+        try { return n.GetValue<long>(); }
+        catch { try { return (long)n.GetValue<double>(); } catch { return 0; } }
+    }
+
+    /// <summary>Parses an ISO-8601 timestamp to local time, or null when absent/unparseable.</summary>
+    public static DateTime? ParseTimestamp(string? iso) =>
+        !string.IsNullOrEmpty(iso) && DateTimeOffset.TryParse(iso, out var dto) ? dto.LocalDateTime : null;
+
+    /// <summary>The first <c>"timestamp"</c> value in a raw record line, in UTC, read without parsing the JSON;
+    /// null when there isn't one. It's a guess for skipping records far from a time window: a nested object's
+    /// timestamp can come ahead of the record's own, so callers keep a margin either side.</summary>
+    public static DateTime? PeekTimestampUtc(string line)
+    {
+        const string Key = "\"timestamp\":\"";
+        int i = line.IndexOf(Key, StringComparison.Ordinal);
+        if (i < 0) return null;
+        i += Key.Length;
+        int j = line.IndexOf('"', i);
+        if (j < 0) return null;
+        return DateTime.TryParse(line.AsSpan(i, j - i), System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var t)
+            ? DateTime.SpecifyKind(t, DateTimeKind.Utc)
+            : null;
+    }
+
+    /// <summary>The <c>message.content</c> array of a record, or null when the body is not a block array
+    /// (e.g. a plain-string user prompt, or a metadata record).</summary>
+    public static JsonArray? ContentArray(JsonNode? record) => record?["message"]?["content"] as JsonArray;
+
+    /// <summary>The <c>type</c> discriminator of a content block (<c>tool_use</c>, <c>text</c>,
+    /// <c>tool_result</c>, …), or null.</summary>
+    public static string? BlockType(JsonNode? block) => block?["type"]?.GetValue<string>();
+
+    /// <summary>True when an assistant record holds only thinking. Claude Code writes each block of a message as
+    /// its own record, so this is a message still being written: after thinking comes text or a tool call. The rest
+    /// of the message can take a long time to appear, because nothing is written while a tool call's input streams
+    /// (a sub-agent composing a long <c>SubagentHandback</c> report goes silent for most of a minute).</summary>
+    public static bool IsThinkingOnly(JsonNode? record) =>
+        ContentArray(record) is { Count: > 0 } blocks
+        && blocks.All(b => BlockType(b) is "thinking" or "redacted_thinking");
+
+    /// <summary>True for a record the CLI wrote to the transcript without running a turn for it
+    /// (<c>queueTranscriptOnly</c>). After a <c>SubagentHandback</c> has already delivered an agent's report, the
+    /// agent's <c>&lt;task-notification&gt;</c> is recorded this way, so no assistant reply ever follows it.</summary>
+    public static bool IsTranscriptOnly(JsonNode? record)
+    {
+        try { return record?["queueTranscriptOnly"]?.GetValue<bool>() == true; }
+        catch { return false; }
+    }
+
+    /// <summary>Substring pre-filter for a line that may hold a tool_use block. Quoted, because every tool_result
+    /// carries <c>"tool_use_id"</c>, which a bare <c>tool_use</c> would match.</summary>
+    public static bool MayHoldToolUse(string line) => line.Contains("\"tool_use\"", StringComparison.Ordinal);
+
+    /// <summary>Substring pre-filter for a line that may hold a failed tool_result. Every successful result
+    /// carries <c>"is_error":false</c> too, and tool results are most of a transcript's bytes, so matching the
+    /// bare key would send them all to the JSON parser. Tolerates one space after the colon.</summary>
+    public static bool MayHoldErrorResult(string line) =>
+        line.Contains("\"is_error\":true", StringComparison.Ordinal)
+        || line.Contains("\"is_error\": true", StringComparison.Ordinal);
+
+    /// <summary>Reads a node as a string, returning null rather than throwing when it holds something
+    /// else (a block array, a number). Transcript fields change shape between Claude Code versions —
+    /// <c>message.content</c> is a plain string in some records and an array in others — so any read of
+    /// a "string" field has to survive the other shape.</summary>
+    public static string? AsString(JsonNode? n)
+    {
+        if (n is not JsonValue v) return null;
+        try { return v.GetValue<string>(); }
+        catch { return null; }
+    }
+}

@@ -11,4 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ochre.Core\Ochre.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="fixtures\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

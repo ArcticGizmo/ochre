@@ -1,0 +1,159 @@
+namespace Ochre.Core.Claude.Control;
+
+/// <summary>
+/// The events a Perch-controlled Claude Code session surfaces to the UI, decoded from the CLI's
+/// <c>--output-format stream-json</c> stream by <see cref="StreamJsonParser"/>. One line on stdout can
+/// yield several events (an assistant message carries one event per content block). PoC scope: see
+/// <c>docs/session-control-poc.md</c>.
+/// </summary>
+internal abstract record SessionEvent
+{
+    /// <summary>The record carried a <c>parent_tool_use_id</c>: a sub-agent's message, not the main thread's.
+    /// A background agent's messages keep arriving after the main turn's result.</summary>
+    public bool FromSubagent { get; init; }
+}
+
+/// <summary>One MCP server the CLI reported in <c>init</c>: its name and connection status
+/// (e.g. "connected", "needs-auth", "failed").</summary>
+internal sealed record McpServerInfo(string Name, string Status);
+
+/// <summary>The <c>system/init</c> handshake: the session exists and identifies itself.
+/// <paramref name="SlashCommands"/> is the CLI's advertised <c>slash_commands</c> list (empty when absent) —
+/// the seed for the rich UI's command palette. <paramref name="McpServers"/> is the <c>mcp_servers</c> list
+/// (name + status), backing the <c>/mcp</c> status view.</summary>
+internal sealed record SessionInitEvent(
+    string SessionId, string Model, string PermissionMode, int ToolCount,
+    IReadOnlyList<string>? SlashCommands = null,
+    IReadOnlyList<McpServerInfo>? McpServers = null) : SessionEvent;
+
+/// <summary>A completed assistant text block.</summary>
+internal sealed record AssistantTextEvent(string Text) : SessionEvent;
+
+/// <summary>A completed assistant thinking block.</summary>
+internal sealed record AssistantThinkingEvent(string Text) : SessionEvent;
+
+/// <summary>The assistant invoked a tool. <paramref name="Summary"/> is the shared
+/// <see cref="ToolSummary"/> phrase ("Editing Foo.cs"); <paramref name="InputJson"/> is the raw tool input
+/// (for the expandable arguments on a tool card).</summary>
+internal sealed record ToolUseEvent(string ToolUseId, string ToolName, string Summary, string InputJson = "{}") : SessionEvent;
+
+/// <summary>A tool finished; <paramref name="Text"/> is its result as text (all text blocks joined), capped
+/// at a generous length so the card can show the whole thing on expand — not the old 60-char preview. The
+/// card derives its own one-line collapsed summary from it. <paramref name="Launch"/> is set when the call
+/// started background work (its <c>tool_use_result</c> named a task).</summary>
+internal sealed record ToolResultEvent(string ToolUseId, string Text, bool IsError, BackgroundLaunch? Launch = null) : SessionEvent;
+
+/// <summary>The background task a tool call started, read off its result's <c>tool_use_result</c> /
+/// <c>toolUseResult</c>: a shell's <c>backgroundTaskId</c>, a Monitor's <c>taskId</c> (+ <c>persistent</c>), or an
+/// async agent's <c>agentId</c>. <paramref name="At"/> is the record's timestamp when it has one; <paramref name="OutputFile"/>
+/// is the path a shell's result text names.</summary>
+internal sealed record BackgroundLaunch(string TaskId, BackgroundTaskKind Kind, bool? Persistent = null, DateTime? At = null,
+    string? OutputFile = null);
+
+/// <summary><c>system/task_started</c>: the CLI began tracking a task. <paramref name="IsBackgrounded"/> is false for a
+/// plain foreground shell call, which isn't background work. See <c>docs/background-tasks-plan.md</c>.</summary>
+internal sealed record TaskStartedEvent(
+    string TaskId, string? ToolUseId, string? TaskType, string? Description, bool IsBackgrounded, bool OwnedBySubagent) : SessionEvent;
+
+/// <summary><c>system/task_progress</c>: an agent task's latest step ("Running Sleep for 15 seconds").</summary>
+internal sealed record TaskProgressEvent(string TaskId, string? Description) : SessionEvent;
+
+/// <summary><c>system/task_updated</c> with a <c>patch.status</c> (<c>completed</c> / <c>failed</c> / <c>killed</c>).</summary>
+internal sealed record TaskUpdatedEvent(string TaskId, string? Status, DateTime? EndUtc) : SessionEvent;
+
+/// <summary>A task notification: the stream's <c>system/task_notification</c>, or a transcript's delivered
+/// <c>&lt;task-notification&gt;</c> user record (<paramref name="Delivered"/>, which also carries Monitor events).</summary>
+internal sealed record TaskNotificationEvent(TaskNotification Notification, bool Delivered, DateTime? At = null) : SessionEvent;
+
+/// <summary>A background agent's report reached the session, keyed by its task id (the agent id) or the tool-use id
+/// that launched it. Two sources: the agent's own <c>SubagentHandback</c> call on the stream
+/// (<paramref name="ToolUseId"/> = its <c>parent_tool_use_id</c>), and the transcript's hand-back message
+/// (<paramref name="TaskId"/> = <c>origin.from</c>). See <c>docs/agent-report-notice-plan.md</c>.</summary>
+internal sealed record AgentReportEvent(string? TaskId, string? ToolUseId, string Report) : SessionEvent;
+
+/// <summary><c>system/background_tasks_changed</c>: the CLI's whole set of running background tasks.</summary>
+internal sealed record BackgroundTasksChangedEvent(
+    IReadOnlyList<(string TaskId, string? TaskType, string? Description)> Tasks) : SessionEvent;
+
+/// <summary>A streaming text delta (only emitted with <c>--include-partial-messages</c>). Deltas
+/// accumulate into the block a later <see cref="AssistantTextEvent"/> finalises.</summary>
+internal sealed record TextDeltaEvent(string Text) : SessionEvent;
+
+/// <summary>The CLI is asking permission to run a tool (<c>control_request</c> /
+/// <c>can_use_tool</c>); it blocks until answered via
+/// <see cref="ClaudeSessionController.RespondToPermission"/>. <paramref name="InputJson"/> is the raw
+/// tool input (echoed back as <c>updatedInput</c> on allow); <paramref name="SuggestedMode"/> is the
+/// CLI's first <c>setMode</c> suggestion (e.g. "acceptEdits"), when present.</summary>
+internal sealed record PermissionRequestEvent(
+    string RequestId, string ToolName, string Description, string InputJson, string? SuggestedMode) : SessionEvent;
+
+/// <summary>The CLI withdrew one of its own control requests (<c>control_cancel_request</c>). For a
+/// <see cref="PermissionRequestEvent"/> this means it no longer needs Perch's answer: another attached client
+/// (Remote Control's claude.ai / phone side) answered first, or the turn that asked was torn down.</summary>
+internal sealed record ControlRequestCancelledEvent(string RequestId) : SessionEvent;
+
+/// <summary>The CLI's own turn state (<c>system/session_state_changed</c>): <c>idle</c>, <c>running</c> or
+/// <c>requires_action</c>. Authoritative whoever started the turn (Perch or a Remote Control client), unlike
+/// the state Perch infers from its own sends. Only emitted when the child env has
+/// <c>CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1</c> (see <c>docs/remote-control-sync-plan.md</c>).</summary>
+internal sealed record SessionStateEvent(string State) : SessionEvent;
+
+/// <summary>Acknowledgement of a <c>set_permission_mode</c> control request.</summary>
+internal sealed record ModeChangedEvent(string Mode) : SessionEvent;
+
+/// <summary>The CLI's answer to Perch's <c>remote_control</c> control request (enable/disable Remote Control
+/// for this session — the mechanism the IDE integrations use, not exposed as a stream-json slash command). On
+/// enable, <paramref name="SessionUrl"/> is the claude.ai link (also the QR target) and
+/// <paramref name="BridgeSessionId"/> the bridge id; both are null on disable. <paramref name="Error"/> is set
+/// when the CLI refused (e.g. Remote Control unavailable on the account).</summary>
+internal sealed record RemoteControlEvent(string? SessionUrl, string? BridgeSessionId, string? Error = null) : SessionEvent;
+
+/// <summary>The CLI's answer to Perch's <c>rewind_files</c> control request, matched to it by
+/// <paramref name="RequestId"/>. A dry run reports what would change (<paramref name="FilesChanged"/>, line
+/// counts); a real one just confirms. <paramref name="CanRewind"/> is false, with <paramref name="Error"/> set,
+/// when no checkpoint covers the message (checkpointing was off when it ran, or the id is unknown).</summary>
+internal sealed record RewindFilesEvent(
+    string RequestId,
+    bool CanRewind,
+    string? Error = null,
+    IReadOnlyList<string>? FilesChanged = null,
+    int Insertions = 0,
+    int Deletions = 0) : SessionEvent;
+
+/// <summary>A <c>system</c>/<c>subtype:"status"</c> progress record. The CLI emits these while a long
+/// operation runs — notably <c>/compact</c>, which shows a live "Compacting conversation… (18s) … 18%"
+/// readout. <paramref name="Percent"/> is the completion percentage when one could be read (else null, so
+/// the UI falls back to an indeterminate bar + its own elapsed timer); <paramref name="Message"/> is any
+/// human-readable status text. Only acted on by <see cref="SessionConversation"/> while a compaction is in
+/// flight; harmless otherwise.</summary>
+internal sealed record StatusEvent(int? Percent, string? Message) : SessionEvent;
+
+/// <summary>A <c>system</c>/<c>subtype:"compact_boundary"</c> record — the authoritative signal that a
+/// <c>/compact</c> (or an auto-compaction) <em>succeeded</em>, carrying <paramref name="PreTokens"/> and
+/// <paramref name="PostTokens"/> from <c>compactMetadata</c> (so the freed amount is exact) and the
+/// <paramref name="Trigger"/> ("manual"/"auto"). It only appears on success — a failed or interrupted
+/// compaction emits none.</summary>
+internal sealed record CompactionCompletedEvent(long PreTokens, long PostTokens, string Trigger) : SessionEvent;
+
+/// <summary>The token usage of a <em>single</em> assistant message (<c>message.usage</c> on one model
+/// response). Its input buckets summed are the size of that one prompt — i.e. the point-in-time context
+/// occupancy — which the newest such event tracks. This is the honest occupancy signal, unlike
+/// <see cref="TurnResultEvent"/>, whose usage is the turn <em>aggregate</em> summed across every tool-use
+/// round-trip in the turn (so an agentic turn's result can read many times a single prompt's size).</summary>
+internal sealed record AssistantUsageEvent(long ContextTokens) : SessionEvent;
+
+/// <summary>A turn finished (the <c>result</c> record): outcome plus cost/usage for the whole session so far.
+/// The three input buckets are kept apart because they price very differently — fresh
+/// <paramref name="InputTokens"/> at 1×, <paramref name="CacheCreationTokens"/> at 1.25–2× (by cache TTL),
+/// <paramref name="CacheReadTokens"/> at ≤0.1× (see <see cref="ModelPricing"/>) — and their sum is the prompt size sent to the model, i.e.
+/// the session's current context occupancy.</summary>
+internal sealed record TurnResultEvent(
+    bool IsError, string Subtype, double CostUsd, long InputTokens, long OutputTokens, long DurationMs,
+    long CacheReadTokens = 0, long CacheCreationTokens = 0) : SessionEvent
+{
+    /// <summary>The prompt size for this turn = every input bucket summed = current context occupancy.</summary>
+    public long ContextTokens => InputTokens + CacheReadTokens + CacheCreationTokens;
+
+    /// <summary>Input tokens actually re-billed (not served from cache): fresh input + cache writes.</summary>
+    public long FreshInputTokens => InputTokens + CacheCreationTokens;
+}

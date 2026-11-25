@@ -1,0 +1,438 @@
+using System.Text.Json.Nodes;
+
+namespace Ochre.Core.Claude.Control;
+
+/// <summary>
+/// Decodes one line of the Claude Code CLI's <c>--output-format stream-json</c> stream into zero or more
+/// <see cref="SessionEvent"/>s. Pure and stateless so it can be unit-tested against captured lines; the
+/// process plumbing lives in <see cref="ClaudeSessionController"/>. Like every transcript reader, it
+/// parses defensively — an unknown or malformed line yields no events, never a throw. The shapes were
+/// captured live from claude 2.1.247 (see <c>docs/session-control-poc.md</c> for samples).
+/// </summary>
+internal static class StreamJsonParser
+{
+    public static IReadOnlyList<SessionEvent> Parse(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return [];
+        JsonNode? root;
+        try { root = JsonNode.Parse(line); }
+        catch { return []; }
+        return root is null ? [] : Parse(root);
+    }
+
+    /// <summary><see cref="Parse(string)"/> for a record the caller has already parsed, so a transcript line that
+    /// was parsed once to classify it isn't parsed again.</summary>
+    public static IReadOnlyList<SessionEvent> Parse(JsonNode root)
+    {
+        try
+        {
+            var events = ParseRecord(root);
+            if (events.Count == 0 || TranscriptJson.AsString(root["parent_tool_use_id"]) is not { Length: > 0 }) return events;
+            return events.Select(e => e with { FromSubagent = true }).ToList();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseRecord(JsonNode root) =>
+        TranscriptJson.AsString(root["type"]) switch
+        {
+            "system"           => ParseSystem(root),
+            "assistant"        => ParseAssistant(root),
+            "user"             => ParseToolResults(root),
+            "stream_event"     => ParseStreamEvent(root),
+            "control_request"  => ParseControlRequest(root),
+            "control_response" => ParseControlResponse(root),
+            "control_cancel_request" => TranscriptJson.AsString(root["request_id"]) is { Length: > 0 } cancelled
+                ? [new ControlRequestCancelledEvent(cancelled)]
+                : [],
+            "result"           => ParseResult(root),
+            "attachment"       => ParseQueuedNotification(root),
+            _                  => [],
+        };
+
+    // A <task-notification> that arrived while Claude was mid-turn is absorbed into that turn as a queued_command
+    // attachment (transcript only), not delivered as a user record of its own. Same notification, other path.
+    private static IReadOnlyList<SessionEvent> ParseQueuedNotification(JsonNode root)
+    {
+        var a = root["attachment"];
+        if (TranscriptJson.AsString(a?["type"]) != "queued_command"
+            || TranscriptJson.AsString(a?["commandMode"]) != "task-notification") return [];
+        return TaskNotification.Parse(TranscriptJson.AsString(a?["prompt"])) is { } n
+            ? [new TaskNotificationEvent(n, Delivered: true, TranscriptJson.ParseTimestamp(TranscriptJson.AsString(root["timestamp"])))]
+            : [];
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseSystem(JsonNode root)
+    {
+        var subtype = TranscriptJson.AsString(root["subtype"]);
+        if (subtype == "status") return ParseStatus(root);
+        if (subtype == "compact_boundary") return ParseCompactBoundary(root);
+        if (subtype == "session_state_changed")
+            return TranscriptJson.AsString(root["state"]) is ("idle" or "running" or "requires_action") and string state
+                ? [new SessionStateEvent(state)]
+                : [];
+        if (ParseTaskRecord(subtype, root) is { } task) return [task];
+        if (subtype != "init") return [];
+        var commands = (root["slash_commands"] as JsonArray)?
+            .Select(c => TranscriptJson.AsString(c))
+            .Where(c => !string.IsNullOrEmpty(c))
+            .Select(c => c!)
+            .ToList();
+        var mcp = (root["mcp_servers"] as JsonArray)?
+            .Select(s => new McpServerInfo(
+                TranscriptJson.AsString(s?["name"]) ?? "",
+                TranscriptJson.AsString(s?["status"]) ?? ""))
+            .Where(s => s.Name.Length > 0)
+            .ToList();
+        return
+        [
+            new SessionInitEvent(
+                TranscriptJson.AsString(root["session_id"]) ?? "",
+                TranscriptJson.AsString(root["model"]) ?? "",
+                TranscriptJson.AsString(root["permissionMode"]) ?? "",
+                (root["tools"] as JsonArray)?.Count ?? 0,
+                commands ?? [],
+                mcp ?? []),
+        ];
+    }
+
+    // The authoritative "compaction succeeded" record. compactMetadata carries preTokens/postTokens (the
+    // exact freed amount) and the trigger (manual/auto). Captured live: durationMs, cumulativeDroppedTokens.
+    private static IReadOnlyList<SessionEvent> ParseCompactBoundary(JsonNode root)
+    {
+        var meta = root["compactMetadata"];
+        return
+        [
+            new CompactionCompletedEvent(
+                TranscriptJson.AsLong(meta?["preTokens"]),
+                TranscriptJson.AsLong(meta?["postTokens"]),
+                TranscriptJson.AsString(meta?["trigger"]) ?? ""),
+        ];
+    }
+
+    // A progress record (the CLI emits these during /compact). Its exact shape isn't pinned down, so read a
+    // percentage defensively and structurally: recursively scan the record for a "percent"/"progress"/"pct"
+    // (or "ratio") numeric field wherever it sits, and, failing that, the first "NN%" in any status string.
+    // A null percent is fine — the UI shows an indeterminate bar and its own elapsed timer.
+    private static IReadOnlyList<SessionEvent> ParseStatus(JsonNode root)
+    {
+        var message = TranscriptJson.AsString(root["message"])
+                   ?? TranscriptJson.AsString(root["status"])
+                   ?? TranscriptJson.AsString(root["text"]);
+        int? percent = FindPercent(root);
+        return [new StatusEvent(percent, message)];
+    }
+
+    // Walk the record for a completion percentage: a numeric field whose name reads like one (a >1 value is
+    // taken as a percent, a 0..1 value as a ratio ×100), else a "NN%" embedded in any string value. Depth is
+    // trivial for a status record, so the recursion cost is negligible.
+    private static int? FindPercent(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                foreach (var (key, value) in obj)
+                {
+                    var k = key.ToLowerInvariant();
+                    if ((k.Contains("percent") || k.Contains("progress") || k == "pct" || k.Contains("ratio"))
+                        && AsNumber(value) is { } n)
+                        return n <= 1 ? Math.Clamp((int)Math.Round(n * 100), 0, 100)
+                                      : Math.Clamp((int)Math.Round(n), 0, 100);
+                }
+                foreach (var (_, value) in obj)
+                    if (FindPercent(value) is { } p) return p;
+                return null;
+            case JsonArray arr:
+                foreach (var value in arr)
+                    if (FindPercent(value) is { } p) return p;
+                return null;
+            case JsonValue v when v.TryGetValue<string>(out var s):
+                var m = System.Text.RegularExpressions.Regex.Match(s, @"(\d{1,3})\s*%");
+                return m.Success && int.TryParse(m.Groups[1].Value, out var pv) ? Math.Clamp(pv, 0, 100) : null;
+            default:
+                return null;
+        }
+    }
+
+    private static double? AsNumber(JsonNode? n)
+    {
+        if (n is null) return null;
+        try { return n.GetValue<double>(); }
+        catch { try { return n.GetValue<long>(); } catch { return null; } }
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseAssistant(JsonNode root)
+    {
+        var blocks = TranscriptJson.ContentArray(root);
+        if (blocks is null) return [];
+        var events = new List<SessionEvent>();
+        foreach (var block in blocks)
+        {
+            switch (TranscriptJson.BlockType(block))
+            {
+                case "text" when TranscriptJson.AsString(block?["text"]) is { Length: > 0 } text:
+                    events.Add(new AssistantTextEvent(text));
+                    break;
+                case "thinking" when TranscriptJson.AsString(block?["thinking"]) is { Length: > 0 } thought:
+                    events.Add(new AssistantThinkingEvent(thought));
+                    break;
+                case "tool_use":
+                    var name = TranscriptJson.AsString(block?["name"]) ?? "tool";
+                    events.Add(new ToolUseEvent(
+                        TranscriptJson.AsString(block?["id"]) ?? "",
+                        name,
+                        ToolSummary.Describe(name, block?["input"]),
+                        block?["input"]?.ToJsonString() ?? "{}"));
+                    // A background agent handing its report back: the stream's only copy of the report (the parent's
+                    // hand-back message is a user record, which stream-json doesn't echo). Keyed by the launch it answers.
+                    if (name == "SubagentHandback"
+                        && TranscriptJson.AsString(root["parent_tool_use_id"]) is { Length: > 0 } launch
+                        && TranscriptJson.AsString(block?["input"]?["message"]) is { Length: > 0 } report)
+                        events.Add(new AgentReportEvent(null, launch, report));
+                    break;
+            }
+        }
+
+        // This one message's usage is the size of the prompt behind it — the true current context occupancy.
+        // (The turn's `result` usage sums every round-trip, so it can't be read as occupancy; see
+        // AssistantUsageEvent.) Emitted last so it lands after the message's own content.
+        var usage = root["message"]?["usage"];
+        if (usage is not null)
+        {
+            long ctx = TranscriptJson.AsLong(usage["input_tokens"])
+                     + TranscriptJson.AsLong(usage["cache_read_input_tokens"])
+                     + TranscriptJson.AsLong(usage["cache_creation_input_tokens"]);
+            if (ctx > 0) events.Add(new AssistantUsageEvent(ctx));
+        }
+        return events;
+    }
+
+    // The background-task records (docs/background-tasks-plan.md). Null for any other subtype.
+    private static SessionEvent? ParseTaskRecord(string? subtype, JsonNode root)
+    {
+        var id = TranscriptJson.AsString(root["task_id"]);
+        switch (subtype)
+        {
+            case "task_started" when id is { Length: > 0 }:
+                return new TaskStartedEvent(id,
+                    TranscriptJson.AsString(root["tool_use_id"]),
+                    TranscriptJson.AsString(root["task_type"]),
+                    TranscriptJson.AsString(root["description"]),
+                    AsBool(root["is_backgrounded"]),
+                    AsBool(root["owned_by_subagent"]));
+            case "task_progress" when id is { Length: > 0 }:
+                return new TaskProgressEvent(id, TranscriptJson.AsString(root["description"]));
+            case "task_updated" when id is { Length: > 0 }:
+            {
+                var patch = root["patch"];
+                long end = TranscriptJson.AsLong(patch?["end_time"]);
+                return new TaskUpdatedEvent(id, TranscriptJson.AsString(patch?["status"]),
+                    end > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(end).UtcDateTime : null);
+            }
+            case "task_notification" when id is { Length: > 0 }:
+                return new TaskNotificationEvent(new TaskNotification(id,
+                    TranscriptJson.AsString(root["tool_use_id"]),
+                    TranscriptJson.AsString(root["status"]),
+                    TranscriptJson.AsString(root["output_file"]),
+                    TranscriptJson.AsString(root["summary"])), Delivered: false);
+            case "background_tasks_changed":
+                return new BackgroundTasksChangedEvent((root["tasks"] as JsonArray ?? [])
+                    .Select(t => (Id: TranscriptJson.AsString(t?["task_id"]) ?? "",
+                                  Type: TranscriptJson.AsString(t?["task_type"]),
+                                  Desc: TranscriptJson.AsString(t?["description"])))
+                    .Where(t => t.Id.Length > 0)
+                    .ToList());
+            default:
+                return null;
+        }
+    }
+
+    private static bool AsBool(JsonNode? n)
+    {
+        try { return n?.GetValue<bool>() ?? false; }
+        catch { return false; }
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseToolResults(JsonNode root)
+    {
+        // A delivered <task-notification> (transcript only: stream-json doesn't echo user records) is a user
+        // record with plain string content. It ends a background task, or carries a Monitor event.
+        if (TranscriptJson.AsString(root["message"]?["content"]) is { } text)
+        {
+            if (TaskNotification.Parse(text) is { } n)
+                return [new TaskNotificationEvent(n, Delivered: true, TranscriptJson.ParseTimestamp(TranscriptJson.AsString(root["timestamp"])))];
+            return ParseHandback(root, text) is { } handback ? [handback] : [];
+        }
+
+        var blocks = TranscriptJson.ContentArray(root);
+        if (blocks is null) return [];
+        var events = new List<SessionEvent>();
+        foreach (var block in blocks)
+        {
+            if (TranscriptJson.BlockType(block) != "tool_result") continue;
+            var resultText = ResultTextOf(block?["content"]);
+            events.Add(new ToolResultEvent(
+                TranscriptJson.AsString(block?["tool_use_id"]) ?? "",
+                resultText,
+                block?["is_error"]?.GetValue<bool>() ?? false,
+                LaunchOf(root, resultText)));
+        }
+        return events;
+    }
+
+    // A background agent's hand-back, as the transcript records it (claude 2.1.296): an isMeta user record "Another Claude
+    // session sent a message: <agent-message from="{agentId}">[Subagent hand-back] … The report follows: …", with
+    // origin {kind:"peer", from: agentId, handback: true, body}. Plain peer messages (no handback flag) aren't reports.
+    private static AgentReportEvent? ParseHandback(JsonNode root, string text)
+    {
+        var origin = root["origin"];
+        bool handback;
+        try { handback = origin?["handback"]?.GetValue<bool>() == true; }
+        catch { handback = false; }
+        if (!handback) return null;
+        var report = AgentReport.FromHandbackBody(TranscriptJson.AsString(origin?["body"])) ?? AgentReport.FromAgentMessage(text);
+        var from = TranscriptJson.AsString(origin?["from"]) ?? TranscriptJson.AsString(origin?["senderTaskId"]);
+        return report is not null && from is { Length: > 0 } ? new AgentReportEvent(from, null, report) : null;
+    }
+
+    // The background task a tool result reports starting, from its structured result (stream-json's
+    // tool_use_result, the transcript's toolUseResult). A record carries one tool_result in practice.
+    private static BackgroundLaunch? LaunchOf(JsonNode root, string resultText)
+    {
+        var r = root["tool_use_result"] ?? root["toolUseResult"];
+        if (r is not JsonObject) return null;
+        var at = TranscriptJson.ParseTimestamp(TranscriptJson.AsString(root["timestamp"]));
+        if (TranscriptJson.AsString(r["backgroundTaskId"]) is { Length: > 0 } shell)
+            return new BackgroundLaunch(shell, BackgroundTaskKind.Shell, At: at,
+                OutputFile: BackgroundTaskOutput.FromLaunchResult(resultText));
+        if (TranscriptJson.AsString(r["taskId"]) is { Length: > 0 } monitor && r["timeoutMs"] is not null)
+            return new BackgroundLaunch(monitor, BackgroundTaskKind.Monitor, AsBool(r["persistent"]), at);
+        if (AsBool(r["isAsync"]) && TranscriptJson.AsString(r["agentId"]) is { Length: > 0 } agent)
+            return new BackgroundLaunch(agent, BackgroundTaskKind.Agent, At: at);
+        return null;
+    }
+
+    // A single tool result can be very large (a Read of a 15k-char file), but a thread holds thousands of
+    // them, so keep the whole text only up to this cap — enough to read a command's full output on expand
+    // without letting one giant result balloon the conversation's memory.
+    private const int MaxResultChars = 8_000;
+
+    // tool_result content is a plain string in some records and a block array in others. Returns the full
+    // result text (blocks joined), trimmed and capped at MaxResultChars with a truncation note — the tool
+    // card shows all of it on expand and derives its own short collapsed line, so nothing is clipped here.
+    private static string ResultTextOf(JsonNode? content)
+    {
+        var text = TranscriptJson.AsString(content);
+        if (text is null && content is JsonArray blocks)
+            text = string.Join("\n", blocks
+                .Where(b => TranscriptJson.BlockType(b) == "text")
+                .Select(b => TranscriptJson.AsString(b?["text"]))
+                .Where(t => !string.IsNullOrEmpty(t)));
+        text = (text ?? "").Trim();
+        return text.Length <= MaxResultChars
+            ? text
+            : text[..MaxResultChars].TrimEnd() + $"\n… (+{text.Length - MaxResultChars:N0} more characters)";
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseStreamEvent(JsonNode root)
+    {
+        var ev = root["event"];
+        if (TranscriptJson.AsString(ev?["type"]) != "content_block_delta") return [];
+        var delta = ev?["delta"];
+        if (TranscriptJson.AsString(delta?["type"]) != "text_delta") return [];
+        var text = TranscriptJson.AsString(delta?["text"]);
+        return text is { Length: > 0 } ? [new TextDeltaEvent(text)] : [];
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseControlRequest(JsonNode root)
+    {
+        var request = root["request"];
+        if (TranscriptJson.AsString(request?["subtype"]) != "can_use_tool") return [];
+        string? suggestedMode = null;
+        if (request?["permission_suggestions"] is JsonArray suggestions)
+            suggestedMode = suggestions
+                .Where(s => TranscriptJson.AsString(s?["type"]) == "setMode")
+                .Select(s => TranscriptJson.AsString(s?["mode"]))
+                .FirstOrDefault(m => !string.IsNullOrEmpty(m));
+        return
+        [
+            new PermissionRequestEvent(
+                TranscriptJson.AsString(root["request_id"]) ?? "",
+                TranscriptJson.AsString(request?["tool_name"]) ?? "tool",
+                TranscriptJson.AsString(request?["description"]) ?? "",
+                request?["input"]?.ToJsonString() ?? "{}",
+                suggestedMode),
+        ];
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseControlResponse(JsonNode root)
+    {
+        var response = root["response"];
+
+        // The remote_control ack, matched by the request id the controller stamps on the request
+        // (ClaudeSessionController.RemoteControlRequestId). Enable carries the session URL + bridge id in the
+        // inner response; disable is an empty success; a refusal comes back as an error subtype.
+        if (TranscriptJson.AsString(response?["request_id"])?.StartsWith(ClaudeSessionController.RemoteControlRequestId, StringComparison.Ordinal) == true)
+        {
+            if (TranscriptJson.AsString(response?["subtype"]) == "success")
+            {
+                var inner = response?["response"];
+                return [new RemoteControlEvent(
+                    TranscriptJson.AsString(inner?["session_url"]),
+                    TranscriptJson.AsString(inner?["bridge_session_id"]))];
+            }
+            return [new RemoteControlEvent(null, null, TranscriptJson.AsString(response?["error"]) ?? "remote control failed")];
+        }
+
+        if (TranscriptJson.AsString(response?["request_id"]) is { } rewindId
+            && rewindId.StartsWith(ClaudeSessionController.RewindFilesRequestPrefix, StringComparison.Ordinal))
+        {
+            if (TranscriptJson.AsString(response?["subtype"]) != "success")
+                return [new RewindFilesEvent(rewindId, false, TranscriptJson.AsString(response?["error"]) ?? "rewind failed")];
+            var inner = response?["response"];
+            var files = (inner?["filesChanged"] as JsonArray)?
+                .Select(f => TranscriptJson.AsString(f))
+                .Where(f => !string.IsNullOrEmpty(f))
+                .Select(f => f!)
+                .ToList();
+            return [new RewindFilesEvent(rewindId,
+                inner?["canRewind"]?.GetValueKind() == System.Text.Json.JsonValueKind.True,
+                TranscriptJson.AsString(inner?["error"]),
+                files,
+                (int)TranscriptJson.AsLong(inner?["insertions"]),
+                (int)TranscriptJson.AsLong(inner?["deletions"]))];
+        }
+
+        // Only the set_permission_mode ack carries information the UI shows; other acks are ignored.
+        var mode = TranscriptJson.AsString(response?["response"]?["mode"]);
+        return mode is { Length: > 0 } ? [new ModeChangedEvent(mode)] : [];
+    }
+
+    private static IReadOnlyList<SessionEvent> ParseResult(JsonNode root)
+    {
+        var usage = root["usage"];
+        return
+        [
+            new TurnResultEvent(
+                root["is_error"]?.GetValue<bool>() ?? false,
+                TranscriptJson.AsString(root["subtype"]) ?? "",
+                AsDouble(root["total_cost_usd"]),
+                TranscriptJson.AsLong(usage?["input_tokens"]),
+                TranscriptJson.AsLong(usage?["output_tokens"]),
+                TranscriptJson.AsLong(root["duration_ms"]),
+                TranscriptJson.AsLong(usage?["cache_read_input_tokens"]),
+                TranscriptJson.AsLong(usage?["cache_creation_input_tokens"])),
+        ];
+    }
+
+    // Cost is a double but tolerate an integer serialisation, mirroring TranscriptJson.AsLong.
+    private static double AsDouble(JsonNode? n)
+    {
+        if (n is null) return 0;
+        try { return n.GetValue<double>(); }
+        catch { try { return n.GetValue<long>(); } catch { return 0; } }
+    }
+}

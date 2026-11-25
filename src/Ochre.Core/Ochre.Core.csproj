@@ -5,4 +5,9 @@
   <ItemGroup>
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>
+  <!-- Code copied from Perch keeps its internal visibility, so the two can be compared when fixes land on either side. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ochre" />
+    <InternalsVisibleTo Include="Ochre.Tests" />
+  </ItemGroup>
 </Project>

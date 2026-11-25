@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>ochre</AssemblyName>
+    <RootNamespace>Ochre.Host</RootNamespace>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ochre.Core\Ochre.Core.csproj" />
+    <ProjectReference Include="..\Ochre.Platform.Windows\Ochre.Platform.Windows.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\ui\dist\**" LinkBase="wwwroot" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

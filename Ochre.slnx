@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ochre.Core/Ochre.Core.csproj" />
+    <Project Path="src/Ochre.Host/Ochre.Host.csproj" />
+    <Project Path="src/Ochre.Platform.Windows/Ochre.Platform.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ochre.Tests/Ochre.Tests.csproj" />
+  </Folder>
+</Solution>

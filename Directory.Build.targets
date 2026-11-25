@@ -1,0 +1,9 @@
+<Project>
+  <!-- The WebView2 package (and its buildTransitive targets) always references its WPF control, which conflicts with
+       WinForms' WindowsBase. Nothing in Ochre uses the WPF control, so drop it wherever the package reaches. -->
+  <Target Name="DropWebView2Wpf" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
+</Project>

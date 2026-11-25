@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { on, request, type PlanItemDto, type TaskDetail, type TaskStateDto } from '../bridge';
+import { ConfirmDialog } from '../Dialog';
 import { renderMarkdown } from '../markdown';
 import { PathText } from '../PathText';
 
@@ -8,15 +9,26 @@ const states: TaskStateDto[] = ['backlog', 'active', 'parked', 'done'];
 interface Props {
   id: string;
   onError: (message: string) => void;
+  onDeleted: () => void;
 }
 
-export function TaskView({ id, onError }: Props) {
+export function TaskView({ id, onError, onDeleted }: Props) {
   const [task, setTask] = useState<TaskDetail | null>(null);
+  const [gone, setGone] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(() => {
     request('tasks.get', { id })
-      .then(setTask)
-      .catch((e: Error) => onError(e.message));
+      .then((t) => {
+        setTask(t);
+        setGone(false);
+      })
+      .catch((e: Error) => {
+        // Deleted elsewhere (another window, or the file removed on disk) isn't an error worth a banner.
+        if (e.message === 'no such task') setGone(true);
+        else onError(e.message);
+      });
   }, [id, onError]);
 
   useEffect(() => {
@@ -34,6 +46,20 @@ export function TaskView({ id, onError }: Props) {
     }
   }
 
+  async function remove() {
+    setDeleting(true);
+    try {
+      await request('tasks.delete', { id });
+      setConfirmDelete(false);
+      onDeleted();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  if (gone) return <p className="empty">This task no longer exists.</p>;
   if (!task) return <p className="empty">Loading...</p>;
 
   const update = (fields: { title?: string; notes?: string; repos?: string[] }) =>
@@ -44,7 +70,24 @@ export function TaskView({ id, onError }: Props) {
       <header className="task-header">
         <TitleEditor title={task.title} onSave={(title) => update({ title })} />
         <span className="task-id">{task.id}</span>
+        <button className="link danger" onClick={() => setConfirmDelete(true)}>
+          Delete
+        </button>
       </header>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete ${task.id}?`}
+        confirmLabel="Delete task"
+        danger
+        busy={deleting}
+        onConfirm={remove}
+        onClose={() => setConfirmDelete(false)}
+      >
+        <p>
+          <strong>{task.title}</strong> will be removed from Ochre. Its file moves to the <code>.trash</code> folder next to your tasks, so it can be restored by moving it back. Its id won't be reused.
+        </p>
+      </ConfirmDialog>
 
       <div className="states" role="group" aria-label="State">
         {states.map((s) => (
@@ -63,6 +106,7 @@ export function TaskView({ id, onError }: Props) {
 
       <section>
         <h3>Plan</h3>
+        {task.planText && <div className="markdown plan-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(task.planText) }} />}
         <Plan
           items={task.plan}
           onCheck={(itemId, done) => run(request('plan.check', { id, itemId, done }))}
@@ -188,7 +232,7 @@ function Plan({ items, onCheck, onAdd }: PlanProps) {
 
   return (
     <>
-      {items.length > 0 ? renderItems(items) : <p className="empty">No plan yet.</p>}
+      {items.length > 0 && renderItems(items)}
       <StepInput placeholder="Add a step" onSubmit={(text) => onAdd(text, null)} />
     </>
   );

@@ -19,6 +19,7 @@ public static class BridgeContract
         new("tasks.create", typeof(CreateTaskRequest), typeof(TaskDetail)),
         new("tasks.update", typeof(UpdateTaskRequest), typeof(TaskDetail)),
         new("tasks.setState", typeof(SetStateRequest), typeof(TaskDetail)),
+        new("tasks.delete", typeof(TaskIdRequest), typeof(Ack)),
         new("plan.check", typeof(CheckItemRequest), typeof(TaskDetail)),
         new("plan.add", typeof(AddItemRequest), typeof(TaskDetail)),
     ];

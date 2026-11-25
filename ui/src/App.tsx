@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { on, request, type AppInfo, type TaskListItem } from './bridge';
+import { NewTaskDialog } from './tasks/NewTaskDialog';
 import { TaskList } from './tasks/TaskList';
 import { TaskView } from './tasks/TaskView';
 
@@ -7,6 +8,7 @@ export function App() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refreshList = useCallback(() => {
@@ -22,16 +24,6 @@ export function App() {
     refreshList();
     return on('tasks.changed', refreshList);
   }, [refreshList]);
-
-  async function create(title: string) {
-    try {
-      const task = await request('tasks.create', { title });
-      setSelected(task.id);
-      refreshList();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
 
   return (
     <div className="app">
@@ -49,14 +41,23 @@ export function App() {
           </button>
         </div>
       )}
-      <TaskList tasks={tasks} selected={selected} onSelect={setSelected} onCreate={create} />
+      <TaskList tasks={tasks} selected={selected} onSelect={setSelected} onNew={() => setCreating(true)} />
       <main className="content">
         {selected ? (
-          <TaskView key={selected} id={selected} onError={setError} />
+          <TaskView key={selected} id={selected} onError={setError} onDeleted={() => setSelected(null)} />
         ) : (
           <p className="empty">{tasks.length ? 'Select a task.' : 'Create a task to start. Agents are launched from tasks.'}</p>
         )}
       </main>
+      <NewTaskDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(task) => {
+          setCreating(false);
+          setSelected(task.id);
+          refreshList();
+        }}
+      />
     </div>
   );
 }

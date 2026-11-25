@@ -96,7 +96,11 @@ Exit (from the roadmap): create a task, launch two agents on it, both tick plan 
 
 - Bridge v1 from the spike's findings: `tasks.list`, `tasks.get`, `tasks.create`, `tasks.update` (title, repos, notes), `tasks.setState`, `plan.check`, `plan.add`, and a `tasks.changed` event. Types generated per ADR 0009.
 - List with state filter, sorted by state then last activity. Detail view: plan checkboxes, notes (markdown rendered with DOMPurify), links shown read-only, sessions list, log. Manual ordering (the `order` field) is deferred until dogfooding shows it's wanted.
-- Done 2026-11-25; see `docs/testing/m1-tasks-ui-testing.md`.
+- Done 2026-11-25; see `docs/testing/m1-tasks-ui-testing.md`. After the first hands-on test: tasks are created in a dialog (title, description, repos), deleted through a confirm dialog into a `.trash` folder, and hand-typed plan text and bare bullets are shown rather than ignored. UX conventions recorded in `docs/ux-conventions.md`.
+
+### UI design pass (after slice 5)
+
+The rest of the conventions (filter counts, search, a board view, ID under the title, a coloured status dropdown, centred content) are applied in one pass from a design artefact agreed first. It comes after the thread view so the artefact covers the task list, task detail and session thread together.
 - Edits from the UI go through the store like any other writer, with author `user`.
 
 ### Slice 4: controlled sessions (host side)

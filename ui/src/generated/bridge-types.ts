@@ -26,6 +26,8 @@ export interface CheckItemRequest {
 
 export interface CreateTaskRequest {
   title: string;
+  notes: string | null;
+  repos: string[] | null;
 }
 
 export type Empty = Record<string, never>;
@@ -77,6 +79,7 @@ export interface TaskDetail {
   sessions: SessionRefDto[];
   park: ParkDto | null;
   plan: PlanItemDto[];
+  planText: string;
   notes: string;
   log: string[];
 }
@@ -111,6 +114,7 @@ export interface Requests {
   'tasks.create': { req: CreateTaskRequest; res: TaskDetail };
   'tasks.update': { req: UpdateTaskRequest; res: TaskDetail };
   'tasks.setState': { req: SetStateRequest; res: TaskDetail };
+  'tasks.delete': { req: TaskIdRequest; res: Ack };
   'plan.check': { req: CheckItemRequest; res: TaskDetail };
   'plan.add': { req: AddItemRequest; res: TaskDetail };
 }

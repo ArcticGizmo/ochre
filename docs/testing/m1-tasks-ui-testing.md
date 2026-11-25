@@ -11,7 +11,11 @@ What changed: tasks can be created and worked on in the window. The host exposes
 
 | Try | Before | After |
 |---|---|---|
-| Type a title in "New task title" and press Enter | No way to create tasks | `T-0001` appears in the list and opens on the right; the file exists in the tasks folder |
+| Click "New task", fill in title, a markdown description and two repo paths (one per line), Create task | No way to create tasks | The dialog closes; the task opens with the description as its notes and both repos; the file has them all and a single "created" log line |
+| Open "New task" and press Esc | | The dialog closes and nothing is created |
+| On a task, click Delete | | A dialog names the task and says the file moves to `.trash`; Cancel leaves it alone |
+| Confirm the delete | | The task leaves the list, its file is in `tasks\.trash`, and the next new task gets the next id (the deleted one isn't reused) |
+| In an editor, add plain text and a bare `- bullet` under `## Plan`, save | Neither showed: the edit looked lost | The text shows above the steps and the bullet shows as a step within a second; the log says "changed on disk"; ticking it in Ochre writes `- [x] ...` with an id |
 | Click "active" in the state chips | | The task shows ACTIVE in the list; the log gains "set state active" |
 | Type in "Add a step" and press Enter, three times | | Three plan items, each with an id (`{#p1}`...) in the file |
 | Hover a step, click "+", type, Enter | | A nested sub-step appears under it, indented in the file |

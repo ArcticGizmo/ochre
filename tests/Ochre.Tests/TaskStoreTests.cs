@@ -27,6 +27,21 @@ public sealed class TaskStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Deleting_moves_the_file_to_trash_and_never_reuses_its_id()
+    {
+        await _store.CreateAsync("One", "user");
+        var second = await _store.CreateAsync("Two", "user");
+
+        await _store.DeleteAsync(second, "user");
+
+        Assert.False(File.Exists(Path.Combine(_root, "tasks", second + ".md")));
+        Assert.True(File.Exists(Path.Combine(_store.TrashFolder, second + ".md")));
+        Assert.Equal(["T-0001"], _store.List().Select(t => t.Id));
+        Assert.Equal("T-0003", await _store.CreateAsync("Three", "user"));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _store.DeleteAsync(second, "user"));
+    }
+
+    [Fact]
     public async Task An_edit_made_outside_Ochre_survives_the_next_write()
     {
         var id = await _store.CreateAsync("Task", "user");

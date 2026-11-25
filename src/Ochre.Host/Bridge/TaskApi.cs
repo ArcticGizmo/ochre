@@ -27,8 +27,28 @@ internal static class TaskApi
 
         bridge.Handle("tasks.create", j.CreateTaskRequest, j.TaskDetail, async r =>
         {
-            var id = await store.CreateAsync(Text(r.Title, MaxTitle, "title"), UserAuthor).ConfigureAwait(true);
+            var title = Text(r.Title, MaxTitle, "title");
+            if (r.Notes is { Length: > MaxNotes }) throw new BridgeRejectException("description too long");
+            var repos = r.Repos is null ? [] : ValidRepos(r.Repos);
+            var id = await store.CreateAsync(title, UserAuthor, doc =>
+            {
+                if (!string.IsNullOrWhiteSpace(r.Notes)) doc.SetNotes(r.Notes);
+                if (repos.Count > 0) doc.SetRepos(repos);
+            }).ConfigureAwait(true);
             return ToDetail(id, store.Get(id)!);
+        });
+
+        bridge.Handle("tasks.delete", j.TaskIdRequest, j.Ack, async r =>
+        {
+            try
+            {
+                await store.DeleteAsync(ValidId(r.Id), UserAuthor).ConfigureAwait(true);
+            }
+            catch (KeyNotFoundException)
+            {
+                throw new BridgeRejectException("no such task");
+            }
+            return new Ack();
         });
 
         bridge.Handle("tasks.update", j.UpdateTaskRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
@@ -156,6 +176,7 @@ internal static class TaskApi
         doc.Sessions.Select(s => new SessionRefDto(s.Id, s.Cwd, s.Binding, s.Role)).ToList(),
         doc.Park is { } p ? new ParkDto(Iso(p.At)!, p.Note) : null,
         doc.Plan.Select(ToDto).ToList(),
+        doc.PlanText,
         doc.Notes,
         doc.Log.Select(l => l.Text).ToList());
 

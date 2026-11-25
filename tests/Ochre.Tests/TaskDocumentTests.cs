@@ -227,6 +227,22 @@ public class TaskDocumentTests
             body);
     }
 
+    [Fact]
+    public void Hand_typed_plan_lines_are_never_hidden()
+    {
+        var doc = TaskDocument.Parse("---\nid: T-0004\n---\n\n## Plan\nsomething something something\n- bare step\n* [x] starred and done\n\n## Notes\n");
+
+        Assert.Equal("something something something", doc.PlanText);
+        Assert.Equal(["bare step", "starred and done"], doc.Plan.Select(p => p.Text));
+        Assert.False(doc.Plan[0].Done);
+        Assert.True(doc.Plan[1].Done);
+
+        doc.EnsureItemIds();
+        Assert.Contains("- [ ] bare step {#p1}\n* [x] starred and done {#p2}", doc.Serialize(), StringComparison.Ordinal);
+        Assert.True(doc.SetItemDone("p1", true));
+        Assert.Contains("- [x] bare step {#p1}", doc.Serialize(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("no frontmatter")]
     [InlineData("---\nid: T-1\n")]

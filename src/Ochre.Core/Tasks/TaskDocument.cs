@@ -190,8 +190,21 @@ public sealed partial class TaskDocument
 
     // ---- body: plan ---------------------------------------------------------------------------------------------
 
-    [GeneratedRegex(@"^(?<indent>[ \t]*)[-*] \[(?<mark>[ xX])\] (?<text>.*?)(?:\s*\{#(?<id>[\w-]+)\})?\s*$")]
+    // A bare bullet ("- step") counts as an unticked item: people type plans that way in an editor, and an item
+    // Ochre can't see would be a silently lost edit.
+    [GeneratedRegex(@"^(?<indent>[ \t]*)[-*+] (?:\[(?<mark>[ xX])\] )?(?<text>\S.*?)(?:\s*\{#(?<id>[\w-]+)\})?\s*$")]
     private static partial Regex PlanLine();
+
+    /// <summary>Text in the Plan section that isn't a plan item, shown as-is so nothing written there is hidden.</summary>
+    public string PlanText
+    {
+        get
+        {
+            if (FindSection("Plan") is not var (start, end)) return "";
+            var lines = _body.Skip(start + 1).Take(end - start - 1).Where(l => !PlanLine().IsMatch(l));
+            return string.Join("\n", lines).Trim();
+        }
+    }
 
     public IReadOnlyList<PlanItem> Plan
     {
@@ -205,7 +218,8 @@ public sealed partial class TaskDocument
             {
                 var m = PlanLine().Match(_body[i]);
                 if (!m.Success) continue;
-                flat.Add((m.Groups["id"].Success ? m.Groups["id"].Value : null, m.Groups["text"].Value, m.Groups["mark"].Value != " ", IndentWidth(m.Groups["indent"].Value), i));
+                var done = m.Groups["mark"].Success && m.Groups["mark"].Value != " ";
+                flat.Add((m.Groups["id"].Success ? m.Groups["id"].Value : null, m.Groups["text"].Value, done, IndentWidth(m.Groups["indent"].Value), i));
             }
             return Nest(flat, 0, flat.Count);
         }
@@ -234,9 +248,7 @@ public sealed partial class TaskDocument
     public bool SetItemDone(string id, bool done)
     {
         if (FindItem(id) is not { } item || item.Done == done) return false;
-        var line = _body[item.Line];
-        var mark = line.IndexOf('[', StringComparison.Ordinal);
-        _body[item.Line] = line[..(mark + 1)] + (done ? "x" : " ") + line[(mark + 2)..];
+        _body[item.Line] = WithMark(_body[item.Line], done);
         return true;
     }
 
@@ -274,12 +286,28 @@ public sealed partial class TaskDocument
             if (item.Id is { } id && seen.Add(id)) continue;
             var newId = NextItemId(seen);
             seen.Add(newId);
-            var line = _body[item.Line];
+            // A bare bullet becomes a checkbox item as it gets its id, so the file settles into the documented form.
+            var line = WithMark(_body[item.Line], item.Done);
             var withoutId = item.Id is null ? line.TrimEnd() : Regex.Replace(line, @"\s*\{#[\w-]+\}\s*$", "");
             _body[item.Line] = $"{withoutId} {{#{newId}}}";
             changed = true;
         }
         return changed;
+    }
+
+    /// <summary>Sets the checkbox on a plan line, adding one to a bare bullet.</summary>
+    private static string WithMark(string line, bool done)
+    {
+        var m = PlanLine().Match(line);
+        if (!m.Success) return line;
+        var mark = done ? 'x' : ' ';
+        if (m.Groups["mark"].Success)
+        {
+            var at = m.Groups["mark"].Index;
+            return line[..at] + mark + line[(at + 1)..];
+        }
+        var textAt = m.Groups["text"].Index;
+        return line[..textAt] + $"[{mark}] " + line[textAt..];
     }
 
     private string NextItemId(HashSet<string>? taken = null)

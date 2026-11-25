@@ -68,24 +68,25 @@ public sealed partial class TaskStore : IDisposable
 
     public TaskDocument? Get(string id) => _cache.TryGetValue(id, out var e) ? TaskDocument.Parse(e.Text) : null;
 
-    public async Task<string> CreateAsync(string title, string author, CancellationToken ct = default)
+    /// <summary>Where deleted tasks go. Kept so a delete can be undone by moving the file back.</summary>
+    public string TrashFolder => Path.Combine(_folder, ".trash");
+
+    /// <summary>Creates a task, applying <paramref name="init"/> before the first write so it lands in one go.</summary>
+    public async Task<string> CreateAsync(string title, string author, Action<TaskDocument>? init = null, CancellationToken ct = default)
     {
         await _createGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             Directory.CreateDirectory(_folder);
-            var next = Directory.EnumerateFiles(_folder, "T-*.md")
-                .Select(p => Path.GetFileNameWithoutExtension(p))
-                .Where(IsTaskId)
-                .Select(id => int.Parse(id.AsSpan(2), NumberStyles.None, CultureInfo.InvariantCulture))
-                .DefaultIfEmpty(0)
-                .Max() + 1;
+            var next = HighestIdEverUsed() + 1;
 
             while (true)
             {
                 var id = $"T-{next:D4}";
                 var now = _clock.GetUtcNow();
                 var doc = TaskDocument.CreateNew(id, title, now);
+                init?.Invoke(doc);
+                doc.EnsureItemIds();
                 doc.AppendLog(now, author, "created");
                 var text = doc.Serialize();
                 try
@@ -151,6 +152,50 @@ public sealed partial class TaskStore : IDisposable
         }
     }
 
+    /// <summary>
+    /// Moves the task to the trash folder. Its id is never reused, because logs, links and other tasks may still
+    /// refer to it.
+    /// </summary>
+    public async Task DeleteAsync(string id, string author, CancellationToken ct = default)
+    {
+        if (!IsTaskId(id)) throw new KeyNotFoundException($"no task '{id}'");
+        var gate = _gates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var path = PathFor(id);
+            if (!File.Exists(path)) throw new KeyNotFoundException($"no task '{id}'");
+            Directory.CreateDirectory(TrashFolder);
+            var target = Path.Combine(TrashFolder, Path.GetFileName(path));
+            if (File.Exists(target))
+                target = Path.Combine(TrashFolder, $"{id.ToUpperInvariant()}.{_clock.GetUtcNow():yyyyMMddTHHmmssZ}.md");
+            File.Move(path, target);
+            _cache.TryRemove(id, out _);
+            _log.Info($"task {id} deleted by {author} (moved to trash)");
+            Changed?.Invoke(id);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private int HighestIdEverUsed()
+    {
+        IEnumerable<string> files = Directory.EnumerateFiles(_folder, "T-*.md");
+        if (Directory.Exists(TrashFolder)) files = files.Concat(Directory.EnumerateFiles(TrashFolder, "T-*.md"));
+        var highest = 0;
+        foreach (var file in files)
+        {
+            // Trash names may carry a timestamp after the number ("T-0004.20261125T074600Z.md").
+            var name = Path.GetFileName(file).AsSpan(2);
+            var digits = 0;
+            while (digits < name.Length && char.IsAsciiDigit(name[digits])) digits++;
+            if (int.TryParse(name[..digits], NumberStyles.None, CultureInfo.InvariantCulture, out var n)) highest = Math.Max(highest, n);
+        }
+        return highest;
+    }
+
     private string PathFor(string id) => Path.Combine(_folder, id.ToUpperInvariant() + ".md");
 
     private static async Task<string> ReadSharedAsync(string path, CancellationToken ct)
@@ -210,14 +255,22 @@ public sealed partial class TaskStore : IDisposable
             {
                 if (!File.Exists(path))
                 {
-                    if (_cache.TryRemove(id, out _) && raise) Changed?.Invoke(id);
+                    if (_cache.TryRemove(id, out _) && raise)
+                    {
+                        _log.Info($"task {id} removed on disk");
+                        Changed?.Invoke(id);
+                    }
                     return;
                 }
                 var text = ReadSharedAsync(path, CancellationToken.None).GetAwaiter().GetResult();
                 // Our own writes come back through the watcher; they're already cached.
                 if (_cache.TryGetValue(id, out var existing) && existing.Text == text) return;
                 _cache[id] = new Entry(TaskDocument.Parse(text), text);
-                if (raise) Changed?.Invoke(id);
+                if (raise)
+                {
+                    _log.Info($"task {id} changed on disk");
+                    Changed?.Invoke(id);
+                }
                 return;
             }
             catch (IOException) when (attempt < 3)

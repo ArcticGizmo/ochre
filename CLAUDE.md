@@ -32,6 +32,7 @@ A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray
 - IO and heavy work run off the UI thread; guard callbacks against closed windows.
 - Read Claude's live files with `FileShare.ReadWrite` and tolerate partial trailing lines; never throw out of a scan.
 - Every OS-specific capability goes behind a Core interface with a platform implementation.
+- UI work follows `docs/ux-conventions.md` (dialogs for creates and terminal actions, counts on filters, status colours, centred content). Larger visual changes start from a design artefact.
 - A file path in a one-line space keeps the **file name** and elides the leading directory.
 - Every browser link also takes a middle click, which opens it in a new browser window.
 - Secrets go in Credential Manager / Keychain, never in settings or logs.

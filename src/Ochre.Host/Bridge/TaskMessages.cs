@@ -49,12 +49,14 @@ public sealed record TaskDetail(
     IReadOnlyList<SessionRefDto> Sessions,
     ParkDto? Park,
     IReadOnlyList<PlanItemDto> Plan,
+    string PlanText,
     string Notes,
     IReadOnlyList<string> Log);
 
 public sealed record TaskIdRequest(string Id);
 
-public sealed record CreateTaskRequest(string Title);
+/// <param name="Notes">The description; becomes the task's Notes section.</param>
+public sealed record CreateTaskRequest(string Title, string? Notes, IReadOnlyList<string>? Repos);
 
 /// <summary>Only the fields that are present change.</summary>
 public sealed record UpdateTaskRequest(string Id, string? Title, string? Notes, IReadOnlyList<string>? Repos);

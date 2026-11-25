@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { request, type TaskSummary } from './bridge';
 import { TerminalPanel } from './panels/TerminalPanel';
-import { EditorPanel } from './panels/EditorPanel';
 import { BenchPanel } from './panels/BenchPanel';
+
+// Monaco is most of the bundle; keep it off the window-open path until the editor is first used.
+const EditorPanel = lazy(() => import('./panels/EditorPanel').then((m) => ({ default: m.EditorPanel })));
 
 type Tab = 'terminal' | 'editor' | 'bench';
 
@@ -10,7 +12,12 @@ export function App() {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('terminal');
+  const [editorUsed, setEditorUsed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tab === 'editor') setEditorUsed(true);
+  }, [tab]);
 
   useEffect(() => {
     request('tasks.list', {})
@@ -51,7 +58,11 @@ export function App() {
           <TerminalPanel visible={tab === 'terminal'} />
         </section>
         <section className="panel" hidden={tab !== 'editor'}>
-          <EditorPanel visible={tab === 'editor'} />
+          {editorUsed && (
+            <Suspense fallback={<p className="hint">Loading editor...</p>}>
+              <EditorPanel visible={tab === 'editor'} />
+            </Suspense>
+          )}
         </section>
         <section className="panel" hidden={tab !== 'bench'}>
           <BenchPanel />

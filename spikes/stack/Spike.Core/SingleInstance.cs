@@ -16,13 +16,15 @@ public static class SingleInstance
         return $"{app}-{hash}";
     }
 
-    public static void SignalOpen(string pipeName)
+    /// <summary>"open" by default; "--close" on the command line closes (or hides) the window, for timing reopen.</summary>
+    public static void Signal(string pipeName, string[] args)
     {
+        var command = args.Contains("--close") ? "close\n"u8 : "open\n"u8;
         try
         {
             using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out, PipeOptions.CurrentUserOnly);
             client.Connect(2000);
-            client.Write("open\n"u8);
+            client.Write(command);
         }
         catch (TimeoutException)
         {
@@ -32,7 +34,7 @@ public static class SingleInstance
         }
     }
 
-    public static void Listen(string pipeName, Action onOpen, CancellationToken ct)
+    public static void Listen(string pipeName, Action onOpen, Action onClose, CancellationToken ct)
     {
         _ = Task.Run(async () =>
         {
@@ -44,7 +46,9 @@ public static class SingleInstance
                     await using var server = new NamedPipeServerStream(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                     await server.WaitForConnectionAsync(ct).ConfigureAwait(false);
                     var read = await server.ReadAsync(buffer, ct).ConfigureAwait(false);
-                    if (read > 0 && buffer.AsSpan(0, read).StartsWith("open"u8)) onOpen();
+                    var text = buffer.AsSpan(0, read);
+                    if (text.StartsWith("open"u8)) onOpen();
+                    else if (text.StartsWith("close"u8)) onClose();
                 }
                 catch (OperationCanceledException)
                 {

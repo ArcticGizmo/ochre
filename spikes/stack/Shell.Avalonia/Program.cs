@@ -15,7 +15,7 @@ internal static class Program
         using var mutex = new Mutex(true, $@"Local\{AppName}", out var first);
         if (!first)
         {
-            SingleInstance.SignalOpen(pipeName);
+            SingleInstance.Signal(pipeName, args);
             return 0;
         }
 

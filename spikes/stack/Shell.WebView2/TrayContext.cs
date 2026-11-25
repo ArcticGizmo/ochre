@@ -54,6 +54,23 @@ internal sealed class TrayContext : ApplicationContext
         }
     }
 
+    public void CloseWindowFromAnyThread()
+    {
+        try
+        {
+            _invoker.BeginInvoke(() =>
+            {
+                if (_window is not { IsDisposed: false }) return;
+                if (_hideOnClose) _window.Hide();
+                else _window.Close();
+            });
+        }
+        catch (InvalidOperationException)
+        {
+            // Shutting down.
+        }
+    }
+
     private void OpenWindow()
     {
         if (_window is { IsDisposed: false })

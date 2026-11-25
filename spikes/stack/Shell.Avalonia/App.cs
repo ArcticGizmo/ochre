@@ -37,7 +37,7 @@ internal sealed class App(SpikeHost host, string pipeName, CancellationToken sto
         tray.Clicked += (_, _) => OpenWindow();
         TrayIcon.SetIcons(this, [tray]);
 
-        SingleInstance.Listen(pipeName, () => Dispatcher.UIThread.Post(OpenWindow), stopping);
+        SingleInstance.Listen(pipeName, () => Dispatcher.UIThread.Post(OpenWindow), () => Dispatcher.UIThread.Post(CloseWindow), stopping);
         Dispatcher.UIThread.Post(host.MarkTrayReady, DispatcherPriority.Background);
         base.OnFrameworkInitializationCompleted();
     }
@@ -56,6 +56,13 @@ internal sealed class App(SpikeHost host, string pipeName, CancellationToken sto
         _window = new MainWindow(host, _hideOnClose);
         _window.Closed += (_, _) => _window = null;
         _window.Show();
+    }
+
+    private void CloseWindow()
+    {
+        if (_window is null) return;
+        if (_hideOnClose) _window.Hide();
+        else _window.Close();
     }
 
     private void Quit()

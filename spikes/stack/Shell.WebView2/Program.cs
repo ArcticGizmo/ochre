@@ -7,13 +7,13 @@ internal static class Program
     private const string AppName = "ochre-spike-webview2";
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         var pipeName = SingleInstance.PipeName(AppName);
         using var mutex = new Mutex(true, $@"Local\{AppName}", out var first);
         if (!first)
         {
-            SingleInstance.SignalOpen(pipeName);
+            SingleInstance.Signal(pipeName, args);
             return 0;
         }
 
@@ -21,7 +21,7 @@ internal static class Program
         using var host = new SpikeHost("webview2");
         using var context = new TrayContext(host);
         using var cts = new CancellationTokenSource();
-        SingleInstance.Listen(pipeName, context.OpenWindowFromAnyThread, cts.Token);
+        SingleInstance.Listen(pipeName, context.OpenWindowFromAnyThread, context.CloseWindowFromAnyThread, cts.Token);
         Application.Run(context);
         cts.Cancel();
         return 0;

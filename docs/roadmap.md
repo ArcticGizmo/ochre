@@ -6,7 +6,7 @@ Each milestone ends with a manual testing doc (`docs/testing/<milestone>-testing
 
 Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 
-**Exit:** ADR 0002 accepted or replaced, with measurements recorded. Met: ADR 0002 accepted with raw WebView2 in a minimal WinForms host; numbers in [spikes/stack/results.md](../spikes/stack/results.md).
+**Exit:** ADR 0002 accepted or replaced, with measurements recorded. Met: ADR 0002 accepted with raw WebView2 in a minimal WinForms host; numbers in [spike-stack-results.md](spike-stack-results.md).
 
 ## M1: tasks and controlled sessions
 

@@ -4,7 +4,7 @@
 
 Ochre is a task-first **agent development environment** (ADE) for Claude Code. It is a command center where the durable unit of work is the **task**, not the agent session. Sessions, worktrees, terminals, PRs and Jira issues attach to a task, come and go, and the task remembers where you got to.
 
-> **Status:** pre-code. This repo holds the vision, architecture, decisions and roadmap. The first code is the stack spike (M0) in [docs/spike-stack.md](docs/spike-stack.md).
+> **Status:** M0 (stack spike) is done and settled the stack: a .NET 10 host with the UI in WebView2 ([results](docs/spike-stack-results.md)). M1, tasks and controlled sessions, is next; see [docs/implementation-plan.md](docs/implementation-plan.md).
 
 ## Why
 
@@ -29,6 +29,7 @@ Claude sessions end up being the to-do list, and that list disappears every time
 | [docs/security.md](docs/security.md) | Threat model and required mitigations |
 | [docs/roadmap.md](docs/roadmap.md) | Milestones M0 onwards with exit criteria |
 | [docs/spike-stack.md](docs/spike-stack.md) | M0: the stack spike that settles the UI technology |
+| [docs/spike-stack-results.md](docs/spike-stack-results.md) | M0 measurements and the shell decision |
 | [docs/implementation-plan.md](docs/implementation-plan.md) | How M0 and M1 get built, slice by slice, and the testing stance |
 | [docs/reuse-from-perch.md](docs/reuse-from-perch.md) | What to copy from Perch and where it lives |
 | [docs/landscape.md](docs/landscape.md) | Other ADEs as of Nov 2026 and where Ochre differs |

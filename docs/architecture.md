@@ -1,6 +1,6 @@
 # Architecture
 
-Status: proposed, with the UI technology settled by the M0 spike ([ADR 0002](decisions/0002-stack-dotnet-host-web-ui.md), [results](../spikes/stack/results.md)).
+Status: proposed, with the UI technology settled by the M0 spike ([ADR 0002](decisions/0002-stack-dotnet-host-web-ui.md), [results](spike-stack-results.md)).
 
 ## Overview
 

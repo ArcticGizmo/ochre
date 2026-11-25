@@ -4,6 +4,8 @@ What changed: a throwaway spike under `spikes/stack/` with two shells (WinForms 
 
 ## Setup
 
+The spike was deleted after M0, so start from its tag: `git worktree add ../ochre-spike spike-stack` and run the steps below inside that checkout.
+
 1. `pnpm install` then `pnpm build` in `spikes/stack/ui/`.
 2. `dotnet build spikes/stack/Shell.WebView2 -c Release` (and `Shell.Avalonia` to compare).
 3. Optional: set `OCHRE_SPIKE_DESKTOP` to a virtual desktop GUID (from `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops`) so windows open there, unfocused, instead of on your current desktop.

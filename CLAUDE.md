@@ -2,7 +2,7 @@
 
 A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray host plus a web UI in WebView2, hosted in a minimal WinForms shell on Windows (`docs/decisions/0002-stack-dotnet-host-web-ui.md`). The durable unit of work is the **task**; sessions, worktrees, terminals and links attach to it.
 
-**Status: M0 (stack spike) done; M1 in progress.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md`, `docs/roadmap.md` and `docs/implementation-plan.md` before writing code. Spike findings that M1 must carry over are in `spikes/stack/results.md`.
+**Status: M0 (stack spike) done; M1 in progress.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md`, `docs/roadmap.md` and `docs/implementation-plan.md` before writing code. Spike findings that M1 must carry over are in `docs/spike-stack-results.md`; the spike code is at the git tag `spike-stack`.
 
 ## Layout
 

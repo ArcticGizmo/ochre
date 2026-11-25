@@ -32,7 +32,7 @@ Manual testing docs (`docs/testing/<feature>-testing.md`) stay mandatory per CLA
 
 ## M0: stack spike
 
-**Done 2026-11-25.** Outcome: ADR 0002 accepted; the Windows shell is raw WebView2 in a minimal WinForms host. Results and method are in [spikes/stack/results.md](../spikes/stack/results.md). Carried into M1 (slices 1, 3 and the terminal work in M3): coalesce terminal output on a ~16 ms timer, set `IsReputationCheckingRequired = false` for the app's own page, use a `.example` virtual host name, lazy-load Monaco, and decide bridge type generation in ADR 0009. The spike folder stays until the Windows Terminal baseline has been run, then it's tagged `spike-stack` and deleted.
+**Done 2026-11-25.** Outcome: ADR 0002 accepted; the Windows shell is raw WebView2 in a minimal WinForms host. Results and method are in [spike-stack-results.md](spike-stack-results.md); the spike code is preserved at the git tag `spike-stack` and has been deleted from the tree. Carried into M1 (slices 1, 3 and the terminal work in M3): coalesce terminal output on a ~16 ms timer, set `IsReputationCheckingRequired = false` for the app's own page, use a `.example` virtual host name, lazy-load Monaco, and decide bridge type generation in ADR 0009. The spike's `PseudoConsoleSession`, `BridgeDispatcher` and `WebView2Page` are reasonable starting points to lift from the tag.
 
 Goal: accept or replace [ADR 0002](decisions/0002-stack-dotnet-host-web-ui.md) with numbers. Everything lives under `spikes/stack/` and is deleted or archived afterwards. Suggested timebox: one week; stop early if the first shell clearly passes.
 

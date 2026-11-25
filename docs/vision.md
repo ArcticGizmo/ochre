@@ -28,7 +28,7 @@ Perch shipped "work items" (grouping sessions into named pieces of work) and rem
 - **Integrated tabbed terminal** for running anything else in the app, restoring tabs, cwd, scrollback and launch command when reopened, and staying alive while the tray runs.
 - **Git worktree + graph** support: see what is being edited across all tasks right now.
 - **sprig** (optional module): worktree slots, quick-start apps, logs and status.
-- **Multiple windows across monitors**, each a saved layout, with a global "jump to task" switcher.
+- **Multiple windows across monitors and virtual desktops**: open a specific task in its own window and keep it on the desktop where that work lives; windows reopen on their desktops after a restart. Global "jump to task" switcher.
 - **Roost-style grid** of live sessions for a task, or across tasks.
 - **Attention inbox**: one queue of everything that needs you (permission prompts, questions, finished turns, failed CI), grouped by task.
 

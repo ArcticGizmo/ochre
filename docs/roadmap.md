@@ -44,9 +44,20 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 - Git graph + worktrees module (port Perch's `GitGraph` model and `GitRunner`).
 - Jira module: import + link, `LinkResolver`, `task fetch`.
 - sprig module: `WorktreeProvider`, app status and logs panel.
-- Multi-window layouts with per-monitor placement; "jump to task" hotkey.
+- Multiple windows, each showing a specific task (or the task list), so tasks can live on specific virtual desktops; see "Multiple windows" below. Per-monitor placement; "jump to task" hotkey.
 
-**Exit:** turn every module off and the kernel still works; turn sprig on and a task's worktree is a sprig slot.
+**Exit:** turn every module off and the kernel still works; turn sprig on and a task's worktree is a sprig slot; two tasks open in two windows on two virtual desktops come back on those desktops after quitting and relaunching.
+
+### Multiple windows (requirement, 2026-11-25)
+
+The user keeps specific tasks on specific virtual desktops, so Ochre must support several windows at once:
+
+- Open any task in its own window (from the list, a context menu, or `ochre open T-0042`). The new window opens on the **current** virtual desktop.
+- Each window remembers its task, size, position and virtual desktop. On relaunch, windows reopen on the desktop they were on (Windows lets a process move its own windows, so this is possible).
+- Opening a task that's already open in a window on another desktop asks: bring that window here, or open another view here. It never silently switches desktops.
+- Closing a window closes only that view; the host and other windows carry on (ADR 0008).
+
+Until then, don't build anything that assumes a single window: per-window UI state (selected task, scroll) lives in the page, and host events go to every window (WindowHost already broadcasts).
 
 ## M5: attention inbox and Roost grid
 

@@ -30,6 +30,7 @@ A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray
 - Warnings are errors (`TreatWarningsAsErrors` in `Directory.Build.props`); fix warnings, don't suppress them.
 - `Nullable` and `ImplicitUsings` on everywhere.
 - IO and heavy work run off the UI thread; guard callbacks against closed windows.
+- Never assume one window: several windows, each on its own task and virtual desktop, are a firm requirement (`docs/roadmap.md`, "Multiple windows"). Keep per-window state in the page and broadcast host events to every window.
 - Read Claude's live files with `FileShare.ReadWrite` and tolerate partial trailing lines; never throw out of a scan.
 - Every OS-specific capability goes behind a Core interface with a platform implementation.
 - UI work follows `docs/ux-conventions.md` (dialogs for creates and terminal actions, counts on filters, status colours, centred content). Larger visual changes start from a design artefact.

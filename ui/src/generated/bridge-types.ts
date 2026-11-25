@@ -39,6 +39,16 @@ export interface AssistantPartDto {
   diff: string[] | null;
 }
 
+export interface BindSessionRequest {
+  id: string;
+  taskId: string;
+}
+
+export interface BindSuggestionDto {
+  taskId: string;
+  reason: string;
+}
+
 export interface CheckItemRequest {
   id: string;
   itemId: string;
@@ -135,6 +145,8 @@ export interface SessionHeader {
   queuedPrompts: number;
   activity: string | null;
   subagents: SubagentDto[];
+  observed: boolean;
+  branch: string | null;
 }
 
 export interface SessionIdRequest {
@@ -173,6 +185,9 @@ export interface SessionSummary {
   startedAt: string;
   activity: string | null;
   subagents: SubagentDto[];
+  observed: boolean;
+  branch: string | null;
+  suggestions: BindSuggestionDto[];
 }
 
 export interface SessionUpdateEvent {
@@ -287,10 +302,13 @@ export interface Requests {
   'sessions.respond': { req: RespondRequest; res: Ack };
   'sessions.setModel': { req: SetModelRequest; res: Ack };
   'sessions.setEffort': { req: SetEffortRequest; res: Ack };
+  'sessions.bind': { req: BindSessionRequest; res: Ack };
+  'sessions.unbind': { req: SessionIdRequest; res: Ack };
 }
 
 export interface Events {
   'window.shown': Empty;
   'tasks.changed': TaskChangedEvent;
   'sessions.update': SessionUpdateEvent;
+  'sessions.changed': Empty;
 }

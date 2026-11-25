@@ -168,6 +168,18 @@ public sealed partial class TaskDocument
         _frontDirty = true;
     }
 
+    /// <summary>Takes the session off the task. False when it wasn't there.</summary>
+    public bool RemoveSession(string id)
+    {
+        if (!_front.Children.TryGetValue(new YamlScalarNode("sessions"), out var node) || node is not YamlSequenceNode seq) return false;
+        var match = seq.Children.OfType<YamlMappingNode>().FirstOrDefault(m => Scalar(m, "id") == id);
+        if (match is null) return false;
+        seq.Children.Remove(match);
+        if (seq.Children.Count == 0) Remove("sessions");
+        _frontDirty = true;
+        return true;
+    }
+
     public ParkNote? Park
     {
         get
@@ -380,7 +392,8 @@ public sealed partial class TaskDocument
             Park?.Note,
             Park?.At,
             Links,
-            Sessions);
+            Sessions,
+            Repos);
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------

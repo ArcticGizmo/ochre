@@ -182,10 +182,15 @@ public sealed class AgentCommands(TaskStore store, ParkRequests? parkRequests = 
             return mutate(doc);
         }).ConfigureAwait(false);
 
+    // Only a session the task launched counts. One the user bound by hand was started outside Ochre, so nothing
+    // vouches for what claims to be it, and it stays read-only.
     private static void RequireBound(TaskDocument doc, string sessionId)
     {
-        if (!doc.Sessions.Any(s => string.Equals(s.Id, sessionId, StringComparison.Ordinal)))
+        var bound = doc.Sessions.FirstOrDefault(s => string.Equals(s.Id, sessionId, StringComparison.Ordinal));
+        if (bound is null)
             throw new AgentRefusedException($"this session isn't bound to {doc.Id}; an agent can only use the task it was started from");
+        if (bound.Binding != "launched")
+            throw new AgentRefusedException($"this session was started outside Ochre and only linked to {doc.Id}, so it can't use the task; start an agent from the task instead");
     }
 
     private static string Clean(string value, int max, string what)

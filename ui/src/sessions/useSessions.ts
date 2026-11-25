@@ -12,6 +12,9 @@ export function useSessions(): SessionSummary[] {
         .then((list) => alive && setSessions(list))
         .catch(() => {});
     load();
+    // Sessions come and go outside Ochre, and an outside session's suggestions follow the tasks, so both reload.
+    const offChanged = on('sessions.changed', load);
+    const offTasks = on('tasks.changed', load);
     const off = on('sessions.update', (e) => {
       setSessions((list) => {
         const i = list.findIndex((s) => s.id === e.id);
@@ -31,6 +34,8 @@ export function useSessions(): SessionSummary[] {
     return () => {
       alive = false;
       off();
+      offChanged();
+      offTasks();
     };
   }, []);
 

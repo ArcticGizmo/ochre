@@ -13,15 +13,28 @@ export function StatePill({ state, small }: { state: TaskStateDto; small?: boole
   );
 }
 
-/** A host status, or "ended" for an agent on the task that the host no longer has (it can't be opened). */
-export type AgentStatus = SessionStatusDto | 'ended';
+/**
+ * A host status; "closed" for a session started outside Ochre whose process has gone (its transcript can still be
+ * read); "ended" for an agent on the task that the host no longer has (it can't be opened).
+ */
+export type AgentStatus = SessionStatusDto | 'closed' | 'ended';
 
-const agentWords: Record<AgentStatus, string> = { busy: 'working', idle: 'ready', waiting: 'needs you', dormant: 'dormant', ended: 'ended' };
+const agentWords: Record<AgentStatus, string> = { busy: 'working', idle: 'ready', waiting: 'needs you', dormant: 'dormant', closed: 'closed', ended: 'ended' };
 
 export const agentWord = (s: AgentStatus) => agentWords[s];
 
+export function statusOf(s: SessionSummary | { status: SessionStatusDto; observed: boolean }): AgentStatus {
+  return s.observed && s.status === 'dormant' ? 'closed' : s.status;
+}
+
 export function agentStatus(sessionId: string, live: SessionSummary[]): AgentStatus {
-  return live.find((s) => s.id === sessionId)?.status ?? 'ended';
+  const s = live.find((l) => l.id === sessionId);
+  return s ? statusOf(s) : 'ended';
+}
+
+/** A session's name in a one-line space: its role, else the folder it runs in, else its short id. */
+export function sessionName(s: { id: string; role: string | null; cwd: string }): string {
+  return s.role ?? (s.cwd.split(/[\\/]/).filter(Boolean).pop() || s.id.slice(0, 8));
 }
 
 export interface ParkLine {

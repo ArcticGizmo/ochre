@@ -106,6 +106,26 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_session_linked_from_outside_Ochre_can_neither_read_nor_write_its_task()
+    {
+        // Linked by the user (binding: confirmed): nothing vouches for a process claiming its id, so it stays read-only.
+        var id = await _store.CreateAsync("Linked", "user", doc =>
+        {
+            doc.AddItem("First step");
+            doc.AddSession(new TaskSessionRef(Stranger, @"C:\repo", null, "confirmed", null));
+        });
+        var path = Path.Combine(_root, "tasks", id + ".md");
+        var before = await File.ReadAllTextAsync(path);
+
+        Assert.StartsWith("error:", await Run(Stranger, id, "show"));
+        Assert.StartsWith("error:", await Run(Stranger, id, "check", "p1"));
+        Assert.StartsWith("error:", await Run(Stranger, id, "add-step", "Sneaky"));
+        Assert.StartsWith("error:", await Run(Stranger, id, "note", "Sneaky"));
+
+        Assert.Equal(before, await File.ReadAllTextAsync(path));
+    }
+
+    [Fact]
     public async Task Unbinding_a_session_stops_its_next_write()
     {
         var id = await NewTask();

@@ -27,7 +27,9 @@ internal sealed class LiveSession
 
     /// <summary>The id it was launched with; the key the task and the UI know it by, even after a <c>/clear</c>.</summary>
     public string Id { get; }
-    public string TaskId { get; }
+
+    /// <summary>The task it belongs to; empty for an observed session nobody has linked yet.</summary>
+    public string TaskId { get; set; }
     public string Cwd { get; }
     public string? Role { get; }
     public string? PermissionMode { get; }
@@ -46,6 +48,24 @@ internal sealed class LiveSession
 
     /// <summary>The effort level the user picked; null is "auto".</summary>
     public string? Effort { get; set; }
+
+    /// <summary>Started outside Ochre (in a terminal, the desktop app, another tool). Ochre only reads its transcript;
+    /// it never sends to it, stops it or lets it write to a task.</summary>
+    public bool Observed { get; init; }
+
+    /// <summary>For an observed session: busy, idle or waiting from Claude's session file, or closed once its
+    /// process has gone.</summary>
+    public string ObservedStatus { get; set; } = "closed";
+
+    /// <summary>The git branch its transcript last recorded, for binding suggestions.</summary>
+    public string? Branch { get; set; }
+
+    // Observed sessions only. Reads happen under TailGate (the scan and the first thread load race for them); what
+    // they return is applied to the conversation under Gate.
+    internal Lock TailGate { get; } = new();
+    internal string? TranscriptPath { get; set; }
+    internal TranscriptTailReader? ThreadTail { get; set; }
+    internal TranscriptTailReader? BranchTail { get; set; }
 
     /// <summary>No process: it ended, or the host started after it ran. Sending resumes it.</summary>
     public bool Dormant { get; set; }
@@ -77,6 +97,13 @@ internal sealed class SessionManager : IDisposable
     // Past this many transcript lines the thread shows only the tail; the CLI keeps the full context regardless.
     private const int MaxHistoryLines = 4000;
 
+    // Enough recent records to find the branch an observed session is on without reading its whole transcript.
+    private const int BranchScanLines = 50;
+
+    private static readonly TimeSpan ScanInterval = TimeSpan.FromSeconds(2);
+
+    private const string ReadOnly = "this session was started outside Ochre, so it's read-only here";
+
     private readonly TaskStore _tasks;
     private readonly SessionLedger _ledger;
     private readonly AppLog _log;
@@ -85,6 +112,8 @@ internal sealed class SessionManager : IDisposable
     private readonly Dictionary<string, LiveSession> _sessions = new(StringComparer.Ordinal);
     private readonly Lock _gate = new();
     private readonly Timer _flush;
+    private Timer? _scan;
+    private int _scanning;
 
     public SessionManager(TaskStore tasks, SessionLedger ledger, AppLog log, OchreProfile profile, SessionSystem? system = null)
     {
@@ -95,6 +124,9 @@ internal sealed class SessionManager : IDisposable
         _system = system ?? new SessionSystem();
         _flush = new Timer(_ => Flush(), null, FlushInterval, FlushInterval);
     }
+
+    /// <summary>Starts looking for sessions running outside Ochre every couple of seconds.</summary>
+    public void StartObserving() => _scan ??= new Timer(_ => ScanObserved(), null, TimeSpan.Zero, ScanInterval);
 
     /// <summary>A session changed: raised from the flush timer with that session's pending changes taken.</summary>
     public event Action<LiveSession, SessionChanges>? Changed;
@@ -115,24 +147,194 @@ internal sealed class SessionManager : IDisposable
     /// <summary>The name agents call the CLI by (<c>ochre</c>, or <c>ochre-cli</c> in a dev checkout).</summary>
     public string AgentCommand => _system.LocateCli() is { } cli ? Path.GetFileNameWithoutExtension(cli) : "ochre";
 
-    /// <summary>Brings back, dormant, every session a task says it launched. Cheap: no transcript is read until a
-    /// thread is opened.</summary>
+    /// <summary>Brings back, dormant, every session a task says it launched, and every outside session linked to a
+    /// task (closed until the scan finds its process). Cheap: no transcript is read until a thread is opened.</summary>
     public void LoadDormant()
     {
         foreach (var summary in _tasks.List())
         {
             if (_tasks.Get(summary.Id) is not { } doc) continue;
-            foreach (var s in doc.Sessions.Where(s => s.Binding == "launched" && ClaudeCli.IsSessionId(s.Id)))
+            foreach (var s in doc.Sessions.Where(s => ClaudeCli.IsSessionId(s.Id)))
             {
-                var entry = _ledger.Get(s.Id);
-                var session = Create(s.Id, summary.Id, s.Cwd, s.Role, entry?.PermissionMode, entry?.ClaudeId ?? s.Id, entry?.StartedAt ?? DateTimeOffset.MinValue);
+                LiveSession session;
+                if (s.Binding == "launched")
+                {
+                    var entry = _ledger.Get(s.Id);
+                    session = Create(s.Id, summary.Id, s.Cwd, s.Role, entry?.PermissionMode, entry?.ClaudeId ?? s.Id, entry?.StartedAt ?? DateTimeOffset.MinValue);
+                    session.Model = entry?.Model;
+                    session.Effort = entry?.Effort;
+                }
+                else
+                {
+                    session = Create(s.Id, summary.Id, s.Cwd, s.Role, null, s.Id, DateTimeOffset.MinValue, observed: true);
+                }
                 session.Dormant = true;
-                session.Model = entry?.Model;
-                session.Effort = entry?.Effort;
                 lock (_gate) _sessions.TryAdd(s.Id, session);
             }
         }
     }
+
+    /// <summary>The live session list gained or lost a session, or an observed one's branch changed (so its
+    /// suggestions may have). Raised from the scan.</summary>
+    public event Action? ListChanged;
+
+    /// <summary>
+    /// Picks up Claude sessions running outside Ochre from Claude's own session files (ADR 0006), refreshes their
+    /// status and branch, follows the transcript of any whose thread is open, and drops unlinked ones whose process
+    /// has gone. A linked one stays, closed, so its thread can still be read from the task.
+    /// </summary>
+    public void ScanObserved()
+    {
+        if (Interlocked.Exchange(ref _scanning, 1) == 1) return;
+        try
+        {
+            var live = _system.ReadLive();
+            var all = All;
+            var controlled = all.Where(s => !s.Observed).Select(s => s.ClaudeId).ToHashSet(StringComparer.Ordinal);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            bool listChanged = false;
+
+            foreach (var l in live)
+            {
+                if (controlled.Contains(l.SessionId) || !ClaudeCli.IsSessionId(l.SessionId)) continue;
+                seen.Add(l.SessionId);
+                var session = Get(l.SessionId);
+                if (session is null)
+                {
+                    session = Create(l.SessionId, "", l.Cwd, null, null, l.SessionId, l.StartedAt is { } t ? new DateTimeOffset(t) : DateTimeOffset.UtcNow, observed: true);
+                    lock (_gate) _sessions.TryAdd(l.SessionId, session);
+                    listChanged = true;
+                }
+                else if (!session.Observed)
+                {
+                    continue;
+                }
+                var status = l.Status is "busy" or "waiting" ? l.Status : "idle";
+                lock (session.Gate)
+                {
+                    if (session.ObservedStatus != status || session.Dormant)
+                    {
+                        session.ObservedStatus = status;
+                        session.Dormant = false;
+                        session.HeaderDirty = true;
+                        if (session.ThreadTail is not null) session.Conversation.SetLiveTail(status == "busy");
+                    }
+                }
+                if (FollowTranscript(session)) listChanged = true;
+            }
+
+            foreach (var session in all.Where(s => s.Observed && !seen.Contains(s.Id)))
+            {
+                if (session.TaskId.Length == 0)
+                {
+                    lock (_gate) _sessions.Remove(session.Id);
+                    listChanged = true;
+                    continue;
+                }
+                lock (session.Gate)
+                {
+                    if (session.ObservedStatus == "closed") continue;
+                    session.ObservedStatus = "closed";
+                    session.Dormant = true;
+                    if (session.ThreadTail is not null) session.Conversation.SetLiveTail(false);
+                    session.HeaderDirty = true;
+                }
+            }
+
+            if (listChanged) ListChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            // A scan is retried in two seconds; one that fails must never take the host down.
+            _log.Error("observed session scan failed", ex);
+        }
+        finally
+        {
+            Volatile.Write(ref _scanning, 0);
+        }
+    }
+
+    // Reads what an observed session's transcript gained: the branch it last recorded, and, while its thread is
+    // open, the new lines for the thread. True when the branch changed.
+    private bool FollowTranscript(LiveSession session)
+    {
+        session.TranscriptPath ??= _system.ResolveTranscript(session.Id, session.Cwd);
+        if (session.TranscriptPath is not { } path) return false;
+
+        IReadOnlyList<string> branchLines;
+        IReadOnlyList<string> threadLines = [];
+        lock (session.TailGate)
+        {
+            session.BranchTail ??= new TranscriptTailReader(path, BranchScanLines);
+            branchLines = session.BranchTail.Read().Lines;
+            if (session.ThreadTail is { } thread) threadLines = thread.Read().Lines;
+        }
+
+        var branch = branchLines.Select(BranchOf).LastOrDefault(b => b is not null);
+        lock (session.Gate)
+        {
+            foreach (var line in threadLines) session.Conversation.AppendTranscriptLine(line);
+            if (branch is null || branch == session.Branch) return false;
+            session.Branch = branch;
+            session.HeaderDirty = true;
+            return true;
+        }
+    }
+
+    // Every transcript record carries the branch the session was on; reading it needs no git call.
+    private static string? BranchOf(string line)
+    {
+        if (!line.Contains("\"gitBranch\"", StringComparison.Ordinal)) return null;
+        try
+        {
+            return TranscriptJson.AsString(JsonNode.Parse(line)?["gitBranch"]) is { Length: > 0 } b && b != "HEAD" ? b : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Links an observed session to <paramref name="taskId"/> (<c>binding: confirmed</c>). It stays read-only.</summary>
+    public async Task BindAsync(LiveSession session, string taskId)
+    {
+        if (!session.Observed) throw new InvalidOperationException("only a session started outside Ochre can be linked to a task");
+        if (session.TaskId.Length > 0) throw new InvalidOperationException($"this session is already linked to {session.TaskId}");
+        await _tasks.UpdateAsync(taskId, "user", doc =>
+        {
+            if (doc.Sessions.Any(s => s.Id == session.Id)) return null;
+            doc.AddSession(new TaskSessionRef(session.Id, session.Cwd, null, "confirmed", null));
+            return $"linked session {Short(session.Id)}";
+        }).ConfigureAwait(false);
+        lock (session.Gate)
+        {
+            session.TaskId = taskId;
+            session.HeaderDirty = true;
+        }
+        ListChanged?.Invoke();
+    }
+
+    /// <summary>Takes a linked observed session off its task. Sessions the task launched can't be unlinked.</summary>
+    public async Task UnbindAsync(LiveSession session)
+    {
+        if (!session.Observed) throw new InvalidOperationException("an agent the task started can't be unlinked from it");
+        var taskId = session.TaskId;
+        if (taskId.Length == 0) return;
+        await _tasks.UpdateAsync(taskId, "user", doc => doc.RemoveSession(session.Id) ? $"unlinked session {Short(session.Id)}" : null).ConfigureAwait(false);
+        lock (session.Gate)
+        {
+            session.TaskId = "";
+            session.HeaderDirty = true;
+        }
+        if (session.ObservedStatus == "closed")
+            lock (_gate) _sessions.Remove(session.Id);
+        ListChanged?.Invoke();
+    }
+
+    /// <summary>Tasks an unlinked observed session looks like it belongs to, best first. Only suggestions: the user
+    /// links it.</summary>
+    public IReadOnlyList<BindSuggestion> Suggest(LiveSession session) =>
+        session.Observed && session.TaskId.Length == 0 ? BindSuggestions.For(session.Cwd, session.Branch, _tasks.List()) : [];
 
     /// <summary>
     /// Starts an agent on <paramref name="taskId"/> in <paramref name="cwd"/> and records it on the task. A folder
@@ -184,6 +386,11 @@ internal sealed class SessionManager : IDisposable
             if (session.HistoryLoaded) return;
             session.HistoryLoaded = true;
         }
+        if (session.Observed)
+        {
+            await LoadObservedThreadAsync(session).ConfigureAwait(false);
+            return;
+        }
         var claudeId = session.ClaudeId;
         var (history, clipped, found) = await Task.Run(() =>
         {
@@ -206,8 +413,40 @@ internal sealed class SessionManager : IDisposable
         }
     }
 
+    // An observed thread is the tail of its transcript: the last lines now, then whatever the scan reads next. The
+    // history goes in front of anything the scan appended meanwhile, so the order holds.
+    private async Task LoadObservedThreadAsync(LiveSession session)
+    {
+        var (history, clipped, found) = await Task.Run(() =>
+        {
+            session.TranscriptPath ??= _system.ResolveTranscript(session.Id, session.Cwd);
+            if (session.TranscriptPath is not { } path) return ((IReadOnlyList<SessionConversation.ParsedTranscriptLine>)[], false, false);
+            TailRead first;
+            lock (session.TailGate)
+            {
+                session.ThreadTail = new TranscriptTailReader(path, MaxHistoryLines);
+                first = session.ThreadTail.Read();
+            }
+            return (SessionConversation.ParseHistory(first.Lines, session.Id), first.SkippedEarlier, true);
+        }).ConfigureAwait(false);
+
+        lock (session.Gate)
+        {
+            if (!found)
+            {
+                session.Conversation.AddNote("no transcript found for this session yet");
+                return;
+            }
+            int n = session.Conversation.LoadHistory(history);
+            if (clipped && n > 0) session.Conversation.AddNote("showing the most recent part of a long transcript");
+            session.Conversation.SetLiveTail(session.ObservedStatus == "busy");
+            session.ResetPending = true;
+        }
+    }
+
     public void Send(LiveSession session, string text)
     {
+        if (session.Observed) throw new InvalidOperationException(ReadOnly);
         lock (session.Gate)
         {
             if (session.Dormant) Resume(session);
@@ -239,6 +478,7 @@ internal sealed class SessionManager : IDisposable
 
     public void Interrupt(LiveSession session)
     {
+        if (session.Observed) throw new InvalidOperationException(ReadOnly);
         lock (session.Gate)
         {
             if (session.Dormant) return;
@@ -247,11 +487,16 @@ internal sealed class SessionManager : IDisposable
         }
     }
 
-    public void Stop(LiveSession session) => session.Controller.Stop();
+    public void Stop(LiveSession session)
+    {
+        if (session.Observed) throw new InvalidOperationException(ReadOnly);
+        session.Controller.Stop();
+    }
 
     /// <summary>Switches the model now if the agent is running, and for every later resume.</summary>
     public void SetModel(LiveSession session, string model)
     {
+        if (session.Observed) throw new InvalidOperationException(ReadOnly);
         string? effort;
         lock (session.Gate)
         {
@@ -268,6 +513,7 @@ internal sealed class SessionManager : IDisposable
     /// <summary>Sets the effort now if the agent is running, and for every later resume. "auto" clears it.</summary>
     public void SetEffort(LiveSession session, string level)
     {
+        if (session.Observed) throw new InvalidOperationException(ReadOnly);
         var effort = level == "auto" ? null : level;
         string? model;
         lock (session.Gate)
@@ -287,6 +533,7 @@ internal sealed class SessionManager : IDisposable
     public bool Respond(LiveSession session, string requestId, bool allow, string? switchMode,
         IReadOnlyDictionary<string, IReadOnlyList<string>>? answers)
     {
+        if (session.Observed) return false;
         lock (session.Gate)
         {
             if (session.Conversation.PendingPermission is not { } item || item.Request.RequestId != requestId) return false;
@@ -304,10 +551,12 @@ internal sealed class SessionManager : IDisposable
         }
     }
 
-    private LiveSession Create(string id, string taskId, string cwd, string? role, string? permissionMode, string claudeId, DateTimeOffset startedAt)
+    private LiveSession Create(string id, string taskId, string cwd, string? role, string? permissionMode, string claudeId, DateTimeOffset startedAt,
+        bool observed = false)
     {
+        // An observed session gets a controller too, so every session has the same shape, but it is never started.
         var controller = new ClaudeSessionController(_system.Launcher) { Log = _log.Info };
-        var session = new LiveSession(id, taskId, cwd, role, permissionMode, claudeId, startedAt, controller);
+        var session = new LiveSession(id, taskId, cwd, role, permissionMode, claudeId, startedAt, controller) { Observed = observed };
         controller.EventReceived += ev => OnEvent(session, ev);
         controller.Exited += (code, tail) => OnExited(session, code, tail);
         return session;
@@ -407,7 +656,8 @@ internal sealed class SessionManager : IDisposable
     public void Dispose()
     {
         _flush.Dispose();
-        foreach (var session in All) session.Controller.Stop();
+        _scan?.Dispose();
+        foreach (var session in All.Where(s => !s.Observed)) session.Controller.Stop();
     }
 }
 
@@ -448,6 +698,7 @@ internal sealed record SessionSystem
     public Func<string, bool> IsTrusted { get; init; } = cwd => DirectoryTrust.Evaluate(null, cwd);
     public Func<string, bool> GrantTrust { get; init; } = cwd => DirectoryTrust.Grant(null, cwd);
     public Func<string, LiveClaudeSession?> FindLive { get; init; } = id => LiveClaudeSessions.Find(id);
+    public Func<IReadOnlyList<LiveClaudeSession>> ReadLive { get; init; } = () => LiveClaudeSessions.Read();
     public Func<string, string, string?> ResolveTranscript { get; init; } = (id, cwd) => TranscriptLocator.Resolve(id, cwd);
     public Func<string, bool> FolderExists { get; init; } = Directory.Exists;
 }

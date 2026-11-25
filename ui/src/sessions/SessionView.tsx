@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../Dialog';
 import { renderMarkdown } from '../markdown';
 import { PathText } from '../PathText';
 import { Menu } from '../Menu';
-import { agentWord, parkNoteLines } from '../tasks/present';
+import { agentWord, parkNoteLines, sessionName, statusOf } from '../tasks/present';
 
 // The latest of each family. The host accepts any model id, so this list is only what's offered.
 const models = [
@@ -90,8 +90,10 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
   }
   if (!header) return <p className="empty">Loading...</p>;
 
+  const observed = header.observed;
   const dormant = header.status === 'dormant';
-  const ownNote = dormant && parkNote ? parkNoteLines(parkNote).find((l) => l.role !== null && l.role === header.role) : undefined;
+  const ownNote = dormant && !observed && parkNote ? parkNoteLines(parkNote).find((l) => l.role !== null && l.role === header.role) : undefined;
+  const status = statusOf(header);
 
   return (
     <div className="session">
@@ -99,46 +101,51 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
         <button className="link back" onClick={onBack}>
           ← {backLabel}
         </button>
-        <span className="session-title">{header.role ?? 'Agent'}</span>
-        <span className={`status status-${header.status}`}>
+        <span className="session-title">{observed ? sessionName(header) : (header.role ?? 'Agent')}</span>
+        <span className={`status status-${status}`}>
           <span className="dot" />
-          {agentWord(header.status)}
+          {agentWord(status)}
         </span>
+        {observed && <span className="tag-outside">outside Ochre</span>}
         <span className="spacer" />
-        <Menu
-          ariaLabel={`Model: ${modelLabel(header.model)}`}
-          buttonClass="picker"
-          label={
-            <>
-              {modelLabel(header.model)}
-              <span className="chevron" aria-hidden="true" />
-            </>
-          }
-          items={models.map((m) => ({
-            key: m.id,
-            label: <span className="grow">{m.label}</span>,
-            current: m.id === header.model,
-            onSelect: () => request('sessions.setModel', { id, model: m.id }).catch((e: Error) => onError(e.message)),
-          }))}
-        />
-        <Menu
-          ariaLabel={`Effort: ${header.effort}`}
-          buttonClass="picker"
-          label={
-            <>
-              effort {header.effort}
-              <span className="chevron" aria-hidden="true" />
-            </>
-          }
-          items={efforts.map((level) => ({
-            key: level,
-            label: <span className="grow">{level}</span>,
-            current: level === header.effort,
-            onSelect: () => request('sessions.setEffort', { id, effort: level }).catch((e: Error) => onError(e.message)),
-          }))}
-        />
-        {!dormant && turnActive && <button onClick={() => request('sessions.interrupt', { id }).catch((e: Error) => onError(e.message))}>Interrupt</button>}
-        {!dormant && (
+        {!observed && (
+          <>
+            <Menu
+              ariaLabel={`Model: ${modelLabel(header.model)}`}
+              buttonClass="picker"
+              label={
+                <>
+                  {modelLabel(header.model)}
+                  <span className="chevron" aria-hidden="true" />
+                </>
+              }
+              items={models.map((m) => ({
+                key: m.id,
+                label: <span className="grow">{m.label}</span>,
+                current: m.id === header.model,
+                onSelect: () => request('sessions.setModel', { id, model: m.id }).catch((e: Error) => onError(e.message)),
+              }))}
+            />
+            <Menu
+              ariaLabel={`Effort: ${header.effort}`}
+              buttonClass="picker"
+              label={
+                <>
+                  effort {header.effort}
+                  <span className="chevron" aria-hidden="true" />
+                </>
+              }
+              items={efforts.map((level) => ({
+                key: level,
+                label: <span className="grow">{level}</span>,
+                current: level === header.effort,
+                onSelect: () => request('sessions.setEffort', { id, effort: level }).catch((e: Error) => onError(e.message)),
+              }))}
+            />
+          </>
+        )}
+        {!observed && !dormant && turnActive && <button onClick={() => request('sessions.interrupt', { id }).catch((e: Error) => onError(e.message))}>Interrupt</button>}
+        {!observed && !dormant && (
           <button className="link danger" onClick={() => setConfirmStop(true)}>
             Stop
           </button>
@@ -146,7 +153,8 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
       </header>
       <div className="session-meta">
         <PathText path={header.cwd} />
-        <span>{header.permissionMode} mode</span>
+        {header.branch && <span>{header.branch}</span>}
+        {!observed && <span>{header.permissionMode} mode</span>}
         {header.contextTokens > 0 && (
           <span title={header.costUsd > 0 ? `≈ $${header.costUsd.toFixed(2)} at API prices. On a Pro or Max plan nothing is billed per token.` : undefined}>
             {Math.round(header.contextTokens / 1000)}k context
@@ -175,7 +183,13 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
           <strong className="who">{ownNote.role}'s park note:</strong> {ownNote.text}
         </p>
       )}
-      <Composer sessionId={id} queued={header.queuedPrompts} dormant={dormant} autoFocus={dormant || header.status === 'idle'} onError={onError} />
+      {observed ? (
+        <p className="read-only-note muted">
+          Started outside Ochre, so this is read-only: Ochre follows its transcript. Carry on with it where it's running{dormant ? ' (it has closed; resume it there with claude --resume)' : ''}.
+        </p>
+      ) : (
+        <Composer sessionId={id} queued={header.queuedPrompts} dormant={dormant} autoFocus={dormant || header.status === 'idle'} onError={onError} />
+      )}
 
       <ConfirmDialog
         open={confirmStop}

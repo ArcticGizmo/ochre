@@ -33,6 +33,8 @@ public static class BridgeContract
         new("sessions.respond", typeof(RespondRequest), typeof(Ack)),
         new("sessions.setModel", typeof(SetModelRequest), typeof(Ack)),
         new("sessions.setEffort", typeof(SetEffortRequest), typeof(Ack)),
+        new("sessions.bind", typeof(BindSessionRequest), typeof(Ack)),
+        new("sessions.unbind", typeof(SessionIdRequest), typeof(Ack)),
     ];
 
     public static IReadOnlyList<EventContract> Events { get; } =
@@ -40,5 +42,7 @@ public static class BridgeContract
         new("window.shown", typeof(Empty)),
         new("tasks.changed", typeof(TaskChangedEvent)),
         new("sessions.update", typeof(SessionUpdateEvent)),
+        // A session appeared or went, or an observed one's suggestions may have changed: fetch sessions.list again.
+        new("sessions.changed", typeof(Empty)),
     ];
 }

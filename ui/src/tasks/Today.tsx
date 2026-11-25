@@ -1,17 +1,19 @@
 import { request, type SessionSummary, type TaskListItem } from '../bridge';
-import { agentStatus, agentWord, byActivity, ParkNote, StatePill, when } from './present';
+import { OutsideSessions } from '../sessions/OutsideSessions';
+import { agentStatus, agentWord, byActivity, ParkNote, sessionName, StatePill, when } from './present';
 
 interface Props {
   tasks: TaskListItem[];
   live: SessionSummary[];
   onOpenTask: (id: string) => void;
   onOpenAgent: (sessionId: string, task: TaskListItem) => void;
+  onOpenSession: (sessionId: string) => void;
   onNew: () => void;
   onError: (message: string) => void;
 }
 
 /** The morning view: every Active and Parked task, with where you left off and one click back into each agent. */
-export function Today({ tasks, live, onOpenTask, onOpenAgent, onNew, onError }: Props) {
+export function Today({ tasks, live, onOpenTask, onOpenAgent, onOpenSession, onNew, onError }: Props) {
   const shown = tasks.filter((t) => t.state === 'active' || t.state === 'parked').sort(byActivity);
   const active = shown.filter((t) => t.state === 'active').length;
 
@@ -86,7 +88,7 @@ export function Today({ tasks, live, onOpenTask, onOpenAgent, onNew, onError }: 
                 {t.sessions.length === 0 && <span className="muted">None.</span>}
                 {t.sessions.map((s) => {
                   const status = agentStatus(s.id, live);
-                  const name = s.role ?? s.id.slice(0, 8);
+                  const name = sessionName(s);
                   return status === 'ended' ? (
                     <span key={s.id} className="agent-chip status-ended" title="This agent is no longer known to Ochre, so it can't be resumed.">
                       <span className="dot" />
@@ -124,6 +126,8 @@ export function Today({ tasks, live, onOpenTask, onOpenAgent, onNew, onError }: 
           )}
         </article>
       ))}
+
+      <OutsideSessions live={live} tasks={tasks} onOpen={onOpenSession} onError={onError} />
     </div>
   );
 }

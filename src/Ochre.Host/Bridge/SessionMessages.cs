@@ -87,8 +87,15 @@ public enum ResolutionDto
 /// <param name="Progress">Its latest progress line, for a background agent that reports one.</param>
 public sealed record SubagentDto(string Description, string? Progress);
 
-/// <param name="Id">The id the session was launched with (also its id on the task).</param>
+/// <param name="Reason">Why it might belong there, e.g. "folder is in ochre, branch names PROJ-142".</param>
+public sealed record BindSuggestionDto(string TaskId, string Reason);
+
+/// <param name="Id">The id the session was launched with (also its id on the task); for an observed session, its Claude id.</param>
+/// <param name="TaskId">Its task; empty for an observed session nobody has linked.</param>
 /// <param name="Activity">What it's doing in the current turn (the running tool, "thinking", "writing"); null when idle.</param>
+/// <param name="Observed">Started outside Ochre: read-only here. Dormant then means its process has closed.</param>
+/// <param name="Branch">The git branch its transcript last recorded (observed sessions).</param>
+/// <param name="Suggestions">Tasks an unlinked observed session looks like it belongs to, best first.</param>
 public sealed record SessionSummary(
     string Id,
     string TaskId,
@@ -97,7 +104,10 @@ public sealed record SessionSummary(
     SessionStatusDto Status,
     string StartedAt,
     string? Activity,
-    IReadOnlyList<SubagentDto> Subagents);
+    IReadOnlyList<SubagentDto> Subagents,
+    bool Observed,
+    string? Branch,
+    IReadOnlyList<BindSuggestionDto> Suggestions);
 
 /// <param name="Model">The model the user picked, else the one the CLI reported; empty before either.</param>
 /// <param name="Effort">The effort level the user picked, or "auto".</param>
@@ -114,7 +124,9 @@ public sealed record SessionHeader(
     long ContextTokens,
     int QueuedPrompts,
     string? Activity,
-    IReadOnlyList<SubagentDto> Subagents);
+    IReadOnlyList<SubagentDto> Subagents,
+    bool Observed,
+    string? Branch);
 
 /// <param name="Diff">For an edit or write: the change as diff lines ("+", "-" or " " followed by the text).</param>
 public sealed record AssistantPartDto(
@@ -174,6 +186,9 @@ public sealed record SetModelRequest(string Id, string Model);
 
 /// <param name="Effort">"auto" or one of the CLI's levels (low, medium, high, xhigh, max).</param>
 public sealed record SetEffortRequest(string Id, string Effort);
+
+/// <summary>Links a session started outside Ochre to a task (binding: confirmed).</summary>
+public sealed record BindSessionRequest(string Id, string TaskId);
 
 public sealed record QuestionAnswerDto(string Question, IReadOnlyList<string> Labels);
 

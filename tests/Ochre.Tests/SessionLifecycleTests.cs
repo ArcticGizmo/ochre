@@ -24,6 +24,7 @@ public sealed class SessionLifecycleTests : IDisposable
     private readonly HashSet<string> _trusted = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _transcripts = new(StringComparer.Ordinal);
     private LiveClaudeSession? _liveElsewhere;
+    private readonly List<LiveClaudeSession> _outside = [];
     private readonly List<SessionManager> _managers = [];
 
     public SessionLifecycleTests()
@@ -44,6 +45,7 @@ public sealed class SessionLifecycleTests : IDisposable
             IsTrusted = cwd => _trusted.Contains(cwd),
             GrantTrust = cwd => _trusted.Add(cwd),
             FindLive = id => _liveElsewhere is { } live && live.SessionId == id ? live : null,
+            ReadLive = () => [.. _outside],
             ResolveTranscript = (id, _) => _transcripts.GetValueOrDefault(id),
             FolderExists = Directory.Exists,
         };
@@ -343,6 +345,92 @@ public sealed class SessionLifecycleTests : IDisposable
         Until(() => s!.Dormant, "the agent to go dormant");
         Assert.False(requests.IsOpen(taskId, s!.Id));   // its chance to write a note has closed
         Assert.Equal("", _store.Get(taskId)!.Park!.Note);
+    }
+
+    private const string Outside = "33333333-aaaa-bbbb-cccc-000000000003";
+
+    private LiveClaudeSession OutsideSession(string status = "busy") => new(4242, Outside, _repo, status, "cli", null);
+
+    [Fact]
+    public async Task A_session_started_outside_Ochre_is_listed_read_only_and_suggested_for_the_task_whose_repo_holds_it()
+    {
+        var sessions = NewManager();
+        var taskId = await _store.CreateAsync("Task", "user", doc => doc.SetRepos([_repo]));
+        _outside.Add(OutsideSession());
+
+        sessions.ScanObserved();
+
+        var s = sessions.Get(Outside)!;
+        Assert.True(s.Observed);
+        Assert.Equal("", s.TaskId);
+        Assert.Equal("busy", s.ObservedStatus);
+        var suggestion = Assert.Single(sessions.Suggest(s));
+        Assert.Equal(taskId, suggestion.TaskId);
+        Assert.Throws<InvalidOperationException>(() => sessions.Send(s, "hello"));
+        Assert.Throws<InvalidOperationException>(() => sessions.Stop(s));
+        Assert.Empty(_claude.Launches);
+    }
+
+    [Fact]
+    public async Task Linking_records_it_as_confirmed_and_a_linked_session_outlives_its_process()
+    {
+        var sessions = NewManager();
+        var taskId = await NewTask();
+        _outside.Add(OutsideSession());
+        sessions.ScanObserved();
+
+        await sessions.BindAsync(sessions.Get(Outside)!, taskId);
+        var bound = Assert.Single(_store.Get(taskId)!.Sessions);
+        Assert.Equal((Outside, "confirmed"), (bound.Id, bound.Binding));
+        Assert.Empty(sessions.Suggest(sessions.Get(Outside)!));
+
+        _outside.Clear();
+        sessions.ScanObserved();
+        Assert.Equal("closed", sessions.Get(Outside)!.ObservedStatus);
+
+        // A restart brings it back closed from the task; an unlinked one whose process went is simply dropped.
+        var restarted = NewManager();
+        restarted.LoadDormant();
+        Assert.True(restarted.Get(Outside)!.Observed);
+        await restarted.UnbindAsync(restarted.Get(Outside)!);
+        Assert.Null(restarted.Get(Outside));
+        Assert.Empty(_store.Get(taskId)!.Sessions);
+    }
+
+    [Fact]
+    public async Task An_observed_thread_follows_its_transcript_and_picks_up_the_branch()
+    {
+        var sessions = NewManager();
+        var path = Path.Combine(_root, "outside.jsonl");
+        static string Prompt(string text, string branch) =>
+            $$"""{"type":"user","message":{"role":"user","content":"{{text}}"},"uuid":"{{Guid.NewGuid()}}","gitBranch":"{{branch}}"}""" + "\n";
+        await File.WriteAllTextAsync(path, Prompt("first", "main"));
+        _transcripts[Outside] = path;
+        _outside.Add(OutsideSession("idle"));
+
+        sessions.ScanObserved();
+        var s = sessions.Get(Outside)!;
+        Assert.Equal("main", s.Branch);
+        await sessions.EnsureHistoryAsync(s);
+        Assert.Equal(1, Locked(s, c => c.Items.OfType<UserMessageItem>().Count()));
+
+        await File.AppendAllTextAsync(path, Prompt("second", "feature/PROJ-7-x"));
+        sessions.ScanObserved();
+        Assert.Equal(["first", "second"], Locked(s, c => c.Items.OfType<UserMessageItem>().Select(u => u.Text).ToList()));
+        Assert.Equal("feature/PROJ-7-x", s.Branch);
+    }
+
+    [Fact]
+    public async Task An_agent_Ochre_launched_is_never_taken_for_an_outside_session()
+    {
+        var sessions = NewManager();
+        var (s, _) = await sessions.StartAsync(await NewTask(), _repo, null, null, null, trustFolder: false);
+        _outside.Add(new LiveClaudeSession(4243, s!.Id, _repo, "busy", "sdk-cli", null));
+
+        sessions.ScanObserved();
+
+        Assert.False(sessions.Get(s.Id)!.Observed);
+        Assert.Single(sessions.All);
     }
 
     public void Dispose()

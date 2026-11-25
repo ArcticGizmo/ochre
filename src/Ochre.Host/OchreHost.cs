@@ -26,6 +26,8 @@ internal sealed class OchreHost : IDisposable
         Sessions.LoadDormant();
         Sessions.Changed += (session, changes) =>
             Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.update", SessionApi.Update(session, changes), AppJson.Default.SessionUpdateEvent));
+        Sessions.ListChanged += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.changed", new Empty(), AppJson.Default.Empty));
+        Sessions.StartObserving();
         Parking = new ParkCoordinator(Tasks, Sessions, ParkRequests, log);
         Parking.Changed += id => Windows.Broadcast(BridgeDispatcher.SerializeEvent("tasks.changed", new TaskChangedEvent(id), AppJson.Default.TaskChangedEvent));
     }

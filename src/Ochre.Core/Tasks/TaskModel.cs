@@ -42,6 +42,7 @@ public sealed record TaskSummary(
     string? ParkNote,
     DateTimeOffset? ParkedAt,
     IReadOnlyList<TaskLink> Links,
-    IReadOnlyList<TaskSessionRef> Sessions);
+    IReadOnlyList<TaskSessionRef> Sessions,
+    IReadOnlyList<string> Repos);
 
 public sealed class TaskFormatException(string message) : Exception(message);

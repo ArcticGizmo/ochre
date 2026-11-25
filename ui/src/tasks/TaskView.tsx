@@ -8,7 +8,8 @@ import { SessionView } from '../sessions/SessionView';
 import { StartAgentDialog } from '../sessions/StartAgentDialog';
 import { useSessions } from '../sessions/useSessions';
 import { ParkDialog } from './ParkDialog';
-import { agentStatus, agentWord, ParkNote, stateLabel, states, when } from './present';
+import { LinkSuggestions } from '../sessions/OutsideSessions';
+import { agentStatus, agentWord, ParkNote, sessionName, stateLabel, states, when } from './present';
 
 interface Props {
   id: string;
@@ -156,7 +157,7 @@ export function TaskView({ id, openSession, onOpenSession, onError, onDeleted }:
         open={parking}
         taskId={task.id}
         title={task.title}
-        running={live.filter((s) => s.taskId === task.id && s.status !== 'dormant')}
+        running={live.filter((s) => s.taskId === task.id && s.status !== 'dormant' && !s.observed)}
         onClose={() => setParking(false)}
         onParked={() => setParking(false)}
       />
@@ -189,6 +190,8 @@ export function TaskView({ id, openSession, onOpenSession, onError, onDeleted }:
           )}
         </section>
       )}
+
+      <LinkSuggestions taskId={task.id} live={live} onOpen={onOpenSession} onError={onError} />
 
       {(task.agentChangedItems.length > 0 || task.agentChangedNotes) && (
         <div className="review-bar">
@@ -241,12 +244,18 @@ export function TaskView({ id, openSession, onOpenSession, onError, onDeleted }:
                     <span className="dot" />
                     {agentWord(status)}
                   </span>
-                  <span className="who">{s.role ?? 'agent'}</span>
+                  <span className="who">{sessionName(s)}</span>
+                  {s.binding === 'confirmed' && <span className="tag-outside">outside Ochre</span>}
                   <PathText path={s.cwd} />
                   <code title={s.id}>{s.id.slice(0, 8)}</code>
                   {status !== 'ended' && (
                     <button className="link" onClick={() => onOpenSession(s.id)}>
                       Open
+                    </button>
+                  )}
+                  {s.binding === 'confirmed' && (
+                    <button className="link" title="Take this session off the task; it carries on outside Ochre" onClick={() => request('sessions.unbind', { id: s.id }).catch((e: Error) => onError(e.message))}>
+                      Unlink
                     </button>
                   )}
                 </li>

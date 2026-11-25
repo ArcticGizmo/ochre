@@ -50,7 +50,8 @@ internal sealed class ParkCoordinator
             return "parked";
         }).ConfigureAwait(false);
 
-        var running = _sessions.All.Where(s => s.TaskId == taskId && !s.Dormant).ToList();
+        // A session linked from outside Ochre can't be asked for a note or stopped; it carries on as it is.
+        var running = _sessions.All.Where(s => s.TaskId == taskId && !s.Dormant && !s.Observed).ToList();
         foreach (var s in running) _requests.Open(taskId, s.Id);
         if (running.Count > 0) Changed?.Invoke(taskId);
         return Task.WhenAll(running.Select(s => Task.Run(() => CollectAsync(s))));

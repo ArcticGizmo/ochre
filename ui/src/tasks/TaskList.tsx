@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { SessionSummary, TaskListItem, TaskStateDto } from '../bridge';
-import { agentStatus, agentWord, byActivity, StatePill, when, type AgentStatus } from './present';
+import { agentStatus, agentWord, byActivity, sessionName, StatePill, when, type AgentStatus } from './present';
 
 type Filter = 'open' | TaskStateDto;
 
@@ -125,7 +125,7 @@ export function TaskList({ tasks, live, selected, openSession, search, onSelect,
                           }}
                         >
                           <span className="dot" />
-                          <span className="who">{s.role ?? s.id.slice(0, 8)}</span>
+                          <span className="who">{sessionName(s)}</span>
                           <span className="act">{summary?.activity ?? agentWord(st)}</span>
                         </button>
                         {summary && summary.subagents.length > 0 && (

@@ -26,7 +26,42 @@ internal static partial class SessionApi
         var j = AppJson.Default;
 
         bridge.Handle("sessions.list", j.Empty, j.IReadOnlyListSessionSummary, _ =>
-            (IReadOnlyList<SessionSummary>)sessions.All.Select(Summary).ToList());
+            (IReadOnlyList<SessionSummary>)sessions.All.Select(s => Summary(s, sessions.Suggest(s))).ToList());
+
+        bridge.Handle("sessions.bind", j.BindSessionRequest, j.Ack, async r =>
+        {
+            if (!TaskStore.IsTaskId(r.TaskId)) throw new BridgeRejectException("invalid task id");
+            try
+            {
+                await sessions.BindAsync(Find(sessions, r.Id), r.TaskId).ConfigureAwait(true);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new BridgeRejectException(ex.Message);
+            }
+            catch (KeyNotFoundException)
+            {
+                throw new BridgeRejectException("no such task");
+            }
+            return new Ack();
+        });
+
+        bridge.Handle("sessions.unbind", j.SessionIdRequest, j.Ack, async r =>
+        {
+            try
+            {
+                await sessions.UnbindAsync(Find(sessions, r.Id)).ConfigureAwait(true);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new BridgeRejectException(ex.Message);
+            }
+            catch (KeyNotFoundException)
+            {
+                throw new BridgeRejectException("its task no longer exists");
+            }
+            return new Ack();
+        });
 
         bridge.Handle("sessions.get", j.SessionIdRequest, j.SessionSnapshot, async r =>
         {
@@ -93,13 +128,13 @@ internal static partial class SessionApi
 
         bridge.Handle("sessions.interrupt", j.SessionIdRequest, j.Ack, r =>
         {
-            sessions.Interrupt(Find(sessions, r.Id));
+            Refusing(() => sessions.Interrupt(Find(sessions, r.Id)));
             return new Ack();
         });
 
         bridge.Handle("sessions.stop", j.SessionIdRequest, j.Ack, r =>
         {
-            sessions.Stop(Find(sessions, r.Id));
+            Refusing(() => sessions.Stop(Find(sessions, r.Id)));
             return new Ack();
         });
 
@@ -122,16 +157,29 @@ internal static partial class SessionApi
         bridge.Handle("sessions.setModel", j.SetModelRequest, j.Ack, r =>
         {
             if (!ModelId().IsMatch(r.Model)) throw new BridgeRejectException("not a model id");
-            sessions.SetModel(Find(sessions, r.Id), r.Model);
+            Refusing(() => sessions.SetModel(Find(sessions, r.Id), r.Model));
             return new Ack();
         });
 
         bridge.Handle("sessions.setEffort", j.SetEffortRequest, j.Ack, r =>
         {
             if (r.Effort != "auto" && !ClaudeSessionController.IsEffortLevel(r.Effort)) throw new BridgeRejectException("unknown effort level");
-            sessions.SetEffort(Find(sessions, r.Id), r.Effort);
+            Refusing(() => sessions.SetEffort(Find(sessions, r.Id), r.Effort));
             return new Ack();
         });
+    }
+
+    // The manager refuses with InvalidOperationException (e.g. a read-only observed session); the UI gets the reason.
+    private static void Refusing(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new BridgeRejectException(ex.Message);
+        }
     }
 
     // Ids like claude-opus-5-5 or aliases like opus; it rides the command line on resume, so nothing else gets through.
@@ -149,11 +197,11 @@ internal static partial class SessionApi
         }
     }
 
-    public static SessionSummary Summary(LiveSession s)
+    public static SessionSummary Summary(LiveSession s, IReadOnlyList<BindSuggestion> suggestions)
     {
         lock (s.Gate)
             return new SessionSummary(s.Id, s.TaskId, s.Cwd, s.Role, Status(s), s.StartedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
-                Activity(s), Subagents(s));
+                Activity(s), Subagents(s), s.Observed, s.Branch, suggestions.Select(b => new BindSuggestionDto(b.TaskId, b.Reason)).ToList());
     }
 
     private static LiveSession Find(SessionManager sessions, string id) =>
@@ -164,7 +212,7 @@ internal static partial class SessionApi
     {
         var c = s.Conversation;
         return new SessionHeader(s.Id, s.TaskId, s.Cwd, s.Role, Status(s), s.Model ?? c.Model, s.Effort ?? "auto", c.PermissionMode, c.TotalCostUsd,
-            c.ContextTokens, c.QueuedPrompts, Activity(s), Subagents(s));
+            c.ContextTokens, c.QueuedPrompts, Activity(s), Subagents(s), s.Observed, s.Branch);
     }
 
     private static bool IsAgentTool(string name) => name is "Agent" or "Task";
@@ -203,7 +251,14 @@ internal static partial class SessionApi
     }
 
     private static SessionStatusDto Status(LiveSession s) =>
-        s.Dormant ? SessionStatusDto.Dormant
+        s.Observed ? s.ObservedStatus switch
+        {
+            "busy" => SessionStatusDto.Busy,
+            "waiting" => SessionStatusDto.Waiting,
+            "idle" => SessionStatusDto.Idle,
+            _ => SessionStatusDto.Dormant,
+        }
+        : s.Dormant ? SessionStatusDto.Dormant
         : s.Conversation.PendingPermission is not null || s.Conversation.WaitingElsewhere ? SessionStatusDto.Waiting
         : s.Conversation.TurnActive ? SessionStatusDto.Busy
         : SessionStatusDto.Idle;

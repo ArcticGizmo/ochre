@@ -73,6 +73,7 @@ export function App() {
             live={live}
             onOpenTask={openTask}
             onOpenAgent={(sessionId, task) => setThread({ sessionId, parkNote: task.parkNote })}
+            onOpenSession={(sessionId) => setThread({ sessionId, parkNote: null })}
             onNew={() => setCreating(true)}
             onError={setError}
           />

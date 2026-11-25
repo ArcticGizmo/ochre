@@ -35,6 +35,7 @@ public sealed record AppInfo(string Version, string Profile);
 [JsonSerializable(typeof(RespondRequest))]
 [JsonSerializable(typeof(SetModelRequest))]
 [JsonSerializable(typeof(SetEffortRequest))]
+[JsonSerializable(typeof(BindSessionRequest))]
 [JsonSerializable(typeof(SessionUpdateEvent))]
 internal sealed partial class AppJson : JsonSerializerContext;
 

@@ -848,8 +848,81 @@ select {
   --ag: var(--muted);
 }
 
-.status-ended {
+.status-ended,
+.status-closed {
   --ag: #5c5854;
+}
+
+.status.status-closed {
+  color: var(--muted);
+}
+
+.tag-outside {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--st-parked);
+  border: 1px solid color-mix(in srgb, var(--st-parked) 40%, transparent);
+  border-radius: 4px;
+  padding: 0 5px;
+  flex: none;
+}
+
+.read-only-note {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.outside {
+  margin-top: 28px;
+}
+
+.outside h2 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.outside > p {
+  margin: 2px 0 10px;
+}
+
+.outside-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.outside-row .row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.suggestion {
+  font-size: 12px;
+  border-style: dashed;
+}
+
+.suggestion:hover {
+  border-color: var(--accent);
+}
+
+.suggest-bar {
+  border-left-color: var(--st-parked);
 }
 
 [class*='status-'] > .dot {

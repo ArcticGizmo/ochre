@@ -1,6 +1,6 @@
 # 0006: Observe sessions from Claude's own files, no hook
 
-- Status: proposed
+- Status: accepted (2026-11-25, with M2 slice 4: outside sessions are found from `sessions/{pid}.json` and their threads followed from transcripts, with no hook)
 - Date: 2026-11-25
 
 ## Context

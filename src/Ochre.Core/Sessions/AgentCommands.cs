@@ -62,10 +62,13 @@ public sealed class AgentRefusedException(string message) : Exception(message);
 /// change the task's state or remove anything, because no command here does. Every write is logged against the
 /// session. The binding is checked against the file inside the write, so unbinding a session takes effect at once.
 /// </summary>
-public sealed class AgentCommands(TaskStore store)
+public sealed class AgentCommands(TaskStore store, ParkRequests? parkRequests = null)
 {
     public const int MaxStep = 500;
     public const int MaxNote = 10_000;
+    public const int MaxParkNote = 1_000;
+
+    private readonly ParkRequests _park = parkRequests ?? new ParkRequests();
 
     /// <summary>The reply text, or a reply starting with <c>error:</c>.</summary>
     public async Task<string> HandleAsync(AgentRequest? request)
@@ -148,8 +151,27 @@ public sealed class AgentCommands(TaskStore store)
                 return "noted";
             }
 
+            case ("park-note", 1):
+            {
+                // One line per agent in the task's park note, so newlines in what it wrote are folded away.
+                var text = Clean(string.Join(' ', r.Args[0].Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)), MaxParkNote, "park note");
+                var sessionId = r.SessionId;
+                if (!_park.IsOpen(taskId, sessionId))
+                    throw new AgentRefusedException("a park note is only taken while the user is parking the task, once per agent; use task note for anything else");
+                await Write(taskId, author, sessionId, doc =>
+                {
+                    if (!_park.TryTake(taskId, sessionId)) throw new AgentRefusedException("this agent's park note has already been written");
+                    var who = doc.Sessions.First(s => s.Id == sessionId).Role ?? author;
+                    var park = doc.Park ?? new ParkNote(DateTimeOffset.UtcNow, "");
+                    var line = $"- {who}: {text}";
+                    doc.Park = park with { Note = park.Note.Length == 0 ? line : park.Note + "\n" + line };
+                    return "wrote a park note";
+                }).ConfigureAwait(false);
+                return "park note saved";
+            }
+
             default:
-                throw new AgentRefusedException($"unknown or malformed command '{r.Op}'. Commands: current, show [--plan], check ITEM, uncheck ITEM, add-step TEXT [--under ITEM], note TEXT");
+                throw new AgentRefusedException($"unknown or malformed command '{r.Op}'. Commands: current, show [--plan], check ITEM, uncheck ITEM, add-step TEXT [--under ITEM], note TEXT, park-note TEXT");
         }
     }
 

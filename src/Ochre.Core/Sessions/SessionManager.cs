@@ -106,6 +106,9 @@ internal sealed class SessionManager : IDisposable
         lock (_gate) return _sessions.GetValueOrDefault(id);
     }
 
+    /// <summary>The name agents call the CLI by (<c>ochre</c>, or <c>ochre-cli</c> in a dev checkout).</summary>
+    public string AgentCommand => _system.LocateCli() is { } cli ? Path.GetFileNameWithoutExtension(cli) : "ochre";
+
     /// <summary>Brings back, dormant, every session a task says it launched. Cheap: no transcript is read until a
     /// thread is opened.</summary>
     public void LoadDormant()

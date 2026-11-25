@@ -130,6 +130,42 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_park_note_is_refused_unless_the_task_is_being_parked()
+    {
+        var id = await NewTask();
+        Assert.StartsWith("error:", await Run(Bound, id, "park-note", "Half done."));
+        Assert.Null(_store.Get(id)!.Park);
+    }
+
+    [Fact]
+    public async Task A_park_note_is_taken_once_per_agent_as_one_line()
+    {
+        var requests = new ParkRequests();
+        var agents = new AgentCommands(_store, requests);
+        var id = await NewTask();
+        requests.Open(id, Bound);
+
+        Assert.Equal("park note saved", await agents.HandleAsync(new AgentRequest(Bound, id, "park-note", ["Parser done.\nNext: wire the bar."])));
+        Assert.StartsWith("error:", await agents.HandleAsync(new AgentRequest(Bound, id, "park-note", ["Again."])));
+
+        var park = _store.Get(id)!.Park!;
+        Assert.Equal("- session 11111111: Parser done. Next: wire the bar.", park.Note);
+        Assert.False(requests.IsOpen(id, Bound));
+    }
+
+    [Fact]
+    public async Task An_unbound_session_cannot_use_a_park_request()
+    {
+        var requests = new ParkRequests();
+        var agents = new AgentCommands(_store, requests);
+        var id = await NewTask();
+        requests.Open(id, Stranger);
+
+        Assert.StartsWith("error:", await agents.HandleAsync(new AgentRequest(Stranger, id, "park-note", ["Sneaky."])));
+        Assert.Null(_store.Get(id)!.Park);
+    }
+
+    [Fact]
     public void A_request_survives_the_trip_through_json()
     {
         var sent = new AgentRequest(Bound, "T-0001", "add-step", ["Say \"hi\"; then go", "--under", "p1"]);

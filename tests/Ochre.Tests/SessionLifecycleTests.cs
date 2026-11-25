@@ -275,6 +275,76 @@ public sealed class SessionLifecycleTests : IDisposable
         Assert.Equal(NoteKind.Info, note.Kind);
     }
 
+    [Fact]
+    public async Task Parking_with_no_running_agents_parks_with_your_note()
+    {
+        var sessions = NewManager();
+        var parking = new ParkCoordinator(_store, sessions, new ParkRequests(), _log);
+        var taskId = await NewTask();
+
+        await await parking.ParkAsync(taskId, "Stopping here for today.");
+
+        var doc = _store.Get(taskId)!;
+        Assert.Equal(TaskState.Parked, doc.State);
+        Assert.Equal("Stopping here for today.", doc.Park!.Note);
+    }
+
+    [Fact]
+    public async Task Parking_asks_each_running_agent_for_a_note_then_stops_it()
+    {
+        var sessions = NewManager();
+        var requests = new ParkRequests();
+        var agents = new AgentCommands(_store, requests);
+        var parking = new ParkCoordinator(_store, sessions, requests, _log);
+        var taskId = await NewTask();
+        var (alpha, _) = await sessions.StartAsync(taskId, _repo, "alpha", null, null, false);
+        var alphaProcess = _claude.Last;
+        var (beta, _) = await sessions.StartAsync(taskId, _repo, "beta", null, null, false);
+        var betaProcess = _claude.Last;
+
+        var collecting = await parking.ParkAsync(taskId, "Stopping for the day.");
+        Assert.Equal(TaskState.Parked, _store.Get(taskId)!.State);
+        Assert.Equal(2, parking.WaitingFor(taskId).Count);
+
+        // Each agent is asked, writes its note through the CLI as it would, and ends its turn.
+        foreach (var (s, p, note) in new[] { (alpha!, alphaProcess, "Parser fixed."), (beta!, betaProcess, "Tests half written.") })
+        {
+            Until(() => p.Prompts.Any(t => t.Contains("park-note", StringComparison.Ordinal)), $"{s.Role}'s park prompt");
+            Assert.Equal("park note saved", await agents.HandleAsync(new AgentRequest(s.Id, taskId, "park-note", [note])));
+            p.Emit(StreamJson.Result());
+        }
+        await collecting.WaitAsync(Wait);
+
+        // Stopping closes the CLI's input; the agent goes dormant once the process has exited.
+        Until(() => alpha!.Dormant && beta!.Dormant, "both agents to go dormant");
+        Assert.Empty(parking.WaitingFor(taskId));
+        var lines = _store.Get(taskId)!.Park!.Note.Split('\n');
+        Assert.Equal("Stopping for the day.", lines[0]);
+        Assert.Contains("- alpha: Parser fixed.", lines);
+        Assert.Contains("- beta: Tests half written.", lines);
+    }
+
+    [Fact]
+    public async Task A_busy_agent_is_interrupted_and_one_that_never_answers_is_stopped_anyway()
+    {
+        var sessions = NewManager();
+        var requests = new ParkRequests();
+        var parking = new ParkCoordinator(_store, sessions, requests, _log, busyWait: TimeSpan.FromMilliseconds(300), noteWait: TimeSpan.FromMilliseconds(300));
+        var taskId = await NewTask();
+        var (s, _) = await sessions.StartAsync(taskId, _repo, "alpha", null, "long job", false);
+        var process = _claude.Last;   // mid-turn: a prompt went in and no result has come back
+
+        var collecting = await parking.ParkAsync(taskId, null);
+        Until(() => process.Sent.Any(n => (string?)n["request"]?["subtype"] == "interrupt"), "the interrupt");
+        process.Emit(StreamJson.Result());
+        await collecting.WaitAsync(Wait);
+
+        Assert.Contains(process.Prompts, t => t.Contains("park-note", StringComparison.Ordinal));
+        Until(() => s!.Dormant, "the agent to go dormant");
+        Assert.False(requests.IsOpen(taskId, s!.Id));   // its chance to write a note has closed
+        Assert.Equal("", _store.Get(taskId)!.Park!.Note);
+    }
+
     public void Dispose()
     {
         foreach (var m in _managers) m.Dispose();

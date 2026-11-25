@@ -66,6 +66,11 @@ export interface ParkDto {
   note: string;
 }
 
+export interface ParkTaskRequest {
+  id: string;
+  note: string | null;
+}
+
 export interface PermissionDto {
   requestId: string;
   toolName: string;
@@ -212,6 +217,7 @@ export interface TaskDetail {
   log: string[];
   agentChangedItems: string[];
   agentChangedNotes: boolean;
+  parkingWaitingFor: string[];
 }
 
 export interface TaskIdRequest {
@@ -246,6 +252,7 @@ export interface Requests {
   'tasks.setState': { req: SetStateRequest; res: TaskDetail };
   'tasks.delete': { req: TaskIdRequest; res: Ack };
   'tasks.reviewAgentChanges': { req: TaskIdRequest; res: TaskDetail };
+  'tasks.park': { req: ParkTaskRequest; res: Ack };
   'plan.check': { req: CheckItemRequest; res: TaskDetail };
   'plan.add': { req: AddItemRequest; res: TaskDetail };
   'sessions.list': { req: Empty; res: SessionSummary[] };

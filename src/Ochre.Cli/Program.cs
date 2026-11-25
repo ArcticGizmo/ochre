@@ -58,6 +58,7 @@ internal static class Program
               task add-step "<text>" [--under <item>]
                                                  add a plan item
               task note "<text>"                 append to the task's notes
+              task park-note "<text>"            while the user parks the task: where you are and the next step
             """);
         return code;
     }

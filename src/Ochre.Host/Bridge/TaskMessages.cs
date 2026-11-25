@@ -53,7 +53,11 @@ public sealed record TaskDetail(
     string Notes,
     IReadOnlyList<string> Log,
     IReadOnlyList<string> AgentChangedItems,
-    bool AgentChangedNotes);
+    bool AgentChangedNotes,
+    IReadOnlyList<string> ParkingWaitingFor);
+
+/// <param name="Note">Your own note; the agents' notes are added below it, one line each.</param>
+public sealed record ParkTaskRequest(string Id, string? Note);
 
 public sealed record TaskIdRequest(string Id);
 

@@ -6,6 +6,7 @@ import { PathText } from '../PathText';
 import { SessionView } from '../sessions/SessionView';
 import { StartAgentDialog } from '../sessions/StartAgentDialog';
 import { useSessions } from '../sessions/useSessions';
+import { ParkDialog } from './ParkDialog';
 
 const states: TaskStateDto[] = ['backlog', 'active', 'parked', 'done'];
 
@@ -21,6 +22,7 @@ export function TaskView({ id, onError, onDeleted }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [startingAgent, setStartingAgent] = useState(false);
+  const [parking, setParking] = useState(false);
   // Which agent's thread this window shows in place of the task; per window, so two windows can differ.
   const [openSession, setOpenSession] = useState<string | null>(null);
   const live = useSessions();
@@ -78,10 +80,24 @@ export function TaskView({ id, onError, onDeleted }: Props) {
       <header className="task-header">
         <TitleEditor title={task.title} onSave={(title) => update({ title })} />
         <span className="task-id">{task.id}</span>
+        {task.state === 'parked' ? (
+          <button onClick={() => run(request('tasks.setState', { id, state: 'active' }))}>Resume</button>
+        ) : (
+          task.state !== 'done' && <button onClick={() => setParking(true)}>Park</button>
+        )}
         <button className="link danger" onClick={() => setConfirmDelete(true)}>
           Delete
         </button>
       </header>
+
+      <ParkDialog
+        open={parking}
+        taskId={task.id}
+        title={task.title}
+        running={live.filter((s) => s.taskId === task.id && s.status !== 'dormant')}
+        onClose={() => setParking(false)}
+        onParked={() => setParking(false)}
+      />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -105,10 +121,16 @@ export function TaskView({ id, onError, onDeleted }: Props) {
         ))}
       </div>
 
-      {task.park && task.state === 'parked' && (
+      {task.park && (task.park.note || task.parkingWaitingFor.length > 0) && (task.state === 'parked' || task.state === 'active') && (
         <section className="park">
           <h3>Where you left off</h3>
-          <p>{task.park.note}</p>
+          {task.park.note && <p>{task.park.note}</p>}
+          {task.parkingWaitingFor.length > 0 && (
+            <p className="muted">
+              Waiting for park notes from{' '}
+              {task.parkingWaitingFor.map((sid) => task.sessions.find((s) => s.id === sid)?.role ?? sid.slice(0, 8)).join(', ')}...
+            </p>
+          )}
         </section>
       )}
 

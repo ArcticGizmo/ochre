@@ -21,6 +21,7 @@ public static class BridgeContract
         new("tasks.setState", typeof(SetStateRequest), typeof(TaskDetail)),
         new("tasks.delete", typeof(TaskIdRequest), typeof(Ack)),
         new("tasks.reviewAgentChanges", typeof(TaskIdRequest), typeof(TaskDetail)),
+        new("tasks.park", typeof(ParkTaskRequest), typeof(Ack)),
         new("plan.check", typeof(CheckItemRequest), typeof(TaskDetail)),
         new("plan.add", typeof(AddItemRequest), typeof(TaskDetail)),
         new("sessions.list", typeof(Empty), typeof(IReadOnlyList<SessionSummary>)),

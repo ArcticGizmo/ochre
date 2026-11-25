@@ -25,6 +25,7 @@ public sealed record AppInfo(string Version, string Profile);
 [JsonSerializable(typeof(CheckItemRequest))]
 [JsonSerializable(typeof(AddItemRequest))]
 [JsonSerializable(typeof(TaskChangedEvent))]
+[JsonSerializable(typeof(ParkTaskRequest))]
 [JsonSerializable(typeof(IReadOnlyList<SessionSummary>))]
 [JsonSerializable(typeof(SessionSnapshot))]
 [JsonSerializable(typeof(SessionIdRequest))]

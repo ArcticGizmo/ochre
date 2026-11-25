@@ -21,9 +21,15 @@ public static class AgentPrompt
             $"{command} task check ITEM marks a plan item done (items have ids such as p3). " +
             $"{command} task add-step TEXT adds a plan item. {command} task note TEXT appends to the notes. " +
             "Read the task before you start, tick items as you finish them, and add steps you discover. " +
-            "Only the user can mark the task done.";
+            "Only the user can mark the task done. " +
+            $"When the user parks the task you will be asked for a park note: {command} task park-note TEXT.";
         return ClaudeCli.IsSafePrompt(note) ? note : null;
     }
+
+    /// <summary>The turn that asks a running agent for its park note. Sent as a message, so any text is fine.</summary>
+    public static string ParkPrompt(string command) =>
+        "The user is parking this task for now. In one or two sentences, record where you are and the very next step, " +
+        $"with `{command} task park-note \"<text>\"`. Then stop: don't start new work, the session will be closed and resumed later.";
 
     /// <summary>
     /// The task commands an agent may run without a permission prompt. The host already confines them to the bound

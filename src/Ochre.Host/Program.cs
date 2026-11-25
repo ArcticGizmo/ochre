@@ -36,7 +36,7 @@ internal static class Program
         using var host = new OchreHost(profile, paths, log);
         var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), new UrlOpener());
         host.Attach(shell);
-        var agents = new AgentCommands(host.Tasks);
+        var agents = new AgentCommands(host.Tasks, host.ParkRequests);
         instance.Listen((cmd, arg) => cmd == "agent" ? agents.HandleAsync(AgentRequest.Parse(arg)) : HandleCommand(shell, profile, cmd, arg));
 
         shell.Run(openWindow: command == "open");

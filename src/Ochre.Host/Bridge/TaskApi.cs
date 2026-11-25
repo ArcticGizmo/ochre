@@ -16,15 +16,33 @@ internal static class TaskApi
     private const int MaxNotes = 100_000;
     private const int MaxRepos = 20;
 
-    public static void Register(BridgeDispatcher bridge, TaskStore store)
+    public static void Register(BridgeDispatcher bridge, TaskStore store, ParkCoordinator parking)
     {
         var j = AppJson.Default;
+        TaskDetail Detail(string id, TaskDocument doc) => ToDetail(id, doc, parking.WaitingFor(id));
+
+        bridge.Handle("tasks.park", j.ParkTaskRequest, j.Ack, async r =>
+        {
+            if (r.Note is { Length: > MaxNotes }) throw new BridgeRejectException("note too long");
+            var doc = store.Get(ValidId(r.Id)) ?? throw new BridgeRejectException("no such task");
+            if (doc.State is TaskState.Parked or TaskState.Done) throw new BridgeRejectException($"the task is already {doc.State.ToString().ToLowerInvariant()}");
+            try
+            {
+                // Returns once the task is Parked; collecting the agents' notes carries on and shows as it lands.
+                _ = await parking.ParkAsync(r.Id, r.Note).ConfigureAwait(true);
+            }
+            catch (TaskFormatException ex)
+            {
+                throw new BridgeRejectException($"the task file can't be read ({ex.Message}); fix it in an editor and try again");
+            }
+            return new Ack();
+        });
 
         bridge.Handle("tasks.list", j.Empty, j.IReadOnlyListTaskListItem, _ =>
             (IReadOnlyList<TaskListItem>)store.List().Select(ToListItem).ToList());
 
         bridge.Handle("tasks.get", j.TaskIdRequest, j.TaskDetail, r =>
-            ToDetail(r.Id, store.Get(ValidId(r.Id)) ?? throw new BridgeRejectException("no such task")));
+            Detail(r.Id, store.Get(ValidId(r.Id)) ?? throw new BridgeRejectException("no such task")));
 
         bridge.Handle("tasks.create", j.CreateTaskRequest, j.TaskDetail, async r =>
         {
@@ -36,7 +54,7 @@ internal static class TaskApi
                 if (!string.IsNullOrWhiteSpace(r.Notes)) doc.SetNotes(r.Notes);
                 if (repos.Count > 0) doc.SetRepos(repos);
             }).ConfigureAwait(true);
-            return ToDetail(id, store.Get(id)!);
+            return Detail(id, store.Get(id)!);
         });
 
         bridge.Handle("tasks.delete", j.TaskIdRequest, j.Ack, async r =>
@@ -52,7 +70,7 @@ internal static class TaskApi
             return new Ack();
         });
 
-        bridge.Handle("tasks.update", j.UpdateTaskRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
+        bridge.Handle("tasks.update", j.UpdateTaskRequest, j.TaskDetail, r => Update(store, Detail, r.Id, doc =>
         {
             var changes = new List<string>();
             if (r.Title is not null && Text(r.Title, MaxTitle, "title") is var title && title != doc.Title)
@@ -81,7 +99,7 @@ internal static class TaskApi
             return changes.Count == 0 ? null : string.Join(", ", changes);
         }));
 
-        bridge.Handle("tasks.setState", j.SetStateRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
+        bridge.Handle("tasks.setState", j.SetStateRequest, j.TaskDetail, r => Update(store, Detail, r.Id, doc =>
         {
             var state = FromDto(r.State);
             if (doc.State == state) return null;
@@ -89,19 +107,19 @@ internal static class TaskApi
             return $"set state {state.ToString().ToLowerInvariant()}";
         }));
 
-        bridge.Handle("plan.check", j.CheckItemRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
+        bridge.Handle("plan.check", j.CheckItemRequest, j.TaskDetail, r => Update(store, Detail, r.Id, doc =>
         {
             if (doc.FindItem(r.ItemId) is null) throw new BridgeRejectException("no such plan item");
             return doc.SetItemDone(r.ItemId, r.Done) ? $"{(r.Done ? "checked" : "unchecked")} {r.ItemId}" : null;
         }));
 
-        bridge.Handle("tasks.reviewAgentChanges", j.TaskIdRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
+        bridge.Handle("tasks.reviewAgentChanges", j.TaskIdRequest, j.TaskDetail, r => Update(store, Detail, r.Id, doc =>
         {
             var pending = AgentChanges.Unreviewed(doc);
             return pending.PlanItems.Count == 0 && !pending.Notes ? null : AgentChanges.ReviewedMessage;
         }));
 
-        bridge.Handle("plan.add", j.AddItemRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
+        bridge.Handle("plan.add", j.AddItemRequest, j.TaskDetail, r => Update(store, Detail, r.Id, doc =>
         {
             var text = Text(r.Text, MaxItemText, "step");
             if (r.ParentId is { } parent && doc.FindItem(parent) is null) throw new BridgeRejectException("no such plan item");
@@ -109,12 +127,12 @@ internal static class TaskApi
         }));
     }
 
-    private static async ValueTask<TaskDetail> Update(TaskStore store, string id, Func<TaskDocument, string?> mutate)
+    private static async ValueTask<TaskDetail> Update(TaskStore store, Func<string, TaskDocument, TaskDetail> detail, string id, Func<TaskDocument, string?> mutate)
     {
         try
         {
             var doc = await store.UpdateAsync(ValidId(id), UserAuthor, mutate).ConfigureAwait(true);
-            return ToDetail(id, doc);
+            return detail(id, doc);
         }
         catch (KeyNotFoundException)
         {
@@ -172,7 +190,7 @@ internal static class TaskApi
     private static TaskListItem ToListItem(TaskSummary s) =>
         new(s.Id, s.Title, ToDto(s.State), Iso(s.Updated), s.PlanDone, s.PlanTotal, s.NextStep, s.ParkNote);
 
-    private static TaskDetail ToDetail(string id, TaskDocument doc)
+    private static TaskDetail ToDetail(string id, TaskDocument doc, IReadOnlyList<string> parkingWaitingFor)
     {
         var unreviewed = AgentChanges.Unreviewed(doc);
         return new(
@@ -190,7 +208,8 @@ internal static class TaskApi
             doc.Notes,
             doc.Log.Select(l => l.Text).ToList(),
             unreviewed.PlanItems,
-            unreviewed.Notes);
+            unreviewed.Notes,
+            parkingWaitingFor);
     }
 
     private static PlanItemDto ToDto(PlanItem item) =>

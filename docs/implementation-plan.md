@@ -171,6 +171,7 @@ Planned 2026-11-25 from a survey of Perch main at `9275e0b`. Findings that shape
 - `ochre task park-note "<text>"`: accepted only from a bound session while a park request for it is open, capped in length, logged. It inherits ADR 0010's pre-allow, so these limits live on the host. Tests extend `AgentCommandsTests` (security boundary).
 - Storage (decided): `park.note` keeps your note first, then one line per agent (`- alpha: ...`), so the single-note format in task-model.md still reads naturally.
 - **Resume** sets the task Active and shows the park note above the plan; agents stay dormant until you send to one.
+- Done 2026-11-25; see `docs/testing/m2-park-testing.md`. Checked with a real agent: it wrote its note through the CLI unprompted and went dormant. The park returns as soon as the task is Parked; the window shows which agents it is still waiting on (`ParkingWaitingFor` on the task detail).
 
 ### Slice 3: Today
 

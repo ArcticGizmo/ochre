@@ -868,6 +868,29 @@ select {
   flex: none;
 }
 
+button.link.gear {
+  display: inline-flex;
+  padding: 4px;
+}
+
+.check-field {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.check-field input {
+  margin-top: 3px;
+}
+
+.check-field small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
 .read-only-note {
   border-top: 1px solid var(--line);
   padding-top: 10px;

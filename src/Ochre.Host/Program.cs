@@ -37,14 +37,27 @@ internal static class Program
         var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), new UrlOpener());
         host.Attach(shell);
         var agents = new AgentCommands(host.Tasks, host.ParkRequests);
-        instance.Listen((cmd, arg) => cmd == "agent" ? agents.HandleAsync(AgentRequest.Parse(arg)) : HandleCommand(shell, profile, cmd, arg));
+        using var ending = new SessionEnding();
+        ending.Ending += () =>
+        {
+            try
+            {
+                host.Shutdown.OnSessionEnding();
+            }
+            catch (Exception ex)
+            {
+                // Never let a failure here get in the way of Windows shutting down.
+                log.Error("shutdown handling failed", ex);
+            }
+        };
+        instance.Listen((cmd, arg) => cmd == "agent" ? agents.HandleAsync(AgentRequest.Parse(arg)) : HandleCommand(shell, host, profile, cmd, arg));
 
         shell.Run(openWindow: command == "open");
         log.Info("stopped");
         return 0;
     }
 
-    private static async Task<string> HandleCommand(WindowsShell shell, OchreProfile profile, string command, string? argument)
+    private static async Task<string> HandleCommand(WindowsShell shell, OchreHost host, OchreProfile profile, string command, string? argument)
     {
         switch (command)
         {
@@ -65,6 +78,10 @@ internal static class Program
             case "dev-capture" when argument is not null && Path.IsPathFullyQualified(argument):
                 await ((IShellDevTools)shell).CaptureAsync(argument).ConfigureAwait(false);
                 return argument;
+            case "dev-session-ending":
+                // What Windows' shutdown request does, without shutting down; the cancel check runs as it would.
+                host.Shutdown.OnSessionEnding();
+                return $"ok; tasks are put back in {ShutdownParker.CancelledAfter.TotalSeconds:0} s unless Ochre stops first";
 #endif
             default:
                 await Task.CompletedTask.ConfigureAwait(false);

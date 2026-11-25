@@ -213,6 +213,10 @@ export interface SetStateRequest {
   state: TaskStateDto;
 }
 
+export interface SettingsDto {
+  autoParkOnShutdown: boolean;
+}
+
 export interface StartSessionRequest {
   taskId: string;
   cwd: string;
@@ -283,6 +287,8 @@ export interface UpdateTaskRequest {
 export interface Requests {
   'app.info': { req: Empty; res: AppInfo };
   'app.ready': { req: Empty; res: Ack };
+  'settings.get': { req: Empty; res: SettingsDto };
+  'settings.update': { req: SettingsDto; res: SettingsDto };
   'tasks.list': { req: Empty; res: TaskListItem[] };
   'tasks.get': { req: TaskIdRequest; res: TaskDetail };
   'tasks.create': { req: CreateTaskRequest; res: TaskDetail };

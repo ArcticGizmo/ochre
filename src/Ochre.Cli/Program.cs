@@ -21,6 +21,7 @@ internal static class Program
             ["quit"] => Quit(profile),
             ["dev", "eval", var script] => Send(profile, "dev-eval", script, print: true),
             ["dev", "capture", var path] => Send(profile, "dev-capture", Path.GetFullPath(path), print: true),
+            ["dev", "session-ending"] => Send(profile, "dev-session-ending", null, print: true),
             ["task", var op, .. var rest] => Task(profile, op, rest),
             _ => Usage(Console.Error, 2),
         };
@@ -50,6 +51,7 @@ internal static class Program
             Dev builds of Ochre also accept:
               dev eval "<js>"        run script in the open window and print the result
               dev capture <file.png> save a picture of the open window
+              dev session-ending     act as if Windows were shutting down (dev builds)
 
             Inside an agent Ochre started (OCHRE_SESSION and OCHRE_TASK set):
               task current                       the task id this session works on

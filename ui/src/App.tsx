@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { on, request, type AppInfo, type TaskListItem } from './bridge';
 import { SessionView } from './sessions/SessionView';
+import { SettingsDialog } from './SettingsDialog';
 import { useSessions } from './sessions/useSessions';
 import { NewTaskDialog } from './tasks/NewTaskDialog';
 import { TaskBoard } from './tasks/TaskBoard';
@@ -32,6 +33,7 @@ export function App() {
   const [taskThread, setTaskThread] = useState<string | null>(null);
   const [thread, setThread] = useState<Thread | null>(null);
   const [creating, setCreating] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const live = useSessions();
 
@@ -131,6 +133,17 @@ export function App() {
         </nav>
         <span className="spacer" />
         {info && <span className="version">v{info.version}</span>}
+        <button className="link gear" aria-label="Settings" title="Settings" onClick={() => setSettingsOpen(true)}>
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+            <path
+              d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </header>
       {error && (
         <div className="banner" role="alert">
@@ -141,6 +154,7 @@ export function App() {
         </div>
       )}
       <div className="body">{body}</div>
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <NewTaskDialog
         open={creating}
         onClose={() => setCreating(false)}

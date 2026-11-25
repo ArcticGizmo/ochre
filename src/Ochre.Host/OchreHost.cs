@@ -22,8 +22,12 @@ internal sealed class OchreHost : IDisposable
         Tasks = new TaskStore(paths.Tasks, log);
         Tasks.Changed += id => Windows.Broadcast(BridgeDispatcher.SerializeEvent("tasks.changed", new TaskChangedEvent(id), AppJson.Default.TaskChangedEvent));
         Tasks.Start();
-        Sessions = new SessionManager(Tasks, new SessionLedger(paths.SessionLedger), log, profile, new SessionSystem { LocateCli = AgentCli.Locate });
+        Settings = new OchreSettings(paths.Settings);
+        var ledger = new SessionLedger(paths.SessionLedger);
+        Sessions = new SessionManager(Tasks, ledger, log, profile, new SessionSystem { LocateCli = AgentCli.Locate });
         Sessions.LoadDormant();
+        Shutdown = new ShutdownParker(Tasks, Sessions, ledger, () => Settings.AutoParkOnShutdown, log);
+        Shutdown.ClearAtStart();
         Sessions.Changed += (session, changes) =>
             Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.update", SessionApi.Update(session, changes), AppJson.Default.SessionUpdateEvent));
         Sessions.ListChanged += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.changed", new Empty(), AppJson.Default.Empty));
@@ -35,6 +39,11 @@ internal sealed class OchreHost : IDisposable
     /// <summary>Agents asked for a park note; shared with the agent command handler, which takes the notes.</summary>
     public ParkRequests ParkRequests { get; } = new();
     public ParkCoordinator Parking { get; }
+
+    public OchreSettings Settings { get; }
+
+    /// <summary>Parks tasks when Windows ends the session, if the user turned that on.</summary>
+    internal ShutdownParker Shutdown { get; }
 
     public OchreProfile Profile { get; }
     public OchrePaths Paths { get; }

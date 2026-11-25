@@ -194,6 +194,7 @@ Decided 2026-11-25: launched agents use the CLI reliably once its commands are p
 
 - Off by default (a setting). On WM_QUERYENDSESSION the host stamps the shutdown in the ledger (Perch's approach), marks each task with running agents Parked with an automatic note ("Ochre was shut down while alpha and beta were working; last step ticked: p3"), and lets the sessions end. There's no time for agent-written notes. A heartbeat after the stamp means the shutdown was cancelled, and the stamp is undone.
 - Skip Perch's `PowerHistory` (Windows event log, extra package). Port `SessionEnd`'s clean/abrupt classification only if Today needs it.
+- Done 2026-11-25; see `docs/testing/m2-shutdown-testing.md`. The setting lives in `settings.json` (`OchreSettings`, the first setting) behind a Settings dialog. `SessionEnding` (Platform.Windows, `SystemEvents.SessionEnding`) sits behind `ISessionEnding`. The "heartbeat" is a timer: still running 90 s after the request means it was cancelled, and only tasks still carrying their automatic note are put back. `SessionEnd`'s classification wasn't needed. Dev builds have `cli dev session-ending` to act it out.
 
 ### Slice 6: exit run
 

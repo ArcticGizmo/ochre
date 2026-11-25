@@ -433,6 +433,100 @@ public sealed class SessionLifecycleTests : IDisposable
         Assert.Single(sessions.All);
     }
 
+    private (SessionManager Sessions, SessionLedger Ledger, ShutdownParker Parker) NewShutdownSetup(bool enabled)
+    {
+        var ledger = new SessionLedger(Path.Combine(_root, "sessions.json"));
+        var sessions = NewManager();
+        return (sessions, ledger, new ShutdownParker(_store, sessions, ledger, () => enabled, _log));
+    }
+
+    [Fact]
+    public async Task With_auto_park_off_a_shutdown_changes_nothing()
+    {
+        var (sessions, ledger, parker) = NewShutdownSetup(enabled: false);
+        var taskId = await NewTask();
+        await _store.UpdateAsync(taskId, "user", doc => { doc.State = TaskState.Active; return "set state active"; });
+        await sessions.StartAsync(taskId, _repo, "alpha", null, null, trustFolder: false);
+
+        parker.OnSessionEnding();
+
+        Assert.Equal(TaskState.Active, _store.Get(taskId)!.State);
+        Assert.Null(ledger.Shutdown);
+    }
+
+    [Fact]
+    public async Task A_shutdown_parks_tasks_with_running_agents_with_an_automatic_note_and_stamps_the_ledger()
+    {
+        var (sessions, ledger, parker) = NewShutdownSetup(enabled: true);
+        var busy = await NewTask();
+        await _store.UpdateAsync(busy, "user", doc =>
+        {
+            doc.State = TaskState.Active;
+            doc.SetItemDone("p1", true);
+            return "checked p1";
+        });
+        var quiet = await NewTask();
+        await _store.UpdateAsync(quiet, "user", doc => { doc.State = TaskState.Active; return "set state active"; });
+        await sessions.StartAsync(busy, _repo, "alpha", null, null, trustFolder: false);
+        await sessions.StartAsync(busy, _repo, "beta", null, null, trustFolder: false);
+
+        parker.OnSessionEnding();
+
+        var doc = _store.Get(busy)!;
+        Assert.Equal(TaskState.Parked, doc.State);
+        Assert.Equal("Ochre was shut down while alpha and beta were running; last step ticked: First step.", doc.Park!.Note);
+        Assert.Equal(TaskState.Active, _store.Get(quiet)!.State);
+        var stamped = Assert.Single(ledger.Shutdown!.Tasks);
+        Assert.Equal((busy, "active"), (stamped.TaskId, stamped.PreviousState));
+        // Agents are left to end with the system rather than stopped.
+        Assert.All(_claude.Launches, l => Assert.False(l.Process.HasExited));
+    }
+
+    [Fact]
+    public async Task A_cancelled_shutdown_puts_tasks_back_but_leaves_alone_any_the_user_changed_since()
+    {
+        var (sessions, ledger, parker) = NewShutdownSetup(enabled: true);
+        var untouched = await NewTask();
+        var resumed = await NewTask();
+        foreach (var id in new[] { untouched, resumed })
+        {
+            await _store.UpdateAsync(id, "user", doc =>
+            {
+                doc.State = TaskState.Active;
+                doc.Park = new ParkNote(DateTimeOffset.UtcNow.AddDays(-1), "Yesterday's note");
+                return "set state active";
+            });
+            await sessions.StartAsync(id, _repo, "alpha", null, null, trustFolder: false);
+        }
+        parker.OnSessionEnding();
+        await _store.UpdateAsync(resumed, "user", doc => { doc.State = TaskState.Active; return "set state active"; });
+
+        parker.ShutdownCancelled();
+
+        var back = _store.Get(untouched)!;
+        Assert.Equal(TaskState.Active, back.State);
+        Assert.Equal("Yesterday's note", back.Park!.Note);
+        Assert.StartsWith("Ochre was shut down", _store.Get(resumed)!.Park!.Note, StringComparison.Ordinal);
+        Assert.Null(ledger.Shutdown);
+    }
+
+    [Fact]
+    public async Task A_stamp_found_at_start_means_the_shutdown_went_ahead_and_the_tasks_stay_parked()
+    {
+        var (sessions, _, parker) = NewShutdownSetup(enabled: true);
+        var taskId = await NewTask();
+        await _store.UpdateAsync(taskId, "user", doc => { doc.State = TaskState.Active; return "set state active"; });
+        await sessions.StartAsync(taskId, _repo, "alpha", null, null, trustFolder: false);
+        parker.OnSessionEnding();
+
+        var (_, ledger, next) = NewShutdownSetup(enabled: true);
+        Assert.NotNull(ledger.Shutdown);
+        next.ClearAtStart();
+
+        Assert.Null(ledger.Shutdown);
+        Assert.Equal(TaskState.Parked, _store.Get(taskId)!.State);
+    }
+
     public void Dispose()
     {
         foreach (var m in _managers) m.Dispose();

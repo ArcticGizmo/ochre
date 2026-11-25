@@ -21,6 +21,13 @@ public sealed record LedgerEntry(
     string? Model = null,
     string? Effort = null);
 
+/// <summary>A task a shutdown parked, with what it had before so a cancelled shutdown can put it back.</summary>
+/// <param name="AutoNote">The note the shutdown wrote; the task is only put back while it still has this note.</param>
+public sealed record ShutdownParkedTask(string TaskId, string PreviousState, DateTimeOffset? PreviousParkAt, string? PreviousParkNote, string AutoNote);
+
+/// <summary>When Windows said it was ending the session, and the tasks Ochre parked because of it.</summary>
+public sealed record ShutdownStamp(DateTimeOffset At, IReadOnlyList<ShutdownParkedTask> Tasks);
+
 /// <summary>
 /// What the host needs to bring a launched session back after a restart that the task file doesn't hold: how it was
 /// launched and which Claude session it has become. Modelled on Perch's <c>SessionLedger</c>; one small JSON file in
@@ -31,6 +38,29 @@ public sealed class SessionLedger(string path)
 {
     private readonly Lock _gate = new();
     private Dictionary<string, LedgerEntry>? _entries;
+    private ShutdownStamp? _shutdown;
+
+    /// <summary>The last shutdown's stamp, until it's cleared (cancelled, or seen at the next start).</summary>
+    public ShutdownStamp? Shutdown
+    {
+        get
+        {
+            lock (_gate)
+            {
+                Entries();
+                return _shutdown;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                Entries();
+                _shutdown = value;
+                Save();
+            }
+        }
+    }
 
     public LedgerEntry? Get(string id)
     {
@@ -76,7 +106,9 @@ public sealed class SessionLedger(string path)
         if (AtomicFile.ReadShared(path) is not { Length: > 0 } json) return entries;
         try
         {
-            if (JsonNode.Parse(json)?["sessions"] is not JsonArray list) return entries;
+            var root = JsonNode.Parse(json);
+            _shutdown = ReadShutdown(root?["shutdown"]);
+            if (root?["sessions"] is not JsonArray list) return entries;
             foreach (var node in list)
             {
                 string? S(string key) => TranscriptJson.AsString(node?[key]);
@@ -112,13 +144,47 @@ public sealed class SessionLedger(string path)
             if (e.Effort is not null) o["effort"] = e.Effort;
             list.Add((JsonNode)o);
         }
+        var root = new JsonObject { ["sessions"] = list };
+        if (_shutdown is { } stamp) root["shutdown"] = WriteShutdown(stamp);
         try
         {
-            AtomicFile.Write(path, new JsonObject { ["sessions"] = list }.ToJsonString());
+            AtomicFile.Write(path, root.ToJsonString());
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Best effort: the next change writes it again.
         }
+    }
+
+    private static string Iso(DateTimeOffset t) => t.ToString("O", CultureInfo.InvariantCulture);
+
+    private static DateTimeOffset? ParseTime(string? s) =>
+        DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : null;
+
+    private static JsonObject WriteShutdown(ShutdownStamp stamp)
+    {
+        var tasks = new JsonArray();
+        foreach (var t in stamp.Tasks)
+        {
+            var o = new JsonObject { ["task"] = t.TaskId, ["state"] = t.PreviousState, ["autoNote"] = t.AutoNote };
+            if (t.PreviousParkAt is { } at) o["parkAt"] = Iso(at);
+            if (t.PreviousParkNote is not null) o["parkNote"] = t.PreviousParkNote;
+            tasks.Add((JsonNode)o);
+        }
+        return new JsonObject { ["at"] = Iso(stamp.At), ["tasks"] = tasks };
+    }
+
+    private static ShutdownStamp? ReadShutdown(JsonNode? node)
+    {
+        if (ParseTime(TranscriptJson.AsString(node?["at"])) is not { } at) return null;
+        var tasks = new List<ShutdownParkedTask>();
+        if (node?["tasks"] is JsonArray list)
+            foreach (var t in list)
+            {
+                string? S(string key) => TranscriptJson.AsString(t?[key]);
+                if (S("task") is { Length: > 0 } id && S("state") is { Length: > 0 } state)
+                    tasks.Add(new ShutdownParkedTask(id, state, ParseTime(S("parkAt")), S("parkNote"), S("autoNote") ?? ""));
+            }
+        return new ShutdownStamp(at, tasks);
     }
 }

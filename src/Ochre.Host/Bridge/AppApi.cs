@@ -8,6 +8,9 @@ public sealed record Empty;
 public sealed record Ack(bool Ok = true);
 public sealed record AppInfo(string Version, string Profile);
 
+/// <param name="AutoParkOnShutdown">Park tasks with running agents, with an automatic note, when Windows shuts down or signs out.</param>
+public sealed record SettingsDto(bool AutoParkOnShutdown);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
@@ -36,16 +39,23 @@ public sealed record AppInfo(string Version, string Profile);
 [JsonSerializable(typeof(SetModelRequest))]
 [JsonSerializable(typeof(SetEffortRequest))]
 [JsonSerializable(typeof(BindSessionRequest))]
+[JsonSerializable(typeof(SettingsDto))]
 [JsonSerializable(typeof(SessionUpdateEvent))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
-/// <summary>App-level bridge messages: identity and window lifecycle.</summary>
+/// <summary>App-level bridge messages: identity, window lifecycle and settings.</summary>
 internal static class AppApi
 {
     public static void Register(BridgeDispatcher bridge, OchreHost host)
     {
         var j = AppJson.Default;
         bridge.Handle("app.info", j.Empty, j.AppInfo, _ => new AppInfo(AppInfoProvider.Version, host.Profile.IsDefault ? "" : host.Profile.Name));
+        bridge.Handle("settings.get", j.Empty, j.SettingsDto, _ => new SettingsDto(host.Settings.AutoParkOnShutdown));
+        bridge.Handle("settings.update", j.SettingsDto, j.SettingsDto, r =>
+        {
+            host.Settings.AutoParkOnShutdown = r.AutoParkOnShutdown;
+            return new SettingsDto(host.Settings.AutoParkOnShutdown);
+        });
         bridge.Handle("app.ready", j.Empty, j.Ack, _ =>
         {
             host.Windows.PageReady();

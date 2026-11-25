@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json.Nodes;
 
 namespace Ochre.Core.Claude.Control;
@@ -13,7 +12,7 @@ namespace Ochre.Core.Claude.Control;
 /// <para>Threading: <see cref="EventReceived"/> and <see cref="Exited"/> are raised on the background
 /// pump thread. Writers are serialised by a lock.</para>
 /// </summary>
-internal sealed class ClaudeSessionController : IDisposable
+internal sealed class ClaudeSessionController(IClaudeLauncher? launcher = null) : IDisposable
 {
     /// <summary>A decoded output event. Raised on the pump thread.</summary>
     public event Action<SessionEvent>? EventReceived;
@@ -21,8 +20,9 @@ internal sealed class ClaudeSessionController : IDisposable
     /// <summary>The process ended: exit code + a clipped stderr tail (empty when clean).</summary>
     public event Action<int, string>? Exited;
 
-    private Process? _process;
-    private StreamWriter? _stdin;
+    private readonly IClaudeLauncher _launcher = launcher ?? SystemClaudeLauncher.Instance;
+    private IClaudeProcess? _process;
+    private TextWriter? _stdin;
     private readonly Lock _writeLock = new();
     private int _requestCounter;
 
@@ -70,32 +70,18 @@ internal sealed class ClaudeSessionController : IDisposable
             args += $" --append-system-prompt {ClaudeCli.QuotePrompt(note)}";
         }
 
-        // Resolved to an absolute path, never against `cwd`: the session runs inside a repo Ochre didn't write, and
-        // a `claude.cmd` committed there would otherwise run in place of the real CLI.
-        var psi = ClaudeCli.CreateStartInfo(args);
-        psi.WorkingDirectory = options.Cwd;
-        psi.UseShellExecute = false;
-        psi.CreateNoWindow = true;
-        psi.RedirectStandardInput = true;
-        psi.RedirectStandardOutput = true;
-        psi.RedirectStandardError = true;
-        psi.StandardOutputEncoding = System.Text.Encoding.UTF8;
-        psi.StandardErrorEncoding = System.Text.Encoding.UTF8;
-        psi.StandardInputEncoding = new System.Text.UTF8Encoding(false);
-        // Have the CLI report its own turn state (system/session_state_changed). Undocumented; an older CLI
-        // ignores it and the conversation model infers the state from results instead.
-        psi.Environment["CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS"] = "1";
-        // Print mode records no file checkpoints unless asked, and without them `rewind_files` has nothing to restore.
-        psi.Environment["CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING"] = "1";
-        // Set on the child env, never the command line, so an odd path can't break arg parsing or inject.
-        if (!string.IsNullOrWhiteSpace(options.ConfigDir))
-            psi.Environment["CLAUDE_CONFIG_DIR"] = options.ConfigDir;
-        foreach (var (key, value) in options.Environment)
+        var env = new Dictionary<string, string?>
         {
-            if (value is null) psi.Environment.Remove(key);
-            else psi.Environment[key] = value;
-        }
-        Log?.Invoke($"controlled session start: file={psi.FileName} cwd={options.Cwd} resume={resume} id={id}");
+            // Have the CLI report its own turn state (system/session_state_changed). Undocumented; an older CLI
+            // ignores it and the conversation model infers the state from results instead.
+            ["CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS"] = "1",
+            // Print mode records no file checkpoints unless asked, and without them `rewind_files` has nothing to restore.
+            ["CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING"] = "1",
+        };
+        // Set on the child env, never the command line, so an odd path can't break arg parsing or inject.
+        if (!string.IsNullOrWhiteSpace(options.ConfigDir)) env["CLAUDE_CONFIG_DIR"] = options.ConfigDir;
+        foreach (var (key, value) in options.Environment) env[key] = value;
+        Log?.Invoke($"controlled session start: cwd={options.Cwd} resume={resume} id={id}");
 
         // Registered before the process exists so nothing can race the pre-init window; a failed launch
         // releases it again below.
@@ -103,10 +89,10 @@ internal sealed class ClaudeSessionController : IDisposable
         Cwd = options.Cwd;
         ControlledSessions.Register(id);
 
-        Process process;
+        IClaudeProcess process;
         try
         {
-            process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start claude.");
+            process = _launcher.Start(new ClaudeLaunch(args, options.Cwd, env));
         }
         catch
         {
@@ -115,7 +101,7 @@ internal sealed class ClaudeSessionController : IDisposable
             throw;
         }
         _process = process;
-        _stdin = process.StandardInput;
+        _stdin = process.Input;
 
         // The control-protocol handshake; the CLI answers with its capability catalogue (ignored here).
         WriteLine(new JsonObject
@@ -128,14 +114,12 @@ internal sealed class ClaudeSessionController : IDisposable
         Task.Run(() => Pump(process));
     }
 
-    // One dedicated reader per pipe (stdout pumped line-by-line, stderr drained async) so neither can
-    // back-pressure the child into a deadlock.
-    private void Pump(Process process)
+    private void Pump(IClaudeProcess process)
     {
-        var stderr = process.StandardError.ReadToEndAsync();
+        var stderr = process.Errors;
         try
         {
-            while (process.StandardOutput.ReadLine() is { } line)
+            while (process.Output.ReadLine() is { } line)
             {
                 foreach (var ev in StreamJsonParser.Parse(line))
                 {
@@ -160,7 +144,7 @@ internal sealed class ClaudeSessionController : IDisposable
         string errTail = "";
         try
         {
-            process.WaitForExit(5000);
+            process.WaitForExit(TimeSpan.FromSeconds(5));
             exitCode = process.HasExited ? process.ExitCode : -1;
             var err = stderr.IsCompletedSuccessfully ? stderr.Result : "";
             errTail = ToolSummary.Clip(err.Length > 400 ? err[^400..] : err);
@@ -346,7 +330,7 @@ internal sealed class ClaudeSessionController : IDisposable
         {
             try
             {
-                if (!process.WaitForExit(StopGrace)) process.Kill(entireProcessTree: true);
+                if (!process.WaitForExit(StopGrace)) process.Kill();
             }
             catch { /* already exited */ }
         });

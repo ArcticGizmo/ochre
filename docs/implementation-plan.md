@@ -20,6 +20,7 @@ Automated tests are written only where a bug would be expensive and silent, or w
 | Task file parse/serialise round trip | Corrupting a user's task file loses the one thing Ochre exists to keep. A handful of fixture files, nothing more. |
 | Agent write rules (bound task only, no state change, no link removal) | Security boundary ([security.md](security.md) threat 3); cheap to test at the command-handler level. |
 | Perch code copied as-is | Its tests and fixtures already exist and the code is stable, so bringing them costs little and shows when our copy drifts from Perch. Drop them if the copy is substantially rewritten. |
+| Session lifecycle (start, prompts, exit, dormant, resume, restart) | Added 2026-11-25 at the user's request. `SessionLifecycleTests` drive the real `SessionManager` and controller with an in-memory `claude` (`tests/Ochre.Tests/FakeClaude.cs`) behind the `IClaudeLauncher` seam; trust, live sessions and transcripts come from the test, so nothing starts a process or reads `~/.claude`. Milliseconds, no Claude turns, and it catches regressions before a window check. |
 
 | Don't test (yet) | Why |
 |---|---|
@@ -27,6 +28,11 @@ Automated tests are written only where a bug would be expensive and silent, or w
 | UI, bridge plumbing, tray, window management | Changing fast; verified by hand through the manual testing docs. |
 | CLI argument handling, pipe transport | Thin; exercised by every dogfooding session. |
 | "Kernel with every module off" (ADR 0007) | Deferred to M4, when the module contracts exist and settle. |
+
+Headless options noted for later (2026-11-25), not built:
+
+- **A `--headless` host mode** with a dev command such as `cli dev bridge <type> <json>` that sends one bridge message over the instance pipe and prints the reply. It would run real end-to-end checks (real Claude, resume, the task CLI) with no window at all; it still spends real Claude turns, so it suits exit runs. Window checks would then be needed only for visual changes.
+- **The web UI in headless Chromium (Playwright) against a fake bridge**, to test the React side without WebView2. It adds a large pinned dependency, so it waits until the UI settles or regressions there start to cost.
 
 Manual testing docs (`docs/testing/<feature>-testing.md`) stay mandatory per CLAUDE.md; they are the verification channel while automated coverage is thin, so keep them short. The stance is recorded in CLAUDE.md under Conventions.
 

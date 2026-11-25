@@ -1,11 +1,9 @@
 using System.Text.Json.Nodes;
-using Ochre.Core;
 using Ochre.Core.Claude;
 using Ochre.Core.Claude.Control;
-using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
 
-namespace Ochre.Host.Sessions;
+namespace Ochre.Core.Sessions;
 
 /// <summary>A session launched from a task: running, or dormant until something is sent to it.</summary>
 internal sealed class LiveSession
@@ -77,16 +75,18 @@ internal sealed class SessionManager : IDisposable
     private readonly SessionLedger _ledger;
     private readonly AppLog _log;
     private readonly OchreProfile _profile;
+    private readonly SessionSystem _system;
     private readonly Dictionary<string, LiveSession> _sessions = new(StringComparer.Ordinal);
     private readonly Lock _gate = new();
     private readonly Timer _flush;
 
-    public SessionManager(TaskStore tasks, SessionLedger ledger, AppLog log, OchreProfile profile)
+    public SessionManager(TaskStore tasks, SessionLedger ledger, AppLog log, OchreProfile profile, SessionSystem? system = null)
     {
         _tasks = tasks;
         _ledger = ledger;
         _log = log;
         _profile = profile;
+        _system = system ?? new SessionSystem();
         _flush = new Timer(_ => Flush(), null, FlushInterval, FlushInterval);
     }
 
@@ -132,10 +132,10 @@ internal sealed class SessionManager : IDisposable
         string taskId, string cwd, string? role, string? permissionMode, string? firstPrompt, bool trustFolder)
     {
         if (_tasks.Get(taskId) is null) throw new KeyNotFoundException($"no task '{taskId}'");
-        if (!DirectoryTrust.Evaluate(null, cwd))
+        if (!_system.IsTrusted(cwd))
         {
             if (!trustFolder) return (null, StartRefusal.NeedsTrust);
-            if (!DirectoryTrust.Grant(null, cwd)) _log.Warn("could not record folder trust in .claude.json; launching anyway");
+            if (!_system.GrantTrust(cwd)) _log.Warn("could not record folder trust in .claude.json; launching anyway");
         }
 
         var id = Guid.NewGuid().ToString();
@@ -176,7 +176,7 @@ internal sealed class SessionManager : IDisposable
         var claudeId = session.ClaudeId;
         var (history, clipped, found) = await Task.Run(() =>
         {
-            var path = TranscriptLocator.Resolve(claudeId, session.Cwd);
+            var path = _system.ResolveTranscript(claudeId, session.Cwd);
             if (path is null) return ((IReadOnlyList<SessionConversation.ParsedTranscriptLine>)[], false, false);
             var (lines, clip) = TranscriptScan.LastLines(TranscriptChain.ActiveLines(() => TranscriptScan.ReadLines(path)), MaxHistoryLines);
             return (SessionConversation.ParseHistory(lines, claudeId), clip, true);
@@ -208,15 +208,15 @@ internal sealed class SessionManager : IDisposable
     // Caller holds the session's gate. Continues the same Claude session, so the task binding and OCHRE_SESSION hold.
     private void Resume(LiveSession session)
     {
-        if (LiveClaudeSessions.Find(session.ClaudeId) is { } elsewhere)
+        if (_system.FindLive(session.ClaudeId) is { } elsewhere)
             throw new InvalidOperationException($"this session is open in another Claude Code (process {elsewhere.Pid}); close it there first");
-        if (!Directory.Exists(session.Cwd)) throw new InvalidOperationException($"its folder no longer exists: {session.Cwd}");
-        if (!DirectoryTrust.Evaluate(null, session.Cwd))
+        if (!_system.FolderExists(session.Cwd)) throw new InvalidOperationException($"its folder no longer exists: {session.Cwd}");
+        if (!_system.IsTrusted(session.Cwd))
             throw new InvalidOperationException("Claude Code no longer trusts its folder; start a new agent to be asked again");
 
         // A session that never got a message wrote no transcript, and --resume would fail on it; starting it under the
         // same id keeps the binding.
-        var hasTranscript = TranscriptLocator.Resolve(session.ClaudeId, session.Cwd) is not null;
+        var hasTranscript = _system.ResolveTranscript(session.ClaudeId, session.Cwd) is not null;
         session.Controller.Start(hasTranscript
             ? Options(session) with { ResumeSessionId = session.ClaudeId }
             : Options(session) with { NewSessionId = session.ClaudeId });
@@ -262,7 +262,7 @@ internal sealed class SessionManager : IDisposable
 
     private LiveSession Create(string id, string taskId, string cwd, string? role, string? permissionMode, string claudeId, DateTimeOffset startedAt)
     {
-        var controller = new ClaudeSessionController { Log = _log.Info };
+        var controller = new ClaudeSessionController(_system.Launcher) { Log = _log.Info };
         var session = new LiveSession(id, taskId, cwd, role, permissionMode, claudeId, startedAt, controller);
         controller.EventReceived += ev => OnEvent(session, ev);
         controller.Exited += (code, tail) => OnExited(session, code, tail);
@@ -281,7 +281,7 @@ internal sealed class SessionManager : IDisposable
         };
         string? note = null;
         IReadOnlyList<string> allowed = [];
-        if (AgentCli.Locate() is { } cli)
+        if (_system.LocateCli() is { } cli)
         {
             var command = Path.GetFileNameWithoutExtension(cli);
             env["PATH"] = Path.GetDirectoryName(cli) + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
@@ -331,6 +331,9 @@ internal sealed class SessionManager : IDisposable
         c.PendingPermission is not null || c.WaitingElsewhere ? ControlledActivity.Waiting
         : c.TurnActive ? ControlledActivity.Busy
         : ControlledActivity.Idle;
+
+    /// <summary>Broadcasts pending changes now rather than on the next timer tick; for tests.</summary>
+    internal void FlushNow() => Flush();
 
     private void Flush()
     {
@@ -387,28 +390,18 @@ internal sealed record SessionChanges(bool Reset, bool Header, IReadOnlyList<int
     }
 }
 
-/// <summary>Finds the console CLI agents use to reach their task.</summary>
-internal static class AgentCli
+/// <summary>
+/// What <see cref="SessionManager"/> reads from outside the task store: how <c>claude</c> starts, where the agent
+/// CLI is, Claude Code's folder trust, its live-session files and its transcripts. The defaults are the real ones;
+/// tests replace them so a session's whole lifecycle runs in memory and never touches the user's <c>~/.claude</c>.
+/// </summary>
+internal sealed record SessionSystem
 {
-    /// <summary><c>OCHRE_CLI_EXE</c>, else <c>ochre.com</c> or <c>ochre-cli.exe</c> beside the host; in a dev build,
-    /// also this checkout's CLI build. Null when none exists.</summary>
-    public static string? Locate()
-    {
-        if (Environment.GetEnvironmentVariable("OCHRE_CLI_EXE") is { Length: > 0 } fromEnv && Path.IsPathFullyQualified(fromEnv) && File.Exists(fromEnv))
-            return fromEnv;
-        foreach (var name in new[] { "ochre.com", "ochre-cli.exe" })
-        {
-            var beside = Path.Combine(AppContext.BaseDirectory, name);
-            if (File.Exists(beside)) return beside;
-        }
-#if DEBUG
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            if (!File.Exists(Path.Combine(dir.FullName, "Ochre.slnx"))) continue;
-            var dev = Path.Combine(dir.FullName, "src", "Ochre.Cli", "bin", "Debug", "net10.0", "ochre-cli.exe");
-            return File.Exists(dev) ? dev : null;
-        }
-#endif
-        return null;
-    }
+    public IClaudeLauncher Launcher { get; init; } = SystemClaudeLauncher.Instance;
+    public Func<string?> LocateCli { get; init; } = () => null;
+    public Func<string, bool> IsTrusted { get; init; } = cwd => DirectoryTrust.Evaluate(null, cwd);
+    public Func<string, bool> GrantTrust { get; init; } = cwd => DirectoryTrust.Grant(null, cwd);
+    public Func<string, LiveClaudeSession?> FindLive { get; init; } = id => LiveClaudeSessions.Find(id);
+    public Func<string, string, string?> ResolveTranscript { get; init; } = (id, cwd) => TranscriptLocator.Resolve(id, cwd);
+    public Func<string, bool> FolderExists { get; init; } = Directory.Exists;
 }

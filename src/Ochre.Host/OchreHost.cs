@@ -4,7 +4,6 @@ using Ochre.Core.Hosting;
 using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
 using Ochre.Host.Bridge;
-using Ochre.Host.Sessions;
 
 namespace Ochre.Host;
 
@@ -23,7 +22,7 @@ internal sealed class OchreHost : IDisposable
         Tasks = new TaskStore(paths.Tasks, log);
         Tasks.Changed += id => Windows.Broadcast(BridgeDispatcher.SerializeEvent("tasks.changed", new TaskChangedEvent(id), AppJson.Default.TaskChangedEvent));
         Tasks.Start();
-        Sessions = new SessionManager(Tasks, new SessionLedger(paths.SessionLedger), log, profile);
+        Sessions = new SessionManager(Tasks, new SessionLedger(paths.SessionLedger), log, profile, new SessionSystem { LocateCli = AgentCli.Locate });
         Sessions.LoadDormant();
         Sessions.Changed += (session, changes) =>
             Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.update", SessionApi.Update(session, changes), AppJson.Default.SessionUpdateEvent));

@@ -1,8 +1,8 @@
 using Ochre.Core.Bridge;
 using Ochre.Core.Claude;
 using Ochre.Core.Claude.Control;
+using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
-using Ochre.Host.Sessions;
 
 namespace Ochre.Host.Bridge;
 

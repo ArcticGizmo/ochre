@@ -43,7 +43,7 @@ A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray
 - After changing a bridge record or `BridgeContract`, run `dotnet run --project tools/Ochre.BridgeGen` and commit `ui/src/generated/bridge-types.ts` (ADR 0009).
 - `run.cmd` builds everything and starts the dev host; `cli.cmd <args>` builds and runs the console CLI against it (`cli status`, `cli quit`, ...). Both use the dev profile.
 - Check UI changes in the real window, not just the build: set `OCHRE_DEV_DESKTOP=<virtual desktop guid>` before `run.cmd` (so the window doesn't land on the user's screen), then drive it with `cli dev eval "<js>"` and look with `cli dev capture captures/<timestamp>-<reason>.png`. From PowerShell or bash, call the scripts as `.\run.cmd` / `.\cli.cmd`.
-- Experimental phase: write automated tests only for data-loss and security boundaries, or once a feature's direction has settled. Code copied from Perch brings its existing tests. Everything else is verified by hand through the manual testing docs. See `docs/implementation-plan.md`.
+- Experimental phase: write automated tests only for data-loss and security boundaries, the controlled-session lifecycle (in-memory `claude` via `tests/Ochre.Tests/FakeClaude.cs`; never start a real process or read `~/.claude` in a test), or once a feature's direction has settled. Code copied from Perch brings its existing tests. Everything else is verified by hand through the manual testing docs. See `docs/implementation-plan.md`.
 
 ## Copying from Perch
 

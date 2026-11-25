@@ -210,6 +210,8 @@ export interface TaskDetail {
   planText: string;
   notes: string;
   log: string[];
+  agentChangedItems: string[];
+  agentChangedNotes: boolean;
 }
 
 export interface TaskIdRequest {
@@ -243,6 +245,7 @@ export interface Requests {
   'tasks.update': { req: UpdateTaskRequest; res: TaskDetail };
   'tasks.setState': { req: SetStateRequest; res: TaskDetail };
   'tasks.delete': { req: TaskIdRequest; res: Ack };
+  'tasks.reviewAgentChanges': { req: TaskIdRequest; res: TaskDetail };
   'plan.check': { req: CheckItemRequest; res: TaskDetail };
   'plan.add': { req: AddItemRequest; res: TaskDetail };
   'sessions.list': { req: Empty; res: SessionSummary[] };

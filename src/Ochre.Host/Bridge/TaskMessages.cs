@@ -51,7 +51,9 @@ public sealed record TaskDetail(
     IReadOnlyList<PlanItemDto> Plan,
     string PlanText,
     string Notes,
-    IReadOnlyList<string> Log);
+    IReadOnlyList<string> Log,
+    IReadOnlyList<string> AgentChangedItems,
+    bool AgentChangedNotes);
 
 public sealed record TaskIdRequest(string Id);
 

@@ -14,7 +14,7 @@ public static class AgentPrompt
     /// name without extension, such as <c>ochre</c>). Null when either can't ride the command line safely.</summary>
     public static string? For(string taskId, string command)
     {
-        if (!TaskStore.IsTaskId(taskId) || command.Length == 0 || !command.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_')) return null;
+        if (!TaskStore.IsTaskId(taskId) || !IsCommandName(command)) return null;
         var note =
             $"You are working on Ochre task {taskId}. Ochre is the task tracker the user runs beside you, and the task holds the plan. " +
             $"Use the {command} command to read and update it: {command} task show prints the title, plan and notes. " +
@@ -24,4 +24,15 @@ public static class AgentPrompt
             "Only the user can mark the task done.";
         return ClaudeCli.IsSafePrompt(note) ? note : null;
     }
+
+    /// <summary>
+    /// The task commands an agent may run without a permission prompt. The host already confines them to the bound
+    /// task and logs every write (<see cref="AgentCommands"/>), and a prompt on every tick would stop agents keeping
+    /// the plan current. Everything else they run still asks.
+    /// </summary>
+    public static IReadOnlyList<string> AllowedTools(string command) =>
+        IsCommandName(command) ? [$"Bash({command} task *)", $"PowerShell({command} task *)"] : [];
+
+    private static bool IsCommandName(string command) =>
+        command.Length > 0 && command.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 }

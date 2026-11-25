@@ -530,7 +530,8 @@ select {
 
 .status-ended,
 .status-gone {
-  color: var(--line);
+  color: var(--muted);
+  opacity: 0.7;
 }
 
 .agents li {
@@ -728,6 +729,40 @@ select {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 8px;
+}
+
+.review-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--warn);
+  background: var(--panel);
+  border-radius: 0 6px 6px 0;
+  margin: 12px 0;
+}
+
+.review-bar span {
+  flex: 1;
+}
+
+.plan label.agent-changed span:first-of-type {
+  border-bottom: 1px dashed var(--warn);
+}
+
+.plan label.done.agent-changed span:first-of-type {
+  text-decoration: line-through;
+}
+
+/* Overrides the struck-through, muted styling of a done item's text. */
+.plan label.done .agent-tag,
+.agent-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--warn);
+  text-decoration: none;
+  margin-left: 6px;
 }
 
 .composer {

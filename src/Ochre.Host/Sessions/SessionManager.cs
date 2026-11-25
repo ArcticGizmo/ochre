@@ -112,10 +112,13 @@ internal sealed class SessionManager : IDisposable
             ["OCHRE_PROFILE"] = _profile.IsDefault ? null : _profile.Name,
         };
         string? note = null;
+        IReadOnlyList<string> allowed = [];
         if (cli is not null)
         {
+            var command = Path.GetFileNameWithoutExtension(cli);
             env["PATH"] = Path.GetDirectoryName(cli) + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
-            note = AgentPrompt.For(taskId, Path.GetFileNameWithoutExtension(cli));
+            note = AgentPrompt.For(taskId, command);
+            allowed = AgentPrompt.AllowedTools(command);
         }
         else
         {
@@ -135,6 +138,7 @@ internal sealed class SessionManager : IDisposable
                 NewSessionId = id,
                 PermissionMode = permissionMode,
                 AppendSystemPrompt = note,
+                AllowedTools = allowed,
                 Environment = env,
             });
         }

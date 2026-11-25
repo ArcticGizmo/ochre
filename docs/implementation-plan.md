@@ -132,6 +132,7 @@ The rest of the conventions (filter counts, search, a board view, ID under the t
 
 - Highlight plan items added or changed by agents until the user acknowledges them (carried over from slice 6).
 - Walk the exit criterion by hand, write `docs/testing/m1-testing.md`, then start tracking Ochre work as Ochre tasks.
+- Done 2026-11-25. The highlight is derived from the log (agent entries since the last `user reviewed agent changes`), so it adds no task fields. Walking the exit run showed agents stalling on a permission prompt for every task command, which led to ADR 0010 (pre-allow only the task commands).
 - Optional cheap win to try while dogfooding: a manual "park note" field the user fills in by hand. It previews M2's value before the agent-driven version exists.
 
 ### M1 risks

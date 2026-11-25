@@ -112,18 +112,35 @@ export function TaskView({ id, onError, onDeleted }: Props) {
         </section>
       )}
 
+      {(task.agentChangedItems.length > 0 || task.agentChangedNotes) && (
+        <div className="review-bar">
+          <span>
+            Agents changed{' '}
+            {[
+              task.agentChangedItems.length > 0 && `${task.agentChangedItems.length} plan item${task.agentChangedItems.length === 1 ? '' : 's'}`,
+              task.agentChangedNotes && 'the notes',
+            ]
+              .filter(Boolean)
+              .join(' and ')}{' '}
+            since you last looked.
+          </span>
+          <button onClick={() => run(request('tasks.reviewAgentChanges', { id }))}>Mark reviewed</button>
+        </div>
+      )}
+
       <section>
         <h3>Plan</h3>
         {task.planText && <div className="markdown plan-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(task.planText) }} />}
         <Plan
           items={task.plan}
+          agentChanged={task.agentChangedItems}
           onCheck={(itemId, done) => run(request('plan.check', { id, itemId, done }))}
           onAdd={(text, parentId) => run(request('plan.add', { id, text, parentId }))}
         />
       </section>
 
-      <section>
-        <h3>Notes</h3>
+      <section className={task.agentChangedNotes ? 'agent-changed-notes' : undefined}>
+        <h3>Notes{task.agentChangedNotes && <span className="agent-tag">agent</span>}</h3>
         <Notes notes={task.notes} onSave={(notes) => update({ notes })} />
       </section>
 
@@ -227,20 +244,23 @@ function TitleEditor({ title, onSave }: { title: string; onSave: (title: string)
 
 interface PlanProps {
   items: PlanItemDto[];
+  /** Items agents added or ticked since the user last reviewed them. */
+  agentChanged: string[];
   onCheck: (itemId: string, done: boolean) => void;
   onAdd: (text: string, parentId: string | null) => void;
 }
 
-function Plan({ items, onCheck, onAdd }: PlanProps) {
+function Plan({ items, agentChanged, onCheck, onAdd }: PlanProps) {
   const [addingUnder, setAddingUnder] = useState<string | null>(null);
 
   const renderItems = (list: PlanItemDto[]) => (
     <ul className="plan">
       {list.map((item) => (
         <li key={item.id}>
-          <label className={item.done ? 'done' : ''}>
+          <label className={[item.done ? 'done' : '', agentChanged.includes(item.id) ? 'agent-changed' : ''].join(' ')}>
             <input type="checkbox" checked={item.done} onChange={(e) => onCheck(item.id, e.target.checked)} />
             <span>{item.text}</span>
+            {agentChanged.includes(item.id) && <span className="agent-tag">agent</span>}
           </label>
           <button className="link add-sub" title="Add a sub-step" onClick={() => setAddingUnder(item.id)}>
             +

@@ -14,10 +14,10 @@ What changed: a task can start Claude agents. Each one runs as a controlled sess
 |---|---|---|
 | On a task, click "Start agent" | The Agents section only listed ids | A dialog with Folder (the task's repos, or another folder), Role, Permissions and a pre-filled First message |
 | Start with role `checker`, permissions "Ask before edits and commands", first message: "Run the task show command, tick both plan items with task check, then reply done. Don't edit files." | No way to launch an agent | The thread opens; your message shows; the header says CHECKER, BUSY, the folder, model and mode |
-| Wait for the agent's first command | | A yellow-bordered "Allow PowerShell?" (or Bash) card shows `ochre-cli task show` (`ochre task show` when installed); status WAITING |
-| Click Allow on each card | | Each card becomes a one-line "allowed" receipt; the tool card above it gets a green dot and expands to show the task text the CLI printed |
+| Wait for the agent's commands | Each `ochre-cli task ...` waited on an "Allow PowerShell?" card | No prompt for the task commands (ADR 0010): tool cards run `ochre-cli task show` and `task check` (`ochre task ...` when installed) and get green dots; expanding one shows what the CLI printed |
 | Watch the task's plan (Back to the task) | | Both steps are ticked; the log has `session dc59ad95 checked p1` style lines, not `user` |
-| Click Deny on a card instead | | The card reads "declined"; the agent says it was denied and carries on or stops |
+| Ask the agent to run `git status` | | A yellow-bordered "Allow PowerShell?" card; status WAITING. Allow turns it into a one-line "allowed" receipt |
+| Ask it to run `git log -1` and click Deny | | The card reads "declined"; the agent says it was denied |
 | Send "what is 2+2?" from the composer, Enter | | Your message appears, the reply streams in as plain text, then renders as markdown when done; status returns to IDLE |
 | Send a message while it's still answering | | "1 queued" shows by Send until the turn ends |
 | Ask it something long, click Interrupt | | The turn stops; status IDLE |
@@ -38,7 +38,6 @@ What changed: a task can start Claude agents. Each one runs as a controlled sess
 
 ## Known gaps
 
-- Plan changes made by agents are logged but not yet highlighted in the UI for review.
 - Sessions live in memory only; after a quit they show as "not running". Dormant sessions and resume are M2.
 - `/clear` inside an agent gives it a new Claude session id, but its `OCHRE_SESSION` (and the task's record) keep the launch id, which is what the binding check uses.
 - No composer palette, images, rewind or search yet.

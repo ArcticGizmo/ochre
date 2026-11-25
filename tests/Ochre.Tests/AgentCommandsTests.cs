@@ -153,6 +153,14 @@ public sealed class AgentCommandsTests : IDisposable
         Assert.Null(AgentPrompt.For("T-0042", "ochre;calc"));
     }
 
+    [Fact]
+    public void Only_the_task_commands_are_pre_allowed()
+    {
+        Assert.Equal(["Bash(ochre task *)", "PowerShell(ochre task *)"], AgentPrompt.AllowedTools("ochre"));
+        Assert.Empty(AgentPrompt.AllowedTools("ochre\" *"));
+        Assert.Empty(AgentPrompt.AllowedTools(""));
+    }
+
     public void Dispose()
     {
         _store.Dispose();

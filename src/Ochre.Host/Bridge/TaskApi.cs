@@ -1,4 +1,5 @@
 using Ochre.Core.Bridge;
+using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
 
 namespace Ochre.Host.Bridge;
@@ -94,6 +95,12 @@ internal static class TaskApi
             return doc.SetItemDone(r.ItemId, r.Done) ? $"{(r.Done ? "checked" : "unchecked")} {r.ItemId}" : null;
         }));
 
+        bridge.Handle("tasks.reviewAgentChanges", j.TaskIdRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
+        {
+            var pending = AgentChanges.Unreviewed(doc);
+            return pending.PlanItems.Count == 0 && !pending.Notes ? null : AgentChanges.ReviewedMessage;
+        }));
+
         bridge.Handle("plan.add", j.AddItemRequest, j.TaskDetail, r => Update(store, r.Id, doc =>
         {
             var text = Text(r.Text, MaxItemText, "step");
@@ -165,20 +172,26 @@ internal static class TaskApi
     private static TaskListItem ToListItem(TaskSummary s) =>
         new(s.Id, s.Title, ToDto(s.State), Iso(s.Updated), s.PlanDone, s.PlanTotal, s.NextStep, s.ParkNote);
 
-    private static TaskDetail ToDetail(string id, TaskDocument doc) => new(
-        id,
-        doc.Title,
-        ToDto(doc.State),
-        Iso(doc.Created),
-        Iso(doc.Updated),
-        doc.Repos,
-        doc.Links.Select(l => new LinkDto(l.Id, l.Kind, l.Ref, l.Title, l.Summary)).ToList(),
-        doc.Sessions.Select(s => new SessionRefDto(s.Id, s.Cwd, s.Binding, s.Role)).ToList(),
-        doc.Park is { } p ? new ParkDto(Iso(p.At)!, p.Note) : null,
-        doc.Plan.Select(ToDto).ToList(),
-        doc.PlanText,
-        doc.Notes,
-        doc.Log.Select(l => l.Text).ToList());
+    private static TaskDetail ToDetail(string id, TaskDocument doc)
+    {
+        var unreviewed = AgentChanges.Unreviewed(doc);
+        return new(
+            id,
+            doc.Title,
+            ToDto(doc.State),
+            Iso(doc.Created),
+            Iso(doc.Updated),
+            doc.Repos,
+            doc.Links.Select(l => new LinkDto(l.Id, l.Kind, l.Ref, l.Title, l.Summary)).ToList(),
+            doc.Sessions.Select(s => new SessionRefDto(s.Id, s.Cwd, s.Binding, s.Role)).ToList(),
+            doc.Park is { } p ? new ParkDto(Iso(p.At)!, p.Note) : null,
+            doc.Plan.Select(ToDto).ToList(),
+            doc.PlanText,
+            doc.Notes,
+            doc.Log.Select(l => l.Text).ToList(),
+            unreviewed.PlanItems,
+            unreviewed.Notes);
+    }
 
     private static PlanItemDto ToDto(PlanItem item) =>
         new(item.Id ?? "", item.Text, item.Done, item.Children.Select(ToDto).ToList());

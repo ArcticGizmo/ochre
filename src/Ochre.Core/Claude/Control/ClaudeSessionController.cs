@@ -57,6 +57,12 @@ internal sealed class ClaudeSessionController : IDisposable
         if (IsSafeToken(options.Model)) args += $" --model {options.Model}";
         if (IsSafeToken(options.PermissionMode) && options.PermissionMode != "default") args += $" --permission-mode {options.PermissionMode}";
         if (IsEffortLevel(options.Effort)) args += $" --effort {options.Effort}";
+        if (options.AllowedTools.Count > 0)
+        {
+            // Permission rules such as `Bash(ochre task *)`: a closed character set, so each rides as one quoted argument.
+            if (!options.AllowedTools.All(IsSafeToolRule)) throw new ArgumentException("An allowed-tool rule has characters that can't be passed safely.", nameof(options));
+            args += " --allowedTools " + string.Join(" ", options.AllowedTools.Select(ClaudeCli.QuotePrompt));
+        }
         if (options.AppendSystemPrompt is { } note)
         {
             // It rides the command line, so only text no shell would act on inside quotes is allowed through.
@@ -368,6 +374,9 @@ internal sealed class ClaudeSessionController : IDisposable
     // (model names, permission modes) — never free text.
     private static bool IsSafeToken(string? s) =>
         !string.IsNullOrEmpty(s) && s.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '.' or '_');
+
+    internal static bool IsSafeToolRule(string? s) =>
+        !string.IsNullOrEmpty(s) && s.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '.' or '_' or ' ' or '(' or ')' or '*' or ':');
 }
 
 /// <summary>How to launch a controlled session. <see cref="Environment"/> entries are added to the child's
@@ -385,6 +394,8 @@ internal sealed record SessionStartOptions(string Cwd)
     public bool Fork { get; init; }
     /// <summary>Pins the account: injected as <c>CLAUDE_CONFIG_DIR</c>. Null inherits the host's own.</summary>
     public string? ConfigDir { get; init; }
+    /// <summary>Permission rules for <c>--allowedTools</c>, run without asking (e.g. <c>Bash(ochre task *)</c>).</summary>
+    public IReadOnlyList<string> AllowedTools { get; init; } = [];
     /// <summary>Text for <c>--append-system-prompt</c>; must pass <see cref="ClaudeCli.IsSafePrompt"/>.</summary>
     public string? AppendSystemPrompt { get; init; }
     public IReadOnlyDictionary<string, string?> Environment { get; init; } = new Dictionary<string, string?>();

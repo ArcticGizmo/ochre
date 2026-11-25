@@ -78,7 +78,7 @@ For every Active and Parked task: title, park note, next unchecked plan item, at
 
 ## Agent surface
 
-Agents reach their task through the `ochre` CLI (and an MCP server with the same operations). A session launched from a task gets `OCHRE_TASK=T-0042` and `OCHRE_SESSION=<id>` in its environment.
+Agents reach their task through the `ochre` CLI, whose task commands run without a permission prompt ([ADR 0010](decisions/0010-pre-allow-task-commands.md)). An MCP server with the same operations is deferred until a client that can't run a shell needs one. A session launched from a task gets `OCHRE_TASK=T-0042` and `OCHRE_SESSION=<id>` in its environment.
 
 | Command | Effect |
 |---|---|

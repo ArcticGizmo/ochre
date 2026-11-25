@@ -162,7 +162,7 @@ Planned 2026-11-25 from a survey of Perch main at `9275e0b`. Findings that shape
 
 - **Park** on a task opens a dialog listing its running agents, with an optional note of your own. Confirming sets the task Parked, sends each idle agent a park turn ("write your state and next step with `ochre task park-note`"), waits for each note (busy agents: wait for the turn to end, up to a timeout, then interrupt), then stops them so they go dormant.
 - `ochre task park-note "<text>"`: accepted only from a bound session while a park request for it is open, capped in length, logged. It inherits ADR 0010's pre-allow, so these limits live on the host. Tests extend `AgentCommandsTests` (security boundary).
-- Storage: `park.note` keeps your note first, then one line per agent (`- alpha: ...`), so the single-note format in task-model.md still reads naturally. **Open question:** per-agent notes as separate frontmatter entries instead.
+- Storage (decided): `park.note` keeps your note first, then one line per agent (`- alpha: ...`), so the single-note format in task-model.md still reads naturally.
 - **Resume** sets the task Active and shows the park note above the plan; agents stay dormant until you send to one.
 
 ### Slice 3: Today
@@ -174,20 +174,18 @@ Planned 2026-11-25 from a survey of Perch main at `9275e0b`. Findings that shape
 
 - List live sessions Ochre didn't start, from `~/.claude/sessions/*.json` (slice 1's reader) plus their transcripts; read-only threads by tailing (port `TranscriptTailReader`, 200 lines, with tests). Accept ADR 0006 (hook-free observation) when this works.
 - Suggestions, never automatic: cwd inside a task's repo; a Jira key in the branch (port `JiraTicket.cs`, 105 lines, with tests) matching a task link. One click binds (`binding: confirmed`). `SessionWorktree` (infers a worktree from a transcript's edits) is a later refinement.
-- **Open question:** an observed session has no `OCHRE_SESSION`, so its agent can't use the task commands. Options: bound observed sessions stay read-only (proposed for M2), or the CLI looks its session up by parent process.
+- Decided: an observed session has no `OCHRE_SESSION`, so bound observed sessions stay read-only in M2; only launched agents write to tasks. Looking the session up by parent process can come later if it's missed.
 
-### Slice 5: MCP server
+### MCP server: dropped from M2
 
-- `ochre mcp`: a stdio JSON-RPC server inside the NativeAOT CLI (`initialize`, `tools/list`, `tools/call`), with tools `task_show`, `task_check`, `task_uncheck`, `task_add_step`, `task_note`, `task_park_note`. It forwards to the host over the same pipe, so `AgentCommands` stays the only rule-keeper. Hand-rolled: a few hundred lines, no SDK dependency.
-- Launched agents get it through `--mcp-config <file>` with `mcp__ochre__*` pre-allowed (ADR 0010 extended). **Open question:** whether launched agents get MCP, the CLI or both. Proposal: both for a while, then keep whichever agents use reliably.
-- Tests: none beyond `AgentCommands`; the framing is thin and exercised by every agent.
+Decided 2026-11-25: launched agents use the CLI reliably once its commands are pre-allowed (M1 exit run), and a CLI is cheaper (no server process per agent, no tool definitions in every turn's context) and simpler to configure. An MCP server comes back only if a client that can't run a shell needs task access; it would forward to `AgentCommands` over the same pipe. Moved to "Later" in the roadmap.
 
-### Slice 6: auto-park on shutdown (optional)
+### Slice 5: auto-park on shutdown (optional)
 
 - Off by default (a setting). On WM_QUERYENDSESSION the host stamps the shutdown in the ledger (Perch's approach), marks each task with running agents Parked with an automatic note ("Ochre was shut down while alpha and beta were working; last step ticked: p3"), and lets the sessions end. There's no time for agent-written notes. A heartbeat after the stamp means the shutdown was cancelled, and the stamp is undone.
 - Skip Perch's `PowerHistory` (Windows event log, extra package). Port `SessionEnd`'s clean/abrupt classification only if Today needs it.
 
-### Slice 7: exit run
+### Slice 6: exit run
 
 - Walk the exit criterion, write `docs/testing/m2-testing.md`.
 

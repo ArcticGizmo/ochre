@@ -46,7 +46,7 @@ The kernel must work with **zero modules enabled**: plain repos, no worktrees, n
 | Event bus | Session state changes, task changes, git changes, module events. |
 | Module host | Loads modules, resolves their contributions, enforces on/off. |
 | Window/layout manager | N top-level windows, each a saved layout of panels, with per-monitor placement (corner-relative, as Perch's `PlacementMath`). |
-| Agent surface | `ochre task …` CLI and an MCP server exposing the same operations. |
+| Agent surface | `ochre task …` CLI. An MCP server exposing the same operations is deferred (roadmap, Later). |
 
 ### Observing sessions without a hook
 

@@ -25,7 +25,8 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 - "Today" view.
 - Observed sessions (read-only) from `~/.claude/sessions` + transcripts; binding suggestions.
 - Optional auto-park on OS shutdown (port Perch's `SessionLedger` / shutdown stamp logic).
-- MCP server mirroring the CLI.
+- Observed sessions bound to a task are read-only; only agents Ochre launched write to tasks.
+- The MCP server mirroring the CLI moved to Later (2026-11-25): agents use the CLI reliably, and it's cheaper and simpler.
 
 **Exit:** park two tasks at night; next morning "Today" shows both with notes; one click resumes a session with its context.
 
@@ -80,5 +81,6 @@ Until then, don't build anything that assumes a single window: per-window UI sta
 ## Later
 
 - Per-task usage/cost/time.
+- MCP server mirroring the agent CLI, if a client that can't run a shell needs task access.
 - Other agents behind `AgentAdapter`.
 - macOS head.

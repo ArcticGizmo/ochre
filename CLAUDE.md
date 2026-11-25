@@ -1,10 +1,10 @@
 # Ochre
 
-A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray host plus a web UI in a system WebView (proposed; see `docs/decisions/0002-stack-dotnet-host-web-ui.md`). The durable unit of work is the **task**; sessions, worktrees, terminals and links attach to it.
+A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray host plus a web UI in WebView2, hosted in a minimal WinForms shell on Windows (`docs/decisions/0002-stack-dotnet-host-web-ui.md`). The durable unit of work is the **task**; sessions, worktrees, terminals and links attach to it.
 
-**Status: pre-code.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md` and `docs/roadmap.md` before writing code. The first code is the M0 stack spike (`docs/spike-stack.md`) under `spikes/stack/`.
+**Status: M0 (stack spike) done; M1 in progress.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md`, `docs/roadmap.md` and `docs/implementation-plan.md` before writing code. Spike findings that M1 must carry over are in `spikes/stack/results.md`.
 
-## Layout (planned, settled after M0)
+## Layout
 
 - `src/Ochre.Core/`: UI-free core (task store, session registry, transcript parsing, git, module contracts). Plain `net10.0`.
 - `src/Ochre.Host/`: the tray host process (`ochre`), WebView shell, bridge, module host, PTYs.

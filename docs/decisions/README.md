@@ -18,7 +18,7 @@ Template:
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-app-local-tasks.md) | Tasks are app-local markdown files | accepted |
-| [0002](0002-stack-dotnet-host-web-ui.md) | .NET host with one web UI in a system WebView | proposed (pending M0 spike) |
+| [0002](0002-stack-dotnet-host-web-ui.md) | .NET host with one web UI in a system WebView | accepted |
 | [0003](0003-separate-repo-copy-and-own.md) | Separate repo; copy code from Perch and own it | accepted |
 | [0004](0004-claude-code-only.md) | Claude Code only, behind an adapter seam | accepted |
 | [0005](0005-jira-import-and-link.md) | Jira is import + link; tasks are a links hub | accepted |

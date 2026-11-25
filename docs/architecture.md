@@ -1,6 +1,6 @@
 # Architecture
 
-Status: proposed. The UI technology is settled by the M0 spike ([spike-stack.md](spike-stack.md), [ADR 0002](decisions/0002-stack-dotnet-host-web-ui.md)).
+Status: proposed, with the UI technology settled by the M0 spike ([ADR 0002](decisions/0002-stack-dotnet-host-web-ui.md), [results](../spikes/stack/results.md)).
 
 ## Overview
 
@@ -71,13 +71,18 @@ First-party features are modules built against the same contracts as plugins. Tu
 
 ## UI
 
-**Proposed: one web UI inside a WebView hosted by the .NET process** (WebView2 on Windows, WKWebView on macOS). The candidate shells are Avalonia (`NativeWebView` + `TrayIcon`), Photino.NET, or raw WebView2; the spike picks one.
+**One web UI inside a WebView hosted by the .NET process** (WebView2 on Windows, WKWebView on macOS). On Windows the shell is raw WebView2 in a minimal WinForms host that supplies only the tray icon and window frame. The shell sits behind a small seam (tray, window, post/receive message) in `Ochre.Platform.Windows`, so the macOS head implements the same seam.
+
+- Terminal output is coalesced on a ~16 ms timer before crossing the bridge; per-read delivery sends ~500k messages for 50 MB of output.
+- WebView2's SmartScreen check is off for the app's own page (it added ~2 s to every cold load); every other navigation is refused, and links open in the real browser.
+- The virtual host uses a reserved `.example` name. Monaco is lazy-loaded so it stays off the window-open path.
+- Closing a window tears down the WebView (~0.76 s to reopen). Hiding instead re-shows in under 100 ms but keeps the WebView's memory; which to use is an M1 setting.
 
 - Front end: TypeScript, React, Vite; pnpm with install scripts disabled, every dependency pinned.
 - **Monaco** for the editor and diffs, **xterm.js** for terminals (with `addon-serialize` for scrollback restore).
 - Assets are served from disk through a virtual host mapping (no local HTTP server for the UI itself).
 - **The renderer is untrusted.** It talks to the host only through a narrow typed bridge that the host validates. No host objects are injected into script. See [security.md](security.md).
-- Throughput-heavy streams (terminal output, transcript tails) may need a faster channel than `postMessage`; the spike measures that.
+- `postMessage` carries terminal output comfortably once coalesced (0.1 ms bridge round trip; no frame over 18 ms while streaming 50 MB). No faster channel is needed.
 
 ## Terminal
 

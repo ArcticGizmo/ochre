@@ -1,6 +1,6 @@
 # 0002: .NET host with one web UI in a system WebView
 
-- Status: proposed (pending the M0 spike)
+- Status: accepted (2026-11-25, after the M0 spike)
 - Date: 2026-11-25
 
 ## Context
@@ -45,4 +45,4 @@ Measured 2026-11-25 on the development laptop with WinForms + WebView2 and Avalo
 
 Findings that shape M1: terminal output must be coalesced (per-read delivery is ~30% slower and sends ~500k messages for 50 MB); WebView2's SmartScreen check added a fixed ~2 s to every cold page load and is turned off for the app's own page; Avalonia's `NativeWebView` has no host-to-page message or virtual-host API, so on Windows it ends up using the raw `CoreWebView2` anyway.
 
-Recommendation: accept option B, with raw WebView2 in a minimal WinForms host behind a shell seam in `Ochre.Platform.Windows`; macOS implements the same seam later. Status stays proposed until confirmed.
+Outcome: option B accepted. The Windows shell is raw WebView2 in a minimal WinForms host (tray icon and window frame only), behind a shell seam in `Ochre.Platform.Windows`; macOS implements the same seam later. Avalonia was rejected for the shell: it matched WebView2 wherever the WebView does the work and cost more wherever the shell shows (memory, startup, package size), and its WebView control couldn't post to the page or map a local folder, so it gave no cross-platform head start.

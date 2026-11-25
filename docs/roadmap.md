@@ -2,11 +2,11 @@
 
 Each milestone ends with a manual testing doc (`docs/testing/<milestone>-testing.md`) and a green build. Order may change; M0 must come first.
 
-## M0: stack spike
+## M0: stack spike (done 2026-11-25)
 
 Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 
-**Exit:** ADR 0002 accepted or replaced, with measurements recorded.
+**Exit:** ADR 0002 accepted or replaced, with measurements recorded. Met: ADR 0002 accepted with raw WebView2 in a minimal WinForms host; numbers in [spikes/stack/results.md](../spikes/stack/results.md).
 
 ## M1: tasks and controlled sessions
 

@@ -110,12 +110,14 @@ The rest of the conventions (filter counts, search, a board view, ID under the t
 - Tell the agent about the task with `--append-system-prompt` (decided): a short paragraph explaining `ochre task show`, `check`, `add-step` and `note`. Without this the agents won't use the CLI, and the task isn't load-bearing.
 - Record the session in the task's `sessions` list with `binding: launched`.
 - Respect folder trust (`DirectoryTrust`) before launching, as Claude does.
+- Done 2026-11-25 with slices 5 and 6; see `docs/testing/m1-sessions-testing.md`. Ported code is in `src/Ochre.Core/Claude/` (commit names the Perch paths). Left behind for now: Perch's `SessionLock` sidecar (one host per profile drives its own sessions; revisit with resume in M2), `SessionAttention`, the slash-command palette catalogue, and decoding transcript images from base64 (only the image cache is read). The CLI is found as `OCHRE_CLI_EXE`, then `ochre.com` or `ochre-cli.exe` beside the host, then (dev builds) this checkout's CLI build; the system prompt names it by that file name.
 
 ### Slice 5: session thread view
 
 - Render `SessionConversation` in the web UI: user and assistant messages (streaming markdown, sanitised), tool calls folded into cards, a composer, and stop/interrupt.
 - Permission prompts, `AskUserQuestion` and plan approval cards, since a controlled session is stuck without them. Port the input models (`AskUserQuestionInput`, `PlanApprovalInput`, `SessionAttention`) and use Perch's UI as the behavioural spec.
 - Defer: slash-command palette, rewind, images, search. Sessions stay in memory only; whether they survive quit is M2's dormant-session work.
+- Done 2026-11-25. The host owns each session's `SessionConversation` and broadcasts changed items every ~80 ms (`sessions.update`, items by index, or a reset), so a streaming reply costs a few messages a second. Streaming text shows plain and renders as markdown once complete.
 
 ### Slice 6: agent CLI
 
@@ -124,9 +126,11 @@ The rest of the conventions (filter counts, search, a board view, ID under the t
 - Optional hardening, cheap with named pipes: resolve the client pid (`GetNamedPipeClientProcessId`) and check it descends from a Claude process Ochre launched, so a stray process can't impersonate a session by setting env vars. Same-user processes are inside the trust boundary anyway, so this is a nice-to-have.
 - UI highlights plan items added or changed by agents until the user acknowledges them.
 - **Tests:** the write rules only.
+- Done 2026-11-25 except the highlighting, which moves to slice 7 (the log already records each agent change). The rules live in `Ochre.Core.Sessions.AgentCommands`, reached over the instance pipe as the `agent` command; the binding is checked against the file inside the write. The client-pid check stays optional and isn't built.
 
 ### Slice 7: exit run
 
+- Highlight plan items added or changed by agents until the user acknowledges them (carried over from slice 6).
 - Walk the exit criterion by hand, write `docs/testing/m1-testing.md`, then start tracking Ochre work as Ochre tasks.
 - Optional cheap win to try while dogfooding: a manual "park note" field the user fills in by hand. It previews M2's value before the agent-driven version exists.
 

@@ -36,6 +36,7 @@ internal sealed class WindowHost : IWindowHost
         dispatcher.UnexpectedError += (type, ex) => _host.Log.Error($"bridge {type} failed", ex);
         AppApi.Register(dispatcher, _host);
         TaskApi.Register(dispatcher, _host.Tasks);
+        SessionApi.Register(dispatcher, _host.Sessions);
         CheckAgainstContract(dispatcher);
         var session = new Session(this, dispatcher, post);
         lock (_gate) _sessions.Add(session);

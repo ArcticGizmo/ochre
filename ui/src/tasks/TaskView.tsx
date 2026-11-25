@@ -3,6 +3,9 @@ import { on, request, type PlanItemDto, type TaskDetail, type TaskStateDto } fro
 import { ConfirmDialog } from '../Dialog';
 import { renderMarkdown } from '../markdown';
 import { PathText } from '../PathText';
+import { SessionView } from '../sessions/SessionView';
+import { StartAgentDialog } from '../sessions/StartAgentDialog';
+import { useSessions } from '../sessions/useSessions';
 
 const states: TaskStateDto[] = ['backlog', 'active', 'parked', 'done'];
 
@@ -17,6 +20,10 @@ export function TaskView({ id, onError, onDeleted }: Props) {
   const [gone, setGone] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [startingAgent, setStartingAgent] = useState(false);
+  // Which agent's thread this window shows in place of the task; per window, so two windows can differ.
+  const [openSession, setOpenSession] = useState<string | null>(null);
+  const live = useSessions();
 
   const load = useCallback(() => {
     request('tasks.get', { id })
@@ -61,6 +68,7 @@ export function TaskView({ id, onError, onDeleted }: Props) {
 
   if (gone) return <p className="empty">This task no longer exists.</p>;
   if (!task) return <p className="empty">Loading...</p>;
+  if (openSession) return <SessionView key={openSession} id={openSession} onBack={() => setOpenSession(null)} onError={onError} />;
 
   const update = (fields: { title?: string; notes?: string; repos?: string[] }) =>
     run(request('tasks.update', { id, title: fields.title ?? null, notes: fields.notes ?? null, repos: fields.repos ?? null }));
@@ -129,14 +137,38 @@ export function TaskView({ id, onError, onDeleted }: Props) {
         {task.sessions.length === 0 ? (
           <p className="empty">No agents yet.</p>
         ) : (
-          <ul className="plain">
-            {task.sessions.map((s) => (
-              <li key={s.id}>
-                <code>{s.id.slice(0, 8)}</code> {s.role ?? 'agent'} in <PathText path={s.cwd} />
-              </li>
-            ))}
+          <ul className="plain agents">
+            {task.sessions.map((s) => {
+              const running = live.find((l) => l.id === s.id);
+              return (
+                <li key={s.id}>
+                  <span className={`status status-${running?.status ?? 'gone'}`}>{running?.status ?? 'not running'}</span>
+                  <span>{s.role ?? 'agent'}</span>
+                  <PathText path={s.cwd} />
+                  <code title={s.id}>{s.id.slice(0, 8)}</code>
+                  {running && (
+                    <button className="link" onClick={() => setOpenSession(s.id)}>
+                      Open
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
+        <button className="start-agent" onClick={() => setStartingAgent(true)}>
+          Start agent
+        </button>
+        <StartAgentDialog
+          open={startingAgent}
+          taskId={task.id}
+          repos={task.repos}
+          onClose={() => setStartingAgent(false)}
+          onStarted={(sessionId) => {
+            setStartingAgent(false);
+            setOpenSession(sessionId);
+          }}
+        />
       </section>
 
       {task.links.length > 0 && (

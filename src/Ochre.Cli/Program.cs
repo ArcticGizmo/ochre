@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Ochre.Core;
 using Ochre.Core.Hosting;
+using Ochre.Core.Sessions;
 
 namespace Ochre.Cli;
 
@@ -20,8 +21,20 @@ internal static class Program
             ["quit"] => Quit(profile),
             ["dev", "eval", var script] => Send(profile, "dev-eval", script, print: true),
             ["dev", "capture", var path] => Send(profile, "dev-capture", Path.GetFullPath(path), print: true),
+            ["task", var op, .. var rest] => Task(profile, op, rest),
             _ => Usage(Console.Error, 2),
         };
+    }
+
+    // The session and task come from the environment Ochre gave the agent; the host checks the binding.
+    private static int Task(OchreProfile profile, string op, string[] args)
+    {
+        var request = new AgentRequest(
+            Environment.GetEnvironmentVariable("OCHRE_SESSION"),
+            Environment.GetEnvironmentVariable("OCHRE_TASK"),
+            op,
+            args);
+        return Send(profile, "agent", request.ToJson(), print: true);
     }
 
     private static int Usage(TextWriter to, int code)
@@ -38,7 +51,13 @@ internal static class Program
               dev eval "<js>"        run script in the open window and print the result
               dev capture <file.png> save a picture of the open window
 
-            Task commands (ochre task ...) arrive with M1 slice 6.
+            Inside an agent Ochre started (OCHRE_SESSION and OCHRE_TASK set):
+              task current                       the task id this session works on
+              task show [--plan]                 title, state, plan, notes and park note
+              task check <item> / uncheck <item> tick or untick a plan item, e.g. p3
+              task add-step "<text>" [--under <item>]
+                                                 add a plan item
+              task note "<text>"                 append to the task's notes
             """);
         return code;
     }

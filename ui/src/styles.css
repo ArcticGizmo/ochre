@@ -8,6 +8,7 @@
   --accent: #cc7722;
   --danger: #e06c5a;
   --ok: #7fb069;
+  --warn: #d9b44a;
   color-scheme: dark;
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
@@ -495,4 +496,254 @@ button.link.danger:hover {
 
 .field textarea {
   resize: vertical;
+}
+
+select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font: inherit;
+}
+
+.error {
+  color: var(--danger);
+}
+
+/* Agent status, the same colours wherever a session appears. */
+.status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  flex: none;
+}
+
+.status-busy {
+  color: var(--accent);
+}
+
+.status-waiting {
+  color: var(--warn);
+}
+
+.status-ended,
+.status-gone {
+  color: var(--line);
+}
+
+.agents li {
+  gap: 10px;
+}
+
+.agents .status {
+  min-width: 72px;
+}
+
+.start-agent {
+  margin-top: 8px;
+}
+
+.session {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.session-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.session-title {
+  font-size: 18px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 10px;
+}
+
+.back {
+  padding-left: 0;
+}
+
+.thread {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 2px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.msg {
+  margin: 12px 0;
+  line-height: 1.5;
+}
+
+.msg.user {
+  white-space: pre-wrap;
+  background: var(--raised);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-left: 15%;
+}
+
+.msg.assistant .text.streaming {
+  white-space: pre-wrap;
+}
+
+.msg.assistant .text p:first-child {
+  margin-top: 0;
+}
+
+.note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+
+.note.error {
+  color: var(--danger);
+}
+
+.working {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.thinking,
+.tool {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.thinking .text {
+  white-space: pre-wrap;
+  color: var(--muted);
+  padding: 4px 0 4px 16px;
+}
+
+.tool summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+
+.tool-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.tool-running .tool-status {
+  background: var(--accent);
+}
+
+.tool-done .tool-status {
+  background: var(--ok);
+}
+
+.tool-failed .tool-status {
+  background: var(--danger);
+}
+
+.tool pre,
+.card pre {
+  background: var(--panel);
+  border-radius: 4px;
+  padding: 8px;
+  margin: 4px 0;
+  max-height: 320px;
+  overflow: auto;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff .add {
+  color: var(--ok);
+}
+
+.diff .del {
+  color: var(--danger);
+}
+
+.diff .meta {
+  color: var(--muted);
+}
+
+.card {
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  background: var(--panel);
+}
+
+.card h4 {
+  margin: 0 0 6px;
+}
+
+.card fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 10px;
+}
+
+.card legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.card .option {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.card .option small {
+  display: block;
+  color: var(--muted);
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.composer {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.composer textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
 }

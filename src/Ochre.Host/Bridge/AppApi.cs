@@ -25,6 +25,14 @@ public sealed record AppInfo(string Version, string Profile);
 [JsonSerializable(typeof(CheckItemRequest))]
 [JsonSerializable(typeof(AddItemRequest))]
 [JsonSerializable(typeof(TaskChangedEvent))]
+[JsonSerializable(typeof(IReadOnlyList<SessionSummary>))]
+[JsonSerializable(typeof(SessionSnapshot))]
+[JsonSerializable(typeof(SessionIdRequest))]
+[JsonSerializable(typeof(StartSessionRequest))]
+[JsonSerializable(typeof(StartSessionResult))]
+[JsonSerializable(typeof(SendPromptRequest))]
+[JsonSerializable(typeof(RespondRequest))]
+[JsonSerializable(typeof(SessionUpdateEvent))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity and window lifecycle.</summary>

@@ -22,11 +22,19 @@ public static class BridgeContract
         new("tasks.delete", typeof(TaskIdRequest), typeof(Ack)),
         new("plan.check", typeof(CheckItemRequest), typeof(TaskDetail)),
         new("plan.add", typeof(AddItemRequest), typeof(TaskDetail)),
+        new("sessions.list", typeof(Empty), typeof(IReadOnlyList<SessionSummary>)),
+        new("sessions.get", typeof(SessionIdRequest), typeof(SessionSnapshot)),
+        new("sessions.start", typeof(StartSessionRequest), typeof(StartSessionResult)),
+        new("sessions.send", typeof(SendPromptRequest), typeof(Ack)),
+        new("sessions.interrupt", typeof(SessionIdRequest), typeof(Ack)),
+        new("sessions.stop", typeof(SessionIdRequest), typeof(Ack)),
+        new("sessions.respond", typeof(RespondRequest), typeof(Ack)),
     ];
 
     public static IReadOnlyList<EventContract> Events { get; } =
     [
         new("window.shown", typeof(Empty)),
         new("tasks.changed", typeof(TaskChangedEvent)),
+        new("sessions.update", typeof(SessionUpdateEvent)),
     ];
 }

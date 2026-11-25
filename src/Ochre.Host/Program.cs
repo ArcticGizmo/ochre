@@ -1,5 +1,6 @@
 using Ochre.Core;
 using Ochre.Core.Hosting;
+using Ochre.Core.Sessions;
 using Ochre.Host.Bridge;
 using Ochre.Platform.Windows;
 using Ochre.Platform.Windows.Shell;
@@ -35,7 +36,8 @@ internal static class Program
         using var host = new OchreHost(profile, paths, log);
         var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), new UrlOpener());
         host.Attach(shell);
-        instance.Listen((cmd, arg) => HandleCommand(shell, profile, cmd, arg));
+        var agents = new AgentCommands(host.Tasks);
+        instance.Listen((cmd, arg) => cmd == "agent" ? agents.HandleAsync(AgentRequest.Parse(arg)) : HandleCommand(shell, profile, cmd, arg));
 
         shell.Run(openWindow: command == "open");
         log.Info("stopped");

@@ -210,6 +210,23 @@ public class TaskDocumentTests
         Assert.Equal(text, reparsed.Serialize());
     }
 
+    [Fact]
+    public void A_new_task_body_has_the_documented_shape()
+    {
+        var now = new DateTimeOffset(2026, 11, 25, 9, 0, 0, TimeSpan.Zero);
+        var doc = TaskDocument.CreateNew("T-0001", "Shape", now);
+        doc.AddItem("First");
+        doc.AddItem("Second");
+        doc.SetNotes("A note.");
+        doc.AppendLog(now, "user", "created");
+
+        var body = doc.Serialize().Split("---\n")[2];
+
+        Assert.Equal(
+            "\n## Plan\n- [ ] First {#p1}\n- [ ] Second {#p2}\n\n## Notes\nA note.\n\n## Log\n- 2026-11-25T09:00Z user created\n",
+            body);
+    }
+
     [Theory]
     [InlineData("no frontmatter")]
     [InlineData("---\nid: T-1\n")]

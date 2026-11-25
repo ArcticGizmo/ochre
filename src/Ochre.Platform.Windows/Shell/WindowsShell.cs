@@ -5,7 +5,7 @@ using Ochre.Core.Platform;
 namespace Ochre.Platform.Windows.Shell;
 
 /// <summary>Tray icon plus one WebView2 window, on a WinForms message loop. Draws no UI of its own.</summary>
-public sealed class WindowsShell : IShell
+public sealed class WindowsShell : IShell, IShellDevTools
 {
     private readonly IWindowHost _host;
     private readonly ShellOptions _options;
@@ -37,6 +37,42 @@ public sealed class WindowsShell : IShell
 
     public void Quit() => _context?.Post(c => c.Quit());
 
+    public Task<string> EvalAsync(string script) =>
+        OnUiThread(async core => await core.ExecuteScriptAsync(script).ConfigureAwait(true));
+
+    public Task CaptureAsync(string path) =>
+        OnUiThread(async core =>
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+            await using var file = File.Create(path);
+            await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, file).ConfigureAwait(true);
+            return path;
+        });
+
+    private Task<T> OnUiThread<T>(Func<CoreWebView2, Task<T>> action)
+    {
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var context = _context;
+        if (context is null)
+        {
+            tcs.SetException(new InvalidOperationException("Ochre is shutting down"));
+            return tcs.Task;
+        }
+        context.Post(async c =>
+        {
+            try
+            {
+                var core = c.Core ?? throw new InvalidOperationException("no window is open");
+                tcs.SetResult(await action(core).ConfigureAwait(true));
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        });
+        return tcs.Task;
+    }
+
     private sealed class TrayContext : ApplicationContext
     {
         private readonly IWindowHost _host;
@@ -67,6 +103,8 @@ public sealed class WindowsShell : IShell
             };
             Application.Idle += OnFirstIdle;
         }
+
+        public CoreWebView2? Core => _window is { IsDisposed: false } w ? w.Core : null;
 
         private void OnFirstIdle(object? sender, EventArgs e)
         {

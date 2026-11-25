@@ -1,18 +1,8 @@
-// Typed client for the host bridge. These types mirror the C# records in src/Ochre.Host/Bridge by hand for now;
-// ADR 0009 (M1 slice 3) decides whether to generate them.
+// Typed client for the host bridge. Message shapes come from generated/bridge-types.ts (ADR 0009); regenerate
+// with `dotnet run --project tools/Ochre.BridgeGen` after changing src/Ochre.Host/Bridge.
+import type { Events, Requests } from './generated/bridge-types';
 
-type Empty = Record<string, never>;
-export interface Ack { ok: boolean }
-export interface AppInfo { version: string; profile: string }
-
-interface Requests {
-  'app.info': { req: Empty; res: AppInfo };
-  'app.ready': { req: Empty; res: Ack };
-}
-
-interface Events {
-  'window.shown': Empty;
-}
+export type * from './generated/bridge-types';
 
 interface WebView2Bridge {
   postMessage(message: string): void;

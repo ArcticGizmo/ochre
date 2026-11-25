@@ -94,8 +94,9 @@ Exit (from the roadmap): create a task, launch two agents on it, both tick plan 
 
 ### Slice 3: task list and detail UI
 
-- Bridge v1 from the spike's findings: `tasks.list`, `tasks.get`, `tasks.create`, `tasks.update` (title, repos, notes), `plan.check`, `plan.add`, and a `task.changed` event.
-- List with state filter and manual ordering (an `order` frontmatter field). Detail view: plan checkboxes, notes (markdown rendered with DOMPurify), links shown read-only, sessions list, log.
+- Bridge v1 from the spike's findings: `tasks.list`, `tasks.get`, `tasks.create`, `tasks.update` (title, repos, notes), `tasks.setState`, `plan.check`, `plan.add`, and a `tasks.changed` event. Types generated per ADR 0009.
+- List with state filter, sorted by state then last activity. Detail view: plan checkboxes, notes (markdown rendered with DOMPurify), links shown read-only, sessions list, log. Manual ordering (the `order` field) is deferred until dogfooding shows it's wanted.
+- Done 2026-11-25; see `docs/testing/m1-tasks-ui-testing.md`.
 - Edits from the UI go through the store like any other writer, with author `user`.
 
 ### Slice 4: controlled sessions (host side)

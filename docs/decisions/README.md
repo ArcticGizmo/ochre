@@ -25,3 +25,4 @@ Template:
 | [0006](0006-hook-free-session-observation.md) | Observe sessions from Claude's own files, no hook | proposed |
 | [0007](0007-modules-on-plugin-contracts.md) | First-party features are modules on the plugin contracts | accepted |
 | [0008](0008-tray-host-process.md) | A background tray host owns all state; windows are views | accepted |
+| [0009](0009-bridge-contract-codegen.md) | The bridge contract is declared once in C# and the TypeScript types are generated | accepted |

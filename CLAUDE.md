@@ -38,6 +38,8 @@ A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray
 - UI dependencies: exact pinned versions, lockfile committed, pnpm with install scripts disabled. Never run `npx`/`pnpm dlx` against unpinned packages.
 - Release scripts (`.ps1`, `.bat`, `.sh`, workflows) stay pure ASCII; `.sh` files stay LF.
 - Tests never plant runnable executables (EDR flags them); plant empty files and assert resolution.
+- After changing a bridge record or `BridgeContract`, run `dotnet run --project tools/Ochre.BridgeGen` and commit `ui/src/generated/bridge-types.ts` (ADR 0009).
+- Check UI changes in the real window, not just the build: run a Debug `ochre.exe` with `OCHRE_DEV_DESKTOP=<virtual desktop guid>` set on the first launch (so the window doesn't land on the user's screen), then drive it with `ochre --dev-eval "<js>"` and look with `ochre --dev-capture captures/<timestamp>-<reason>.png`.
 - Experimental phase: write automated tests only for data-loss and security boundaries, or once a feature's direction has settled. Code copied from Perch brings its existing tests. Everything else is verified by hand through the manual testing docs. See `docs/implementation-plan.md`.
 
 ## Copying from Perch

@@ -26,6 +26,8 @@ public sealed class BridgeDispatcher
 
     public BridgeDispatcher(Action<string> post) => _post = post;
 
+    public IReadOnlyCollection<string> RegisteredTypes => _handlers.Keys;
+
     /// <summary>Raised for failures the renderer only sees as "internal error"; the detail stays on the host.</summary>
     public event Action<string, Exception>? UnexpectedError;
 

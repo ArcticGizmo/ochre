@@ -62,6 +62,7 @@ public sealed partial class TaskDocument
     public static TaskDocument CreateNew(string id, string title, DateTimeOffset now)
     {
         var doc = new TaskDocument(new YamlMappingNode(), "", ["", "## Plan", "", "## Notes", "", "## Log", ""], "\n");
+        // Each section is a heading followed by one blank line until content arrives.
         doc.Id = id;
         doc.Title = title;
         doc.State = TaskState.Backlog;
@@ -257,8 +258,9 @@ public sealed partial class TaskDocument
 
         var (start, end) = FindSection("Plan") ?? CreateSection("Plan", before: "Notes");
         var items = AllPlanItems().ToList();
-        var at = items.Count > 0 ? items.Max(p => p.Line) + 1 : TrimmedEnd(start, end);
-        _body.Insert(at, $"- [ ] {text} {{#{id}}}");
+        var line = $"- [ ] {text} {{#{id}}}";
+        if (items.Count > 0) _body.Insert(items.Max(p => p.Line) + 1, line);
+        else InsertInSection(start, end, [line]);
         return id;
     }
 
@@ -304,12 +306,10 @@ public sealed partial class TaskDocument
     {
         var (start, end) = FindSection("Notes") ?? CreateSection("Notes", before: "Log");
         _body.RemoveRange(start + 1, end - start - 1);
-        var lines = new List<string> { "" };
-        if (notes.Trim().Length > 0)
-        {
-            lines.AddRange(notes.Trim().Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(EscapeHeading));
-            lines.Add("");
-        }
+        var lines = new List<string>();
+        if (notes.Trim().Length > 0) lines.AddRange(notes.Trim().Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(EscapeHeading));
+        // A blank line separates the section from the next heading (or ends the file).
+        lines.Add("");
         _body.InsertRange(start + 1, lines);
     }
 
@@ -332,7 +332,7 @@ public sealed partial class TaskDocument
     {
         var (start, end) = FindSection("Log") ?? CreateSection("Log", before: null);
         var line = $"- {at.UtcDateTime.ToString("yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture)} {SingleLine(author)} {SingleLine(message)}";
-        _body.Insert(TrimmedEnd(start, end), line);
+        InsertInSection(start, end, [line]);
     }
 
     // ---- summary ------------------------------------------------------------------------------------------------
@@ -385,12 +385,17 @@ public sealed partial class TaskDocument
         return (start, start + 2);
     }
 
-    /// <summary>The index just after the last non-blank line of a section, where appended content goes.</summary>
-    private int TrimmedEnd(int start, int end)
+    /// <summary>
+    /// Appends lines after the section's last non-blank line (straight under the heading if it's empty), keeping a
+    /// blank line before the next heading.
+    /// </summary>
+    private void InsertInSection(int start, int end, IReadOnlyList<string> lines)
     {
-        var i = end;
-        while (i > start + 1 && _body[i - 1].Trim().Length == 0) i--;
-        return i == start + 1 && end > start + 1 ? start + 2 : i;
+        var at = end;
+        while (at > start + 1 && _body[at - 1].Trim().Length == 0) at--;
+        _body.InsertRange(at, lines);
+        var after = at + lines.Count;
+        if (after < _body.Count && IsHeading(_body[after], out _)) _body.Insert(after, "");
     }
 
     private static string EscapeHeading(string line) => line.StartsWith('#') ? "\\" + line : line;

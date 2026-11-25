@@ -41,6 +41,8 @@ internal sealed class MainWindow : Form
 
     public void NotifyShown() => _page?.NotifyShown();
 
+    public CoreWebView2? Core => _page is null ? null : _web.CoreWebView2;
+
     // A window opened onto another desktop for a test run shouldn't steal focus from whatever the user is doing.
     protected override bool ShowWithoutActivation => _options.VirtualDesktop is not null;
 

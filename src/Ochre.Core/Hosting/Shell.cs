@@ -19,6 +19,19 @@ public interface IShell
     void Quit();
 }
 
+/// <summary>
+/// Dev-build hooks so a change can be checked in the real window without a person at the screen: run a script in
+/// the page and capture what it shows. Never wired up in release builds.
+/// </summary>
+public interface IShellDevTools
+{
+    /// <summary>Runs <paramref name="script"/> in the open page and returns its result as JSON.</summary>
+    Task<string> EvalAsync(string script);
+
+    /// <summary>Writes a PNG of the page to <paramref name="path"/>.</summary>
+    Task CaptureAsync(string path);
+}
+
 /// <summary>What a shell calls back into: one session per loaded page.</summary>
 public interface IWindowHost
 {

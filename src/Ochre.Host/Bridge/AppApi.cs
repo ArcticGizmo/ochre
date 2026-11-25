@@ -16,6 +16,15 @@ public sealed record AppInfo(string Version, string Profile);
 [JsonSerializable(typeof(Empty))]
 [JsonSerializable(typeof(Ack))]
 [JsonSerializable(typeof(AppInfo))]
+[JsonSerializable(typeof(IReadOnlyList<TaskListItem>))]
+[JsonSerializable(typeof(TaskDetail))]
+[JsonSerializable(typeof(TaskIdRequest))]
+[JsonSerializable(typeof(CreateTaskRequest))]
+[JsonSerializable(typeof(UpdateTaskRequest))]
+[JsonSerializable(typeof(SetStateRequest))]
+[JsonSerializable(typeof(CheckItemRequest))]
+[JsonSerializable(typeof(AddItemRequest))]
+[JsonSerializable(typeof(TaskChangedEvent))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity and window lifecycle.</summary>

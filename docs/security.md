@@ -31,6 +31,10 @@ Ochre runs agents that can execute anything, holds Jira/GitHub tokens, persists 
 - **Web UI:** threat 5 is the defining risk; the mitigations there are not optional. With a system WebView, the browser engine is patched by the OS; Electron would make Chromium patching our job.
 - **.NET host:** there is no in-process sandbox in modern .NET, so third-party code never loads into the host process. Per-host network egress control for plugins is unsolved (AppContainer breaks realistic plugins); treat any network capability as "can exfiltrate" when asking for consent.
 
+## Dev builds
+
+Debug builds accept `--dev-eval` (run script in the page) and `--dev-capture` (save a PNG of it) over the same per-user instance pipe, so changes can be checked in the real window unattended. They are compiled out of release builds. Chromium's remote debugging port is deliberately not used for this: infostealers use it to read browser cookies, and EDR watches for it.
+
 ## Endpoint security (EDR)
 
 The development machine runs CrowdStrike Falcon and Microsoft Defender. An app that spawns shells, ConPTY hosts and child processes looks suspicious to behavioural heuristics, so:

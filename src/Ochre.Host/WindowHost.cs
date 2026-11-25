@@ -35,9 +35,24 @@ internal sealed class WindowHost : IWindowHost
         var dispatcher = new BridgeDispatcher(post);
         dispatcher.UnexpectedError += (type, ex) => _host.Log.Error($"bridge {type} failed", ex);
         AppApi.Register(dispatcher, _host);
+        TaskApi.Register(dispatcher, _host.Tasks);
+        CheckAgainstContract(dispatcher);
         var session = new Session(this, dispatcher, post);
         lock (_gate) _sessions.Add(session);
         return session;
+    }
+
+    private bool _contractChecked;
+
+    /// <summary>A handler missing from BridgeContract (or the reverse) means the generated UI types are stale (ADR 0009).</summary>
+    private void CheckAgainstContract(BridgeDispatcher dispatcher)
+    {
+        if (_contractChecked) return;
+        _contractChecked = true;
+        var declared = BridgeContract.Requests.Select(r => r.Type).ToHashSet(StringComparer.Ordinal);
+        var registered = dispatcher.RegisteredTypes.ToHashSet(StringComparer.Ordinal);
+        foreach (var missing in declared.Except(registered)) _host.Log.Error($"bridge contract declares '{missing}' but no handler is registered");
+        foreach (var extra in registered.Except(declared)) _host.Log.Error($"bridge handler '{extra}' is not in BridgeContract; regenerate the UI types");
     }
 
     /// <summary>Sends an event to every open page. Safe from any thread.</summary>

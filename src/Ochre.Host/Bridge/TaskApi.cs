@@ -164,6 +164,8 @@ internal static class TaskApi
             var path = repo.Trim();
             if (path.Length == 0) continue;
             if (path.Length > 1024 || !Path.IsPathFullyQualified(path)) throw new BridgeRejectException($"not an absolute path: {path}");
+            // One spelling per folder (separators, "..", a trailing slash), so matching and display agree.
+            path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
             if (!clean.Contains(path, StringComparer.OrdinalIgnoreCase)) clean.Add(path);
         }
         return clean;

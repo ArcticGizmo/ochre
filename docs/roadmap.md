@@ -19,7 +19,7 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 
 **Exit:** create a task, launch two agents on it, both tick plan items, quit and relaunch, and the task is intact. Met: see [testing/m1-testing.md](testing/m1-testing.md). Agents run the task commands without a permission prompt ([ADR 0010](decisions/0010-pre-allow-task-commands.md)); their plan changes are highlighted until reviewed.
 
-## M2: park, resume and the morning view
+## M2: park, resume and the morning view (done 2026-11-25)
 
 - Park (manual), collecting park notes from running sessions; dormant sessions; wake on send.
 - "Today" view.

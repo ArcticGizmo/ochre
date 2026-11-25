@@ -199,6 +199,7 @@ Decided 2026-11-25: launched agents use the CLI reliably once its commands are p
 ### Slice 6: exit run
 
 - Walk the exit criterion, write `docs/testing/m2-testing.md`.
+- Done 2026-11-25; see `docs/testing/m2-testing.md`. Walked with two real agents in the dev window: parked at night with notes, restarted, both on Today with notes, one click into an agent, and a resumed agent recalled a word it was given before the park. Found on the way: paths are now normalised when a repo or agent folder is given (a doubled separator got through), and sending to an agent on a Parked task resumes the agent but leaves the task Parked (left as is, for the user to decide).
 
 ## M3 onwards (outline)
 

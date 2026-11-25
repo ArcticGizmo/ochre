@@ -79,6 +79,7 @@ internal static partial class SessionApi
             if (!TaskStore.IsTaskId(r.TaskId)) throw new BridgeRejectException("invalid task id");
             var cwd = r.Cwd.Trim();
             if (cwd.Length == 0 || cwd.Length > 1024 || !Path.IsPathFullyQualified(cwd)) throw new BridgeRejectException("choose an absolute folder");
+            cwd = Path.TrimEndingDirectorySeparator(Path.GetFullPath(cwd));
             if (!Directory.Exists(cwd)) throw new BridgeRejectException($"folder not found: {cwd}");
             var role = string.IsNullOrWhiteSpace(r.Role) ? null : r.Role.Trim();
             if (role is not null && (role.Length > MaxRole || !role.All(c => char.IsLetterOrDigit(c) || c is ' ' or '-' or '_')))

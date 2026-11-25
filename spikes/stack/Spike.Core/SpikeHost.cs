@@ -82,6 +82,11 @@ public sealed class SpikeHost : IDisposable
             return new Metrics(_shellName, _coldStartMs, _lastWindowOpenMs, self.WorkingSet64 / 1024.0 / 1024.0);
         });
         b.Handle("bench.echo", j.EchoMessage, j.EchoMessage, m => m);
+        b.Handle("bench.report", j.BenchReport, j.Ack, r =>
+        {
+            Log("bench " + (r.Line.Length > 2000 ? r.Line[..2000] : r.Line).ReplaceLineEndings(" "));
+            return new Ack();
+        });
         b.Handle("bench.makeBigFile", j.Empty, j.BigFileResult, _ => new ValueTask<BigFileResult>(MakeBigFileAsync()));
         b.Handle("tasks.list", j.Empty, j.TaskSummaryArray, _ => SampleTasks.Load());
         b.Handle("fs.read", j.ReadFileRequest, j.ReadFileResult, r => new ValueTask<ReadFileResult>(ReadFileAsync(r)));

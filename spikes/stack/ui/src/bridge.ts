@@ -12,6 +12,7 @@ interface Requests {
   'metrics.get': { req: Empty; res: Metrics };
   'bench.echo': { req: { n: number; s: string }; res: { n: number; s: string } };
   'bench.makeBigFile': { req: Empty; res: { path: string; bytes: number } };
+  'bench.report': { req: { line: string }; res: Ack };
   'tasks.list': { req: Empty; res: TaskSummary[] };
   'fs.read': { req: { path: string }; res: ReadFileResult };
   'pty.start': { req: { cols: number; rows: number }; res: { attached: boolean; pid: number } };

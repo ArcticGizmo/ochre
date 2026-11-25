@@ -6,6 +6,9 @@ import { on, request } from './bridge';
 // One terminal for the page's lifetime; the host owns the PTY and keeps it alive across windows.
 export const latency = { samples: [] as number[], pendingSince: 0 };
 
+/** performance.now() when xterm last finished parsing a chunk; lets the bench time rendering, not just delivery. */
+export const parsed = { lastAt: 0 };
+
 let term: Terminal | null = null;
 let fit: FitAddon | null = null;
 let serializer: SerializeAddon | null = null;
@@ -30,7 +33,7 @@ export function mountTerminal(container: HTMLElement): void {
         if (latency.samples.length > 200) latency.samples.shift();
         latency.pendingSince = 0;
       }
-      term!.write(data);
+      term!.write(data, () => (parsed.lastAt = performance.now()));
     });
     on('pty.exit', ({ code }) => term!.write(`\r\n[process exited with ${code}]\r\n`));
 

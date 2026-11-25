@@ -21,6 +21,7 @@ public sealed record PtyOutput(string Data);
 public sealed record PtyExit(int Code);
 
 public sealed record BigFileResult(string Path, long Bytes);
+public sealed record BenchReport(string Line);
 
 public sealed record Metrics(string Shell, double ColdStartMs, double? LastWindowOpenMs, double HostWorkingSetMb);
 
@@ -43,5 +44,6 @@ public sealed record Metrics(string Shell, double ColdStartMs, double? LastWindo
 [JsonSerializable(typeof(PtyOutput))]
 [JsonSerializable(typeof(PtyExit))]
 [JsonSerializable(typeof(BigFileResult))]
+[JsonSerializable(typeof(BenchReport))]
 [JsonSerializable(typeof(Metrics))]
 public sealed partial class BridgeJson : JsonSerializerContext;

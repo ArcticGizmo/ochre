@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="Shell.Avalonia/Shell.Avalonia.csproj" />
   <Project Path="Shell.WebView2/Shell.WebView2.csproj" />
   <Project Path="Spike.Core/Spike.Core.csproj" />
 </Solution>

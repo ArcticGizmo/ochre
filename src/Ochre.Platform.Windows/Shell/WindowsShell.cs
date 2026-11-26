@@ -130,7 +130,8 @@ public sealed class WindowsShell : IShell, IShellDevTools
         private readonly IUrlOpener _urls;
         private readonly NotifyIcon _tray;
         private readonly Control _invoker = new();
-        private readonly Icon _icon = AppIcon.Create();
+        private readonly Icon _trayIcon = AppIcon.Tray();
+        private readonly Icon _windowIcon = AppIcon.Window();
         private readonly WindowLayoutStore? _layout;
         private readonly System.Windows.Forms.Timer _saveTimer = new() { Interval = 1000 };
         private readonly Lock _writeGate = new();
@@ -166,7 +167,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
             menu.Items.Add("Open Ochre", null, (_, _) => OpenWindow());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Quit", null, (_, _) => Quit());
-            _tray = new NotifyIcon { Icon = _icon, Text = options.Title, ContextMenuStrip = menu, Visible = true };
+            _tray = new NotifyIcon { Icon = _trayIcon, Text = options.Title, ContextMenuStrip = menu, Visible = true };
             _tray.MouseClick += (_, e) =>
             {
                 if (e.Button == MouseButtons.Left) OpenWindow();
@@ -320,7 +321,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
                 null,
                 _options.WebViewDataFolder,
                 new CoreWebView2EnvironmentOptions(_options.Unattended ? VirtualDesktop.UnthrottledBrowserArguments : null));
-            var window = new MainWindow(_host, _options, _urls, _environment, _icon, $"w{++_nextId}", task, saved, activate);
+            var window = new MainWindow(_host, _options, _urls, _environment, _windowIcon, $"w{++_nextId}", task, saved, activate);
             if (jump) window.ShowJump(loaded: false);
             window.ClosingFor += reason =>
             {
@@ -435,7 +436,8 @@ public sealed class WindowsShell : IShell, IShellDevTools
                 _saveTimer.Dispose();
                 _tray.Dispose();
                 _invoker.Dispose();
-                _icon.Dispose();
+                _trayIcon.Dispose();
+                _windowIcon.Dispose();
             }
             base.Dispose(disposing);
         }

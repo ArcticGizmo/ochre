@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Rasterises ochre.svg into every icon asset the app and the README use. Run tools/gen-icons.cmd after editing the
+    SVG and commit what it writes. Kept out of Ochre.slnx so the app never depends on the SVG renderer.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Ochre.IconGen</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="Svg.Skia" />
+  </ItemGroup>
+</Project>

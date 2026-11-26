@@ -192,13 +192,13 @@ public sealed class ToastNotifier : IDesktopNotifier
 
     private string LogoPath(string name) => Path.Combine(_logos, $"logo-{name}.png");
 
-    // Ochre's status colours as round logos, drawn once at start until there are real icon assets.
+    // The app's own logo for the notification identity, and Ochre's status colours as round logos on each notification.
     private void WriteLogos()
     {
+        Shell.AppIcon.WriteLogo(LogoPath("app"));
         (string Name, Color Color)[] logos =
         [
-            ("app", Color.FromArgb(0xcc, 0x77, 0x22)),
-            ("needs", Color.FromArgb(0xd9, 0xb4, 0x4a)),
+            ("needs",Color.FromArgb(0xd9, 0xb4, 0x4a)),
             ("finished", Color.FromArgb(0x86, 0xb5, 0x72)),
             ("failed", Color.FromArgb(0xe0, 0x6c, 0x5a)),
             ("waiting", Color.FromArgb(0xa3, 0x9d, 0x96)),

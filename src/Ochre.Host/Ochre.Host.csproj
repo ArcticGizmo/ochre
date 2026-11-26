@@ -5,6 +5,7 @@
     <AssemblyName>ochre</AssemblyName>
     <RootNamespace>Ochre.Host</RootNamespace>
     <Version>0.1.0</Version>
+    <ApplicationIcon>..\Ochre.Platform.Windows\Assets\ochre.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ochre.Core\Ochre.Core.csproj" />

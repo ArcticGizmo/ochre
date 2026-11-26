@@ -9,4 +9,9 @@
     <PackageReference Include="Microsoft.Web.WebView2" />
     <ProjectReference Include="..\Ochre.Core\Ochre.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Rendered from ochre.svg by tools/gen-icons.cmd; regenerate rather than edit. -->
+    <EmbeddedResource Include="Assets\ochre.ico" LogicalName="Ochre.Assets.ochre.ico" />
+    <EmbeddedResource Include="Assets\ochre-256.png" LogicalName="Ochre.Assets.ochre-256.png" />
+  </ItemGroup>
 </Project>

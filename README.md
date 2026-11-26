@@ -1,10 +1,13 @@
-# Ochre
+<h1 align="center">Ochre</h1>
+<p align="center">
+ <img src="./docs/assets/ochre-icon.png" width="150" alt="Ochre logo" />
+</p>
 
-*ochre: an earth pigment, among the oldest colours people have used.*
+<p align="center"><em>ochre: an earth pigment, among the oldest colours people have used.</em></p>
 
 Ochre is a task-first **agent development environment** (ADE) for Claude Code. It is a command center where the durable unit of work is the **task**, not the agent session. Sessions, worktrees, terminals, PRs and Jira issues attach to a task, come and go, and the task remembers where you got to.
 
-> **Status:** M0 (stack spike) settled the stack: a .NET 10 host with the UI in WebView2 ([results](docs/spike-stack-results.md)). M1 (tasks and controlled sessions) and M2 (park, resume, Today, and sessions started outside Ochre) are done. M3, terminal tabs, is next; see [docs/roadmap.md](docs/roadmap.md) and [docs/implementation-plan.md](docs/implementation-plan.md).
+> **Status:** M0 (stack spike) settled the stack: a .NET 10 host with the UI in WebView2 ([results](docs/spike-stack-results.md)). M1 (tasks and controlled sessions), M2 (park, resume, Today, and sessions started outside Ochre), M3 (terminal tabs) and M4 (modules: git and worktrees, sprig, multiple windows) are done, and M5 (attention inbox, notifications and the agent grid) is built with its hand checks open. Next: an installer, then M6 (editor); see [docs/roadmap.md](docs/roadmap.md) and [docs/implementation-plan.md](docs/implementation-plan.md).
 
 ## Why
 

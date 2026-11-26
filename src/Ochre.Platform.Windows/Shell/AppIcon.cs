@@ -1,24 +1,46 @@
-using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 
 namespace Ochre.Platform.Windows.Shell;
 
-/// <summary>A placeholder ochre disc, drawn at runtime until there's a real icon asset.</summary>
-internal static class AppIcon
+/// <summary>
+/// Ochre's icon, from the frames tools/Ochre.IconGen renders out of ochre.svg. Both icons live for the whole process.
+/// </summary>
+internal static partial class AppIcon
 {
+    private const int SmCxSmIcon = 49;
+
     /// <summary>
-    /// The icon lives for the whole process, so its GDI handle is deliberately never destroyed; Windows reclaims it
-    /// at exit.
+    /// The notification area shows a small icon at the system DPI. Handing it the frame drawn for exactly that size
+    /// keeps Windows from shrinking a larger one, which is what blurs tray icons.
     /// </summary>
-    public static Icon Create()
+    public static Icon Tray()
     {
-        using var bitmap = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bitmap))
-        {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.Clear(Color.Transparent);
-            using var fill = new SolidBrush(Color.FromArgb(0xcc, 0x77, 0x22));
-            g.FillEllipse(fill, 2, 2, 28, 28);
-        }
-        return Icon.FromHandle(bitmap.GetHicon());
+        var size = GetSystemMetricsForDpi(SmCxSmIcon, GetDpiForSystem());
+        using var stream = Open("ochre.ico");
+        return new Icon(stream, size, size);
     }
+
+    /// <summary>Every frame, so each window takes the sizes it needs for its own monitor's DPI.</summary>
+    public static Icon Window()
+    {
+        using var stream = Open("ochre.ico");
+        return new Icon(stream);
+    }
+
+    /// <summary>The logo as a 256 px PNG, for places that take an image file rather than an icon.</summary>
+    public static void WriteLogo(string path)
+    {
+        using var stream = Open("ochre-256.png");
+        using var file = File.Create(path);
+        stream.CopyTo(file);
+    }
+
+    private static Stream Open(string name) =>
+        typeof(AppIcon).Assembly.GetManifestResourceStream($"Ochre.Assets.{name}") ?? throw new InvalidOperationException($"missing resource {name}");
+
+    [LibraryImport("user32.dll")]
+    private static partial int GetSystemMetricsForDpi(int index, uint dpi);
+
+    [LibraryImport("user32.dll")]
+    private static partial uint GetDpiForSystem();
 }

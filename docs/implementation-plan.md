@@ -459,6 +459,7 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
 ### Slice 7: exit run
 
 - Walk the exit criterion by hand, write `docs/testing/m5-testing.md`.
+- Walked 2026-11-26 in a headless dev host with three real agents; every step passed except the outside `claude` one, which needs a `claude` run by hand, so it waits for the user's hand run with real notifications and opening from a focused window. See `docs/testing/m5-testing.md`.
 
 ### Not in M5
 

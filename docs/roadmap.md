@@ -62,14 +62,14 @@ Started early (2026-11-26, at the user's request): the tray brings forward a win
 
 Don't build anything that assumes a single window: per-window UI state (selected task, scroll) lives in the page, and host events go to every window (WindowHost already broadcasts).
 
-## M5: attention inbox and Roost grid
+## M5: attention inbox and Roost grid (exit walked 2026-11-26; hand checks open)
 
 - Inbox of everything needing you, grouped by task: permission prompts, questions, plan approvals, finished turns, observed sessions waiting.
 - Roost-style grid of a task's sessions (interactive if controlled, read-only if observed).
 - Rich desktop notifications for inbox items (grouped by task, with buttons and replies), starting with a spike.
 - Scope set 2026-11-26 with the user: the grid shows one task's agents; a grid across tasks and failed CI in the inbox wait (Later); notifications are in. Plan in [implementation-plan.md](implementation-plan.md), M5; placement in [ADR 0013](decisions/0013-attention-inbox-and-roost.md).
 
-**Exit:** three agents on a task stream side by side in its grid and a permission is answered in a pane; another window's inbox shows a question and a finished turn grouped by task, and answering or opening them clears them everywhere; an outside `claude` linked to the task shows read-only in the grid and in the inbox while it waits; a permission prompt pops a notification that can allow it, and answering inside Ochre takes the notification away; with the `roost` and `notifications` modules off, the inbox still works.
+**Exit:** three agents on a task stream side by side in its grid and a permission is answered in a pane; another window's inbox shows a question and a finished turn grouped by task, and answering or opening them clears them everywhere; an outside `claude` linked to the task shows read-only in the grid and in the inbox while it waits; a permission prompt pops a notification that can allow it, and answering inside Ochre takes the notification away; with the `roost` and `notifications` modules off, the inbox still works. Walked 2026-11-26 in a headless dev host: every step passed except the outside `claude` one, which is left for a hand run with real notifications; see [testing/m5-testing.md](testing/m5-testing.md).
 
 ## M6: editor
 

@@ -30,6 +30,8 @@ internal static class Program
             ["dev", "jump"] => Send(profile, "dev-jump", null, print: true),
             ["dev", "move-window", var window, var desktop] => Send(profile, "dev-move-window", $"{window}\n{desktop}", print: true),
             ["dev", "session-ending"] => Send(profile, "dev-session-ending", null, print: true),
+            ["dev", "notifications"] => Send(profile, "dev-notifications", null, print: true),
+            ["dev", "notify", var tag, var action, .. var inputs] => Send(profile, "dev-notify", string.Join("\n", new[] { tag, action }.Concat(inputs)), print: true),
             ["task", var op, .. var rest] => Task(profile, op, rest),
             _ => Usage(Console.Error, 2),
         };

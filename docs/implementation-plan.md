@@ -420,6 +420,13 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
 - **Privacy**: Windows keeps notifications in its own store, so the body is a short summary (the tool and a shortened command), never a whole command or reply.
 - **Dev profile**: a headless dev host never shows notifications on the user's screen; it logs them and `ochre-cli dev notifications` lists what it would have shown and can press a button, so the module is driven without the screen. `OCHRE_DEV_NOTIFY=1` shows them for real.
 - **Tests**: the host's handling of an action (current item, stale item, wrong action for the kind, unknown id) with `FakeClaude`.
+- Done 2026-11-26; see `docs/testing/m5-notifications-testing.md`. `Ochre.Platform.Windows`, the host and BridgeGen now target `net10.0-windows10.0.19041.0` (run.cmd and cli.cmd follow the new output folder). Decisions made while building:
+  - **Every button is handled in-process** (foreground activation), not as an `ochre:` link, though the spike showed a link works after quit: a link carries no typed text or choice, and the board's items don't outlive the host. Ochre clears its notifications at start and quit instead; see the spike results.
+  - **Acting** goes through Core's `AttentionActions`: a click names only its notification's session; the module maps that to the item it showed, and the action runs only if that item is still listed and the action fits its kind (`allow`/`deny` a permission, `answer` a question by option index, `approve`/`reject` a plan with text, `send` to a finished agent, `dismiss`). A refused click shows a short notification saying why. Six tests in `AttentionBoardTests`.
+  - **In view**: pages report `attention.viewing` (focused, on the inbox, which threads); a session in view in the focused window gets no notification, loses one it had, and its item never pops up later. `AttentionViews` keeps this per window and drops a window when it closes.
+  - **Modules** reach the board, the views, the actions and "show this task" through `IModuleContext.Attention` and `ShowTask`; Open brings a window showing the task to the current desktop.
+  - **Not built**: per-kind settings. The only kind that doesn't notify is an outside session waiting; a setting can come when dogfooding asks.
+  - **Dev runs**: headless records notifications (`RecordingNotifier`) unless `OCHRE_DEV_NOTIFY=1`; `ochre-cli dev notifications` and `dev notify <tag> <action> [key=value]` drive them. Each profile has its own AppUserModelID (`Ochre`, `Ochre.dev`).
 
 ### Slice 5: Roost model
 

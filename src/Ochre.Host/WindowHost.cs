@@ -40,11 +40,11 @@ internal sealed class WindowHost : IWindowHost
         WindowApi.Register(dispatcher, _host, window);
         TaskApi.Register(dispatcher, _host.Tasks, _host.Parking);
         SessionApi.Register(dispatcher, _host.Sessions);
-        AttentionApi.Register(dispatcher, _host.Attention, _host.Sessions);
+        AttentionApi.Register(dispatcher, _host.Attention, _host.Sessions, _host.AttentionViews, window);
         WorktreeApi.Register(dispatcher, _host.Tasks, _host.Modules, _host.Sessions);
         _host.Modules.RegisterBridge(dispatcher);
         CheckAgainstContract(dispatcher);
-        var session = new Session(this, dispatcher, post);
+        var session = new Session(this, dispatcher, post, window);
         lock (_gate) _sessions.Add(session);
         return session;
     }
@@ -76,10 +76,13 @@ internal sealed class WindowHost : IWindowHost
     private void Remove(Session session)
     {
         lock (_gate) _sessions.Remove(session);
+        _host.AttentionViews.Remove(session.Window);
     }
 
-    private sealed class Session(WindowHost owner, BridgeDispatcher dispatcher, Action<string> post) : IWindowSession
+    private sealed class Session(WindowHost owner, BridgeDispatcher dispatcher, Action<string> post, IShellWindow window) : IWindowSession
     {
+        public IShellWindow Window => window;
+
         public void Post(string message) => post(message);
 
         public Task ReceiveAsync(string? message) => dispatcher.DispatchAsync(message);

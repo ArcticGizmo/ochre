@@ -27,6 +27,21 @@ interface Thread {
   parkNote: string | null;
 }
 
+function useWindowFocus(): boolean {
+  const [focused, setFocused] = useState(() => document.hasFocus());
+  useEffect(() => {
+    const on = () => setFocused(true);
+    const off = () => setFocused(false);
+    window.addEventListener('focus', on);
+    window.addEventListener('blur', off);
+    return () => {
+      window.removeEventListener('focus', on);
+      window.removeEventListener('blur', off);
+    };
+  }, []);
+  return focused;
+}
+
 export function App() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
@@ -79,6 +94,13 @@ export function App() {
   useEffect(() => {
     if (windowKnown) request('window.setTask', { task: shownTask }).catch(() => {});
   }, [windowKnown, shownTask]);
+
+  // What this window has in front of the user, so a desktop notification stays quiet about it.
+  const focused = useWindowFocus();
+  const viewedSession = view === 'today' ? (thread?.sessionId ?? null) : view === 'tasks' ? taskThread : null;
+  useEffect(() => {
+    request('attention.viewing', { focused, inbox: view === 'inbox', sessionIds: viewedSession ? [viewedSession] : [] }).catch(() => {});
+  }, [focused, view, viewedSession]);
 
   const shownTitle = tasks.find((t) => t.id === shownTask)?.title;
   useEffect(() => {

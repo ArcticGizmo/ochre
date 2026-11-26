@@ -80,6 +80,12 @@ export interface AttentionSnapshot {
   needsYou: number;
 }
 
+export interface AttentionViewingRequest {
+  focused: boolean;
+  inbox: boolean;
+  sessionIds: string[];
+}
+
 export interface BindSessionRequest {
   id: string;
   taskId: string;
@@ -710,6 +716,7 @@ export interface Requests {
   'attention.list': { req: Empty; res: AttentionSnapshot };
   'attention.seen': { req: AttentionSeenRequest; res: Ack };
   'attention.dismiss': { req: AttentionItemRequest; res: Ack };
+  'attention.viewing': { req: AttentionViewingRequest; res: Ack };
   'worktrees.providers': { req: Empty; res: WorktreeProviderDto[] };
   'worktrees.plan': { req: WorktreeRequest; res: WorktreePlanDto };
   'worktrees.create': { req: WorktreeRequest; res: WorktreeDto };

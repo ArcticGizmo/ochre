@@ -8,7 +8,7 @@ setlocal
 set "RUN_ROOT=%~dp0"
 set "RUN_LOG=%TEMP%\ochre-run-build.log"
 set "RUN_CLI=%RUN_ROOT%src\Ochre.Cli\bin\Debug\net10.0\ochre-cli.exe"
-set "RUN_HOST=%RUN_ROOT%src\Ochre.Host\bin\Debug\net10.0-windows\ochre.exe"
+set "RUN_HOST=%RUN_ROOT%src\Ochre.Host\bin\Debug\net10.0-windows10.0.19041.0\ochre.exe"
 if /i "%~1"=="-NoBuild" goto start
 if not "%~1"=="" goto usage
 

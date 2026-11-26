@@ -23,9 +23,14 @@ The WinRT path only: `Windows.UI.Notifications.ToastNotificationManager` from a 
 | A shown notification that isn't acted on | Raises `Dismissed` with `TimedOut` when it moves to the centre; the process should ignore it |
 | Output size | `Microsoft.Windows.SDK.NET.dll` adds 23.7 MB and `WinRT.Runtime.dll` 0.5 MB to the output |
 
+## A click after the process has quit
+
+Checked 2026-11-26: with buttons as `ochre-spike:` links, clicking Allow on a notification left in the notification centre after `quit` started a new spike process with the link (`protocol launch ... url=ochre-spike:allow?item=s-builder` in the log). Neither CrowdStrike nor Defender objected. So a protocol link reaches Ochre whether it's running or not, with no COM activator (`LocalServer32`) registered.
+
+Slice 4 doesn't use it, though. A protocol launch carries only the link, not what was typed or chosen, so the reply box, the plan feedback and a question's choice need foreground (in-process) activation anyway. And the attention board keeps no items across a restart (ADR 0013), so a click that starts Ochre would name an item that no longer exists. Instead, every button is foreground, and Ochre clears its notifications when it quits and when it starts; a notification left by a crash does nothing when clicked and is cleared at the next start. The protocol route stays available for a later "open Ochre at this task" link.
+
 ## Not yet checked
 
-- **A click after the process has quit** (protocol activation, `ochre-spike:`). The key was registered but no click was tried. This decides slice 4's design: if a protocol launch works and the endpoint protection on this machine accepts it, every button can be a protocol link that the new `ochre` process forwards to the running host over the existing instance pipe, so clicks work whether Ochre is running or not and no COM activator (`LocalServer32`) is ever registered. If not, buttons stay in-process (foreground activation) and a click after quit does nothing.
 - **Clicking from the notification centre** rather than the pop-up, while running.
 - **`urgent` against `reminder`**, and whether either gets through Do Not Disturb.
 - **The reply box on a finished turn** (`f`, Send). Same mechanism as the plan's feedback box, which worked, so low risk.

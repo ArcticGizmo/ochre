@@ -47,14 +47,16 @@ internal static class Program
         log.Info($"starting {AppInfoProvider.Version} profile={(profile.IsDefault ? "default" : profile.Name)}");
 
         var urls = new UrlOpener();
+        var shellOptions = ShellOptionsFor(profile, paths, log);
+        using var notifier = NotifierFor(profile, paths, shellOptions, log);
         var services = new Dictionary<Type, object>
         {
             [typeof(Ochre.Core.Platform.ITerminalPlatform)] = new Ochre.Platform.Windows.Terminals.ConPtyPlatform(),
             [typeof(Ochre.Core.Platform.IDataProtector)] = new DataProtector(),
             [typeof(Ochre.Core.Platform.IUrlOpener)] = urls,
+            [typeof(Ochre.Core.Platform.IDesktopNotifier)] = notifier,
         };
         using var host = new OchreHost(profile, paths, log, urls, services);
-        var shellOptions = ShellOptionsFor(profile, paths, log);
         var shell = new WindowsShell(host.Windows, shellOptions, urls);
         host.Attach(shell);
         host.RegistersHotkeys = !shellOptions.Unattended;
@@ -74,14 +76,14 @@ internal static class Program
                 log.Error("shutdown handling failed", ex);
             }
         };
-        instance.Listen((cmd, arg) => cmd == "agent" ? agents.HandleAsync(AgentRequest.Parse(arg)) : HandleCommand(shell, host, profile, cmd, arg));
+        instance.Listen((cmd, arg) => cmd == "agent" ? agents.HandleAsync(AgentRequest.Parse(arg)) : HandleCommand(shell, host, profile, notifier, cmd, arg));
 
         shell.Run(openWindow);
         log.Info(host.RestartRequested ? "stopped; restarting" : "stopped");
         return host.RestartRequested;
     }
 
-    private static async Task<string> HandleCommand(WindowsShell shell, OchreHost host, OchreProfile profile, string command, string? argument)
+    private static async Task<string> HandleCommand(WindowsShell shell, OchreHost host, OchreProfile profile, Ochre.Core.Platform.IDesktopNotifier notifier, string command, string? argument)
     {
         switch (command)
         {
@@ -116,6 +118,15 @@ internal static class Program
                 var (moveWindow, desktop) = DevTarget(argument);
                 if (moveWindow is null || !Guid.TryParse(desktop, out var desktopId)) return "error: expected a window id and a desktop guid";
                 return await ((IShellDevTools)shell).MoveWindowAsync(moveWindow, desktopId).ConfigureAwait(false);
+            case "dev-notifications":
+                return notifier is RecordingNotifier recorded ? recorded.Describe() : "error: notifications are real in this run (not headless, or OCHRE_DEV_NOTIFY=1)";
+            case "dev-notify" when argument is not null:
+                if (notifier is not RecordingNotifier recorder) return "error: notifications are real in this run";
+                // tag, action, then key=value inputs, one per line.
+                var lines = argument.Split('\n');
+                if (lines.Length < 2) return "error: expected a tag and an action";
+                var inputs = lines.Skip(2).Select(l => l.Split('=', 2)).Where(p => p.Length == 2).ToDictionary(p => p[0], p => p[1], StringComparer.Ordinal);
+                return recorder.Press(lines[0], lines[1], inputs);
             case "dev-session-ending":
                 // What Windows' shutdown request does, without shutting down; the cancel check runs as it would.
                 host.Modules.SessionEnding();
@@ -152,6 +163,16 @@ internal static class Program
         return (null, argument);
     }
 #endif
+
+    // A headless dev run is driven by tests while the user works, so its notifications are recorded rather than shown
+    // unless OCHRE_DEV_NOTIFY=1 asks for real ones. Each profile has its own identity, so dev notifications never look
+    // like the installed Ochre's.
+    private static Ochre.Core.Platform.IDesktopNotifier NotifierFor(OchreProfile profile, OchrePaths paths, ShellOptions options, AppLog log)
+    {
+        if (options.Headless && Environment.GetEnvironmentVariable("OCHRE_DEV_NOTIFY") != "1") return new RecordingNotifier(log.Info);
+        var aumid = profile.IsDefault ? "Ochre" : $"Ochre.{profile.Name}";
+        return new Ochre.Platform.Windows.Notifications.ToastNotifier(aumid, options.Title, Path.Combine(paths.LocalRoot, "notifications"), log.Info);
+    }
 
     private static ShellOptions ShellOptionsFor(OchreProfile profile, OchrePaths paths, AppLog log)
     {

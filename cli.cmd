@@ -11,7 +11,7 @@ rem The build log is only shown when the build fails, so a working build doesn't
 set "CLI_LOG=%TEMP%\ochre-cli-build.log"
 dotnet build "%CLI_ROOT%src\Ochre.Cli\Ochre.Cli.csproj" -nologo -v q > "%CLI_LOG%" 2>&1
 if errorlevel 1 goto failed
-set "OCHRE_HOST_EXE=%CLI_ROOT%src\Ochre.Host\bin\Debug\net10.0-windows\ochre.exe"
+set "OCHRE_HOST_EXE=%CLI_ROOT%src\Ochre.Host\bin\Debug\net10.0-windows10.0.19041.0\ochre.exe"
 "%CLI_ROOT%src\Ochre.Cli\bin\Debug\net10.0\ochre-cli.exe" %*
 endlocal & exit /b %ERRORLEVEL%
 

@@ -41,6 +41,7 @@ public static class BridgeContract
         new("attention.list", typeof(Empty), typeof(AttentionSnapshot)),
         new("attention.seen", typeof(AttentionSeenRequest), typeof(Ack)),
         new("attention.dismiss", typeof(AttentionItemRequest), typeof(Ack)),
+        new("attention.viewing", typeof(AttentionViewingRequest), typeof(Ack)),
         new("worktrees.providers", typeof(Empty), typeof(IReadOnlyList<WorktreeProviderDto>)),
         new("worktrees.plan", typeof(WorktreeRequest), typeof(WorktreePlanDto)),
         new("worktrees.create", typeof(WorktreeRequest), typeof(WorktreeDto)),

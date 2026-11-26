@@ -36,6 +36,7 @@ internal sealed class OchreHost : IDisposable
             Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.update", SessionApi.Update(session, changes), AppJson.Default.SessionUpdateEvent));
         Sessions.ListChanged += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.changed", new Empty(), AppJson.Default.Empty));
         Attention = new AttentionBoard(Sessions);
+        AttentionActions = new AttentionActions(Attention, Sessions);
         Attention.Changed += () =>
         {
             var snapshot = AttentionApi.Snapshot(Attention, Sessions);
@@ -49,7 +50,8 @@ internal sealed class OchreHost : IDisposable
         Modules = new ModuleHost(
             ModuleCatalog.Create(),
             Settings.ModuleEnabled,
-            new ModuleKernel(log, paths.LocalRoot, Tasks, Sessions, ledger, services, Windows.Broadcast));
+            new ModuleKernel(log, paths.LocalRoot, Tasks, Sessions, ledger, services, Windows.Broadcast,
+                new AttentionKernel(Attention, AttentionViews, AttentionActions), ShowTask));
         Modules.StartAll();
     }
 
@@ -71,6 +73,8 @@ internal sealed class OchreHost : IDisposable
     public TaskStore Tasks { get; }
     public SessionManager Sessions { get; }
     public AttentionBoard Attention { get; }
+    public AttentionViews AttentionViews { get; } = new();
+    public AttentionActions AttentionActions { get; }
     public IShell? Shell { get; private set; }
 
     /// <summary>Set when the user asked to restart (to apply module changes); Program starts a new host after this one exits.</summary>
@@ -80,6 +84,18 @@ internal sealed class OchreHost : IDisposable
     {
         Shell = shell;
         shell.SetTrayStatus(TrayStatus(Attention.Items.Count(i => i.NeedsYou)));
+    }
+
+    // A notification was clicked: show its task where the user is, bringing a window from another desktop if one shows it.
+    private void ShowTask(string? taskId)
+    {
+        if (Shell is not { } shell) return;
+        if (taskId is null || Tasks.Get(taskId) is null)
+        {
+            shell.OpenWindow();
+            return;
+        }
+        _ = shell.OpenTaskAsync(taskId, OpenTaskChoice.Bring, null);
     }
 
     private static string? TrayStatus(int needsYou) => needsYou switch

@@ -62,13 +62,28 @@ public sealed record AttentionSeenRequest(string SessionId);
 
 public sealed record AttentionItemRequest(string Id);
 
+/// <param name="Focused">The window has focus.</param>
+/// <param name="Inbox">It shows the inbox, which counts as having every item in view.</param>
+/// <param name="SessionIds">The sessions whose threads it shows.</param>
+public sealed record AttentionViewingRequest(bool Focused, bool Inbox, IReadOnlyList<string> SessionIds);
+
 /// <summary>The attention inbox's messages (ADR 0013). The page says what the user has in front of them; the board
 /// decides what that clears.</summary>
 internal static class AttentionApi
 {
-    public static void Register(BridgeDispatcher bridge, AttentionBoard board, SessionManager sessions)
+    private const int MaxViewed = 16;
+
+    /// <param name="window">This bridge's window, the key its view is kept under.</param>
+    public static void Register(BridgeDispatcher bridge, AttentionBoard board, SessionManager sessions, AttentionViews views, object window)
     {
         var j = AppJson.Default;
+
+        bridge.Handle("attention.viewing", j.AttentionViewingRequest, j.Ack, r =>
+        {
+            if (r.SessionIds.Count > MaxViewed || r.SessionIds.Any(id => id.Length > 64)) throw new BridgeRejectException("too many sessions");
+            views.Set(window, r.Focused, r.Inbox, r.SessionIds);
+            return new Ack();
+        });
 
         bridge.Handle("attention.list", j.Empty, j.AttentionSnapshot, _ => Snapshot(board, sessions));
 

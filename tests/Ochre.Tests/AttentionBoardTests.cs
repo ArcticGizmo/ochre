@@ -228,6 +228,120 @@ public sealed class AttentionBoardTests : IDisposable
         Assert.Equal(1, raised);
     }
 
+    // --- Acting from outside a window (notification buttons) ---------------------------------------------------------
+
+    private static string Ask(string requestId, string tool, string inputJson) =>
+        $$"""{"type":"control_request","request_id":"{{requestId}}","request":{"subtype":"can_use_tool","tool_name":"{{tool}}","description":"","input":""" + inputJson + "}}";
+
+    private const string Colours = """{"questions":[{"question":"Which colour?","header":"Colour","multiSelect":false,"options":[{"label":"Red","description":""},{"label":"Green","description":""}]}]}""";
+
+    private async Task<(LiveSession Session, FakeClaudeProcess Process, AttentionItem Item)> Waiting(string line)
+    {
+        var (s, p) = await Start();
+        p.Emit(line);
+        Until(() => Locked(s, c => c.PendingPermission is not null), "the prompt");
+        return (s, p, Assert.Single(Items()));
+    }
+
+    private static IReadOnlyList<System.Text.Json.Nodes.JsonNode?> Answers(FakeClaudeProcess p) =>
+        p.Sent.Where(n => (string?)n["type"] == "control_response").Select(n => n["response"]?["response"]).ToList();
+
+    private static readonly Dictionary<string, string> NoInputs = [];
+
+    [Fact]
+    public async Task An_action_on_a_current_permission_reaches_the_agent_once()
+    {
+        var (_, p, item) = await Waiting(StreamJson.AskPermission("req-1", "git push"));
+        var actions = new AttentionActions(_board, _sessions);
+
+        Assert.Null(actions.Act(item.Id, AttentionActions.Allow, NoInputs));
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Allow, NoInputs));   // a second click on the same notification
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Deny, NoInputs));
+
+        Assert.Equal("allow", (string?)Assert.Single(Answers(p))?["behavior"]);
+    }
+
+    [Fact]
+    public async Task Unknown_ids_and_actions_that_do_not_fit_the_kind_do_nothing()
+    {
+        var (s, p, item) = await Waiting(StreamJson.AskPermission("req-1", "git push"));
+        var actions = new AttentionActions(_board, _sessions);
+
+        Assert.NotNull(actions.Act("not-an-item", AttentionActions.Allow, NoInputs));
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Send, new Dictionary<string, string> { [AttentionActions.TextInput] = "hello" }));
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Approve, NoInputs));
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Dismiss, NoInputs));
+        Assert.NotNull(actions.Act(item.Id, "rm -rf", NoInputs));
+
+        Assert.Empty(Answers(p));
+        Assert.Equal(["go"], p.Prompts);
+        Assert.NotNull(Locked(s, c => c.PendingPermission));
+    }
+
+    [Fact]
+    public async Task A_question_is_answered_by_the_index_of_a_listed_option()
+    {
+        var (_, p, item) = await Waiting(Ask("req-q", "AskUserQuestion", Colours));
+        var actions = new AttentionActions(_board, _sessions);
+
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Answer, new Dictionary<string, string> { [AttentionActions.ChoiceInput] = "7" }));
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Answer, new Dictionary<string, string> { [AttentionActions.ChoiceInput] = "Green" }));
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Answer, NoInputs));
+        Assert.Empty(Answers(p));
+
+        Assert.Null(actions.Act(item.Id, AttentionActions.Answer, new Dictionary<string, string> { [AttentionActions.ChoiceInput] = "1" }));
+        var answer = Assert.Single(Answers(p));
+        Assert.Equal("Green", (string?)answer?["updatedInput"]?["answers"]?["Which colour?"]);
+    }
+
+    [Fact]
+    public async Task A_plan_is_rejected_with_the_feedback_typed_on_the_notification()
+    {
+        var (_, p, item) = await Waiting(Ask("req-p", "ExitPlanMode", """{"plan":"1. Do it"}"""));
+        var actions = new AttentionActions(_board, _sessions);
+
+        Assert.Null(actions.Act(item.Id, AttentionActions.Reject, new Dictionary<string, string> { [AttentionActions.TextInput] = " Add a test first. " }));
+
+        var answer = Assert.Single(Answers(p));
+        Assert.Equal(("deny", "Add a test first."), ((string?)answer?["behavior"], (string?)answer?["message"]));
+    }
+
+    [Fact]
+    public async Task A_reply_to_a_finished_agent_is_sent_as_its_next_prompt()
+    {
+        var (s, p) = await Start();
+        FinishTurn(s, p, "Done.");
+        var item = Assert.Single(Items());
+        var actions = new AttentionActions(_board, _sessions);
+
+        Assert.NotNull(actions.Act(item.Id, AttentionActions.Send, new Dictionary<string, string> { [AttentionActions.TextInput] = "   " }));
+        Assert.Null(actions.Act(item.Id, AttentionActions.Send, new Dictionary<string, string> { [AttentionActions.TextInput] = "Now the docs." }));
+
+        Assert.Equal(["go", "Now the docs."], p.Prompts);
+        Assert.Empty(Items());
+    }
+
+    [Fact]
+    public void Views_count_only_the_focused_window()
+    {
+        var views = new AttentionViews();
+        var left = new object();
+        var right = new object();
+
+        views.Set(left, focused: false, inbox: true, ["a"]);
+        Assert.False(views.InView("a"));
+
+        views.Set(right, focused: true, inbox: false, ["b"]);
+        Assert.True(views.InView("b"));
+        Assert.False(views.InView("a"));
+
+        views.Set(right, focused: true, inbox: true, []);
+        Assert.True(views.InView("a"));   // the inbox shows everything
+
+        views.Remove(right);
+        Assert.False(views.InView("a"));
+    }
+
     public void Dispose()
     {
         _board.Dispose();

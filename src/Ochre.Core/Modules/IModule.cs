@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization.Metadata;
+using Ochre.Core.Attention;
 using Ochre.Core.Bridge;
 using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
@@ -42,6 +43,12 @@ internal interface IModuleContext
     SessionManager Sessions { get; }
 
     SessionLedger Ledger { get; }
+
+    /// <summary>The attention inbox (ADR 0013). Throws on a host without one.</summary>
+    AttentionKernel Attention { get; }
+
+    /// <summary>Brings up a window on the current desktop showing <paramref name="taskId"/>, or any window for null.</summary>
+    void ShowTask(string? taskId);
 
     /// <summary>A platform service by its Core interface (<c>ITerminalPlatform</c>, <c>IDataProtector</c>, ...).</summary>
     T Service<T>()

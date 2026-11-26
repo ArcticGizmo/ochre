@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <AssemblyName>ochre</AssemblyName>
     <RootNamespace>Ochre.Host</RootNamespace>
     <Version>0.1.0</Version>
@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\modules\Ochre.Modules.ShutdownPark\Ochre.Modules.ShutdownPark.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Git\Ochre.Modules.Git.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Sprig\Ochre.Modules.Sprig.csproj" />
+    <ProjectReference Include="..\..\modules\Ochre.Modules.Notifications\Ochre.Modules.Notifications.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ochre.BridgeGen" />

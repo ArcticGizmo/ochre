@@ -72,6 +72,7 @@ public sealed record OpenUrlRequest(string Url, bool NewWindow);
 [JsonSerializable(typeof(AttentionSnapshot))]
 [JsonSerializable(typeof(AttentionSeenRequest))]
 [JsonSerializable(typeof(AttentionItemRequest))]
+[JsonSerializable(typeof(AttentionViewingRequest))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity, window lifecycle and settings.</summary>

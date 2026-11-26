@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization.Metadata;
+using Ochre.Core.Attention;
 using Ochre.Core.Bridge;
 using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
@@ -10,6 +11,8 @@ namespace Ochre.Core.Modules;
 internal sealed record ModuleState(string Id, string Name, string Description, bool Enabled, bool Running, string? Error);
 
 /// <summary>What the kernel hands every module (ADR 0012).</summary>
+/// <param name="Attention">The attention inbox, for modules that consume it; null where the host has none (tests).</param>
+/// <param name="ShowTask">Brings up a window showing a task (or any window, for null) on the current desktop.</param>
 internal sealed record ModuleKernel(
     AppLog Log,
     string DataRoot,
@@ -17,7 +20,12 @@ internal sealed record ModuleKernel(
     SessionManager Sessions,
     SessionLedger Ledger,
     IReadOnlyDictionary<Type, object> Services,
-    Action<string> Broadcast);
+    Action<string> Broadcast,
+    AttentionKernel? Attention = null,
+    Action<string?>? ShowTask = null);
+
+/// <summary>The attention inbox as a module sees it (ADR 0013): the items, what's on screen, and acting on an item.</summary>
+internal sealed record AttentionKernel(AttentionBoard Board, AttentionViews Views, AttentionActions Actions);
 
 /// <summary>
 /// Starts the modules that are switched on, after the kernel, and stops them in reverse on quit. A module that
@@ -136,6 +144,10 @@ internal sealed class ModuleHost : IDisposable
         public TaskStore Tasks => kernel.Tasks;
         public SessionManager Sessions => kernel.Sessions;
         public SessionLedger Ledger => kernel.Ledger;
+
+        public AttentionKernel Attention => kernel.Attention ?? throw new InvalidOperationException("this host has no attention inbox");
+
+        public void ShowTask(string? taskId) => kernel.ShowTask?.Invoke(taskId);
 
         public T Service<T>()
             where T : class =>

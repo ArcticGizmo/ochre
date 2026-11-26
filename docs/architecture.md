@@ -86,10 +86,10 @@ First-party features are modules built against the same contracts as plugins. Tu
 
 ## Terminal
 
-- ConPTY owned by the host; bytes streamed to xterm.js.
-- **Restore** (first): tabs, cwd, scrollback and launch command persist; on reopen the shell is relaunched with the old scrollback shown.
-- **Persist** comes free while the tray runs (the host owns the PTYs); nothing survives a reboot.
-- Gate dangerous escape sequences (OSC 52 clipboard write, OSC 8 links with odd schemes).
+- ConPTY owned by the host (`ITerminalPlatform`); output filtered, coalesced every 16 ms, kept as scrollback and sent to every window with a sequence number ([ADR 0011](decisions/0011-host-owned-terminals.md)). xterm.js only draws.
+- **Restore**: tabs, folder, task, scrollback (DPAPI-encrypted, per-tab opt-out) and startup command persist in `terminals\`; on the next start each shell is relaunched below its old scrollback, and the startup command is offered, not run.
+- **Persist** comes free while the tray runs (the host owns the PTYs); quitting ends the shells and what runs in them.
+- `TerminalOutputFilter` gates escape sequences on the host: OSC 52 and unknown OSCs dropped, OSC 8 only for http(s).
 
 ## Widgets and plugins
 

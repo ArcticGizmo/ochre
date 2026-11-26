@@ -235,6 +235,7 @@ Planned 2026-11-26. Perch has no terminal code, so everything here is new or lif
 ### Slice 4: exit run
 
 - Walk the exit criterion by hand, write `docs/testing/m3-testing.md`.
+- Done 2026-11-26; see `docs/testing/m3-testing.md`.
 
 ### Not in M3
 

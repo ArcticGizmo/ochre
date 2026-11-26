@@ -30,14 +30,14 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 
 **Exit:** park two tasks at night; next morning "Today" shows both with notes; one click resumes a session with its context.
 
-## M3: terminal tabs
+## M3: terminal tabs (done 2026-11-26)
 
 - ConPTY in the host, xterm.js tabs, restore (tabs, cwd, scrollback, command).
 - Terminals attachable to a task.
 - Escape-sequence gating.
-- To look at (2026-11-25): a "view as terminal" option on an agent's thread, drawing the same conversation in Claude Code's terminal style. A real Claude TUI in a tab can't drive the same session at once, because Ochre holds it over stream-json, so this is a rendering of the thread rather than a second client.
+- To look at (2026-11-25): a "view as terminal" option on an agent's thread, drawing the same conversation in Claude Code's terminal style. A real Claude TUI in a tab can't drive the same session at once, because Ochre holds it over stream-json, so this is a rendering of the thread rather than a second client. Not built in M3; waits for dogfooding to ask for it.
 
-**Exit:** run a dev server in a tab, close all windows, reopen: still running. Quit and relaunch: tabs restored with scrollback.
+**Exit:** run a dev server in a tab, close all windows, reopen: still running. Quit and relaunch: tabs restored with scrollback. Met: see [testing/m3-testing.md](testing/m3-testing.md). The host owns terminals and filters their output ([ADR 0011](decisions/0011-host-owned-terminals.md)); scrollback is saved encrypted with DPAPI; a startup command is offered again after a restart, never rerun by itself.
 
 ## M4: module host and first modules
 

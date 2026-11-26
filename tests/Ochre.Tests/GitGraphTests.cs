@@ -1,0 +1,608 @@
+using Ochre.Core.Git;
+using Ochre.Core.Git.Graph;
+using Xunit;
+
+namespace Ochre.Tests;
+
+/// <summary>
+/// The git graph's read model: the log/ref parsers on canned git output, and the lane allocator on hand-built
+/// histories. Commits are listed in topological order (children first), as <c>git log --topo-order</c> emits them.
+/// </summary>
+public class GitGraphTests
+{
+    private const char Us = '\u001f';
+
+    private static GraphCommit C(string hash, params string[] parents) => new(hash, parents, "Jon", "jon@x", 0, hash);
+
+    private static LaneAllocator Layout(IReadOnlyList<GraphCommit> commits, string? primary = null)
+    {
+        var a = new LaneAllocator(new LaneAllocator.Options(primary));
+        a.Add(commits);
+        return a;
+    }
+
+    private static GraphEdge E(int from, int to, int color) => new((short)from, (short)to, (short)color);
+
+    // ---- parsers --------------------------------------------------------------------------------------
+
+    [Fact]
+    public void ParseLog_ReadsFieldsAndParents()
+    {
+        var output =
+            $"aaaaaaa1111{Us}bbbbbbb2222 ccccccc3333{Us}Jon Howell{Us}jon@x{Us}1761800000{Us}Merge branch 'feeds'\0" +
+            $"bbbbbbb2222{Us}{Us}Jon Howell{Us}jon@x{Us}1761700000{Us}Root\0";
+        var log = GraphLogReader.ParseLog(output);
+
+        Assert.Equal(2, log.Count);
+        Assert.Equal("aaaaaaa", log[0].ShortHash);
+        Assert.Equal(["bbbbbbb2222", "ccccccc3333"], log[0].Parents);
+        Assert.True(log[0].IsMerge);
+        Assert.Equal("Merge branch 'feeds'", log[0].Subject);
+        Assert.Equal(1761800000, log[0].UnixTime);
+        Assert.Empty(log[1].Parents);
+        // The parent's own hash reuses the child's copy of the string.
+        Assert.Same(log[0].Parents[0], log[1].Hash);
+    }
+
+    [Fact]
+    public void ParseLog_SkipsMalformedRecordsAndKeepsSeparatorsOutOfSubjects()
+    {
+        var output = $"garbage\0aaaaaaa1111{Us}{Us}A{Us}a@x{Us}notatime{Us}x\0bbbbbbb2222{Us}{Us}A{Us}a@x{Us}5{Us}Fix: a\u2014b\n\0";
+        var log = GraphLogReader.ParseLog(output);
+
+        var only = Assert.Single(log);
+        Assert.Equal("Fix: a\u2014b", only.Subject);
+    }
+
+    [Fact]
+    public void ParseRefs_ClassifiesAndPeelsAnnotatedTags()
+    {
+        var output = string.Join('\n',
+            $"1111111{Us}{Us}refs/heads/main",
+            $"2222222{Us}{Us}refs/heads/feature/x",
+            $"1111111{Us}{Us}refs/remotes/origin/main",
+            $"1111111{Us}{Us}refs/remotes/origin/HEAD",
+            $"9999999{Us}3333333{Us}refs/tags/v0.6.1",
+            $"4444444{Us}{Us}refs/tags/light",
+            $"5555555{Us}{Us}refs/stash",
+            $"6666666{Us}{Us}refs/notes/commits",
+            "");
+        var refs = GraphLogReader.ParseRefs(output);
+
+        Assert.Equal(5, refs.Count);
+        Assert.Contains(refs, r => r is { Name: "feature/x", Kind: GraphRefKind.LocalBranch });
+        Assert.Contains(refs, r => r is { Name: "origin/main", Kind: GraphRefKind.RemoteBranch });
+        Assert.DoesNotContain(refs, r => r.Name == "origin/HEAD");
+        Assert.Contains(refs, r => r is { Name: "v0.6.1", Kind: GraphRefKind.Tag, Target: "3333333" });
+        Assert.Contains(refs, r => r is { Name: "light", Target: "4444444" });
+        Assert.DoesNotContain(refs, r => r.Kind == GraphRefKind.Stash); // stashes come from `stash list`
+    }
+
+    [Fact]
+    public void ParseStashes_ReadsEachEntryWithItsBaseCommit()
+    {
+        var output = string.Join('\n',
+            $"aaaaaaa{Us}1111111 2222222 3333333{Us}stash@{{0}}{Us}1700000100{Us}WIP on main: 1111111 subject",
+            $"bbbbbbb{Us}4444444 5555555{Us}stash@{{1}}{Us}1700000000{Us}On feature: my message",
+            $"broken{Us}{Us}stash@{{2}}{Us}x{Us}y",
+            "");
+        var stashes = GraphLogReader.ParseStashes(output);
+
+        Assert.Equal(2, stashes.Count);
+        Assert.Equal(new GraphStash("aaaaaaa", "1111111", "stash@{0}", "WIP on main: 1111111 subject", 1700000100), stashes[0]);
+        Assert.Equal("4444444", stashes[1].Base);
+        Assert.Equal("stash:bbbbbbb", stashes[1].RowHash);
+    }
+
+    [Fact]
+    public void ParseRefs_ReadsEachLocalBranchsUpstreamAndHowFarApartTheyAre()
+    {
+        var output = string.Join('\n',
+            $"1111111{Us}{Us}refs/heads/main{Us}origin/main{Us}",
+            $"2222222{Us}{Us}refs/heads/ahead{Us}origin/ahead{Us}ahead 2",
+            $"3333333{Us}{Us}refs/heads/both{Us}origin/both{Us}ahead 1, behind 4",
+            $"4444444{Us}{Us}refs/heads/gone{Us}origin/gone{Us}gone",
+            $"5555555{Us}{Us}refs/heads/local{Us}{Us}",
+            "");
+        var refs = GraphLogReader.ParseRefs(output).ToDictionary(r => r.Name);
+
+        Assert.True(refs["main"].InSync);
+        Assert.Equal(("origin/ahead", 2, 0), (refs["ahead"].Upstream, refs["ahead"].Ahead, refs["ahead"].Behind));
+        Assert.Equal((1, 4, false), (refs["both"].Ahead, refs["both"].Behind, refs["both"].InSync));
+        Assert.True(refs["gone"].UpstreamGone);
+        Assert.False(refs["gone"].InSync);
+        Assert.Null(refs["local"].Upstream);
+    }
+
+    [Fact]
+    public void LogArgs_PutsExclusionsAfterNot()
+    {
+        Assert.Equal(["HEAD", "main", "--not", "abc^@"], GraphLogReader.GraphLogArgs(new(["HEAD", "main"], ["abc^@"])));
+        Assert.Equal(["--branches", "--remotes", "--tags", "HEAD"], GraphLogReader.GraphLogArgs(GraphLogQuery.Everything));
+    }
+
+    // ---- lane allocator -------------------------------------------------------------------------------
+
+    [Fact]
+    public void Linear_StaysInLaneZero()
+    {
+        var a = Layout([C("c", "b"), C("b", "a"), C("a")]);
+
+        Assert.All(a.Rows, r => Assert.Equal(0, r.Lane));
+        Assert.Empty(a.Rows[0].Up);
+        Assert.Equal([E(0, 0, 0)], a.Rows[1].Up);
+        Assert.Equal([E(0, 0, 0)], a.Rows[2].Up);
+        Assert.Equal(1, a.Width);
+        Assert.Empty(a.OpenEdges);
+    }
+
+    [Fact]
+    public void Branch_ConvergesIntoParentInTheBandAboveIt()
+    {
+        // main: m2 -> m1; feature: f2 -> f1 -> m1. The feature tip is newest.
+        var a = Layout([C("f2", "f1"), C("m2", "m1"), C("f1", "m1"), C("m1")], primary: "m2");
+
+        Assert.Equal([1, 0, 1, 0], a.Rows.Select(r => r.Lane));
+        AssertEdges(a.Rows[1], E(1, 1, 1));
+        AssertEdges(a.Rows[2], E(1, 1, 1), E(0, 0, 0));
+        // The feature lane curves into main at m1, keeping its own colour.
+        AssertEdges(a.Rows[3], E(1, 0, 1), E(0, 0, 0));
+    }
+
+    private static void AssertEdges(GraphRow row, params GraphEdge[] expected)
+    {
+        static IEnumerable<GraphEdge> Sorted(IEnumerable<GraphEdge> e) => e.OrderBy(x => x.From).ThenBy(x => x.To).ThenBy(x => x.Color);
+        Assert.Equal(Sorted(expected), Sorted(row.Up));
+    }
+
+    [Fact]
+    public void Merge_OpensSecondParentLaneJustBelowTheMerge()
+    {
+        var a = Layout([C("m3", "m2", "f1"), C("f1", "m1"), C("m2", "m1"), C("m1")], primary: "m3");
+
+        Assert.Equal([0, 1, 0, 0], a.Rows.Select(r => r.Lane));
+        AssertEdges(a.Rows[1], E(0, 0, 0), E(0, 1, 1));
+        AssertEdges(a.Rows[2], E(0, 0, 0), E(1, 1, 1));
+        AssertEdges(a.Rows[3], E(0, 0, 0), E(1, 0, 1));
+        Assert.Equal(2, a.Width);
+    }
+
+    [Fact]
+    public void Merge_JoinsALaneAlreadyWaitingForTheSecondParent()
+    {
+        // f2 merges main (m2) into the feature while main's own lane is already waiting for m2.
+        var a = Layout([C("m3", "m2"), C("f2", "f1", "m2"), C("m2", "m1"), C("f1", "m1"), C("m1")], primary: "m3");
+
+        Assert.Equal([0, 1, 0, 1, 0], a.Rows.Select(r => r.Lane));
+        Assert.Contains(E(1, 0, 0), a.Rows[2].Up); // the merge's second-parent line joins lane 0
+        Assert.Contains(E(0, 0, 0), a.Rows[2].Up);
+        Assert.Equal(2, a.Width);
+    }
+
+    [Fact]
+    public void Merge_FromThePrimaryBranchHeadsForLaneZero()
+    {
+        // g forks from main's tip m2 (and waits for it in lane 1); then f merges m2 in. The merge line goes
+        // straight to lane 0, where m2 will land, not across into g's lane.
+        var a = Layout([C("g1", "m2"), C("f2", "f1", "m2"), C("m2", "m1"), C("f1", "m1"), C("m1")], primary: "m2");
+
+        Assert.Equal([1, 2, 0, 2, 0], a.Rows.Select(r => r.Lane));
+        AssertEdges(a.Rows[2], E(1, 0, 1), E(2, 0, 0), E(2, 2, 2));
+    }
+
+    [Fact]
+    public void Octopus_OpensALanePerExtraParent()
+    {
+        var a = Layout([C("o", "a", "b", "c"), C("c", "r"), C("b", "r"), C("a", "r"), C("r")], primary: "o");
+
+        Assert.Equal(0, a.Rows[0].Lane);
+        AssertEdges(a.Rows[1], E(0, 0, 0), E(0, 1, 1), E(0, 2, 2));
+        Assert.Equal(3, a.Width);
+        // All three converge on the root.
+        Assert.Equal(3, a.Rows[^1].Up.Count(e => e.To == 0));
+    }
+
+    [Fact]
+    public void FreedLanesAreReused()
+    {
+        // f forks from m2 and merges back at m4; the older dangling branch g then reuses lane 1.
+        var a = Layout([C("m4", "m3", "f1"), C("f1", "m2"), C("m3", "m2"), C("m2", "m1"), C("g1", "m1"), C("m1")], primary: "m4");
+
+        Assert.Equal([0, 1, 0, 0, 1, 0], a.Rows.Select(r => r.Lane));
+        Assert.Equal(2, a.Width);
+    }
+
+    [Fact]
+    public void TwoRoots_EachEndsItsLane()
+    {
+        var a = Layout([C("m", "a", "b"), C("b"), C("a")], primary: "m");
+
+        Assert.Equal([0, 1, 0], a.Rows.Select(r => r.Lane));
+        Assert.Equal([E(0, 0, 0)], a.Rows[2].Up); // b's lane ended at its root
+        Assert.Empty(a.OpenEdges);
+    }
+
+    [Fact]
+    public void TruncatedHistory_LeavesOpenEdgesDown()
+    {
+        var a = Layout([C("c", "b"), C("x", "y")]);
+
+        Assert.Equal(2, a.OpenEdges.Length);
+        Assert.All(a.OpenEdges, e => Assert.Equal(e.From, e.To));
+    }
+
+    [Fact]
+    public void Paging_GivesTheSameRowsAsOneBatch()
+    {
+        var commits = Synthetic(3000, seed: 7);
+        var whole = Layout(commits, primary: commits[0].Hash);
+
+        var paged = new LaneAllocator(new LaneAllocator.Options(commits[0].Hash));
+        for (var i = 0; i < commits.Count; i += 137)
+            paged.Add(commits.Skip(i).Take(137).ToList());
+
+        Assert.Equal(whole.Width, paged.Width);
+        for (var i = 0; i < commits.Count; i++)
+        {
+            Assert.Equal(whole.Rows[i].Lane, paged.Rows[i].Lane);
+            Assert.Equal(whole.Rows[i].Up, paged.Rows[i].Up);
+        }
+    }
+
+    [Fact]
+    public void Compact_LeavingABranchOutClosesUpTheGapItLeft()
+    {
+        // a and b run beside main together; b sits out in lane 2 only because a holds lane 1.
+        List<GraphCommit> both = [C("a2", "a1"), C("b2", "b1"), C("m3", "m2"), C("a1", "m1"), C("b1", "m1"), C("m2", "m1"), C("m1")];
+        Assert.Equal([1, 2, 0, 1, 2, 0, 0], Layout(both, primary: "m3").Rows.Select(r => r.Lane));
+
+        // With a out of the walk, b moves in next to main.
+        List<GraphCommit> withoutA = [C("b2", "b1"), C("m3", "m2"), C("b1", "m1"), C("m2", "m1"), C("m1")];
+        Assert.Equal([1, 0, 1, 0, 0], Layout(withoutA, primary: "m3").Rows.Select(r => r.Lane));
+    }
+
+    [Fact]
+    public void Compact_ALateTipTakesTheInnermostLaneFreeAtItsRow()
+    {
+        // f and g ran in lanes 1 and 2 and both joined main above s (a stash-like tip made on m1): lanes 1 and 2 are
+        // free again by s's row, so it sits in lane 1 rather than out past everything that came before.
+        var a = Layout([C("m4", "m3", "f1"), C("m3", "m2", "g1"), C("f1", "m2"), C("g1", "m2"), C("m2", "m1"), C("s", "m1"), C("m1")],
+            primary: "m4");
+        Assert.Equal(1, a.Rows[5].Lane);
+    }
+
+    [Fact]
+    public void Compact_ANewTipOnTopOnlyPushesTheLinesItRunsBeside()
+    {
+        List<GraphCommit> before = [C("f1", "m1"), C("m2", "m1"), C("m1")];
+        Assert.Equal([1, 0, 0], Layout(before, primary: "m2").Rows.Select(r => r.Lane));
+
+        // n runs from the top down to m2, beside f: n takes lane 1 and f moves out one. Below m2 nothing changes.
+        List<GraphCommit> after = [C("n1", "m2"), .. before];
+        Assert.Equal([1, 2, 0, 0], Layout(after, primary: "m2").Rows.Select(r => r.Lane));
+    }
+
+    [Fact]
+    public void LargeSyntheticHistory_IsConsistent()
+    {
+        var commits = Synthetic(100_000, seed: 42);
+        var a = Layout(commits, primary: commits[0].Hash);
+        var index = commits.Select((c, i) => (c.Hash, i)).ToDictionary(t => t.Hash, t => t.i);
+        var hasChild = new HashSet<string>(commits.SelectMany(c => c.Parents));
+
+        Assert.Equal(commits.Count, a.Rows.Count);
+        for (var i = 0; i < a.Rows.Count; i++)
+        {
+            var row = a.Rows[i];
+            Assert.InRange(row.Lane, 0, a.Width - 1);
+            Assert.All(row.Up, e =>
+            {
+                Assert.InRange(e.From, 0, a.Width - 1);
+                Assert.InRange(e.To, 0, a.Width - 1);
+            });
+            // Every commit with a loaded child has a line arriving at its node.
+            if (hasChild.Contains(commits[i].Hash))
+                Assert.Contains(row.Up, e => e.To == row.Lane);
+        }
+        // Lane 0 holds the primary first-parent chain all the way down.
+        for (var c = commits[0]; c.Parents.Length > 0; c = commits[index[c.Parents[0]]])
+            Assert.Equal(0, a.Rows[index[c.Hash]].Lane);
+    }
+
+    // ---- snapshot -------------------------------------------------------------------------------------
+
+    private static readonly GraphRef[] Refs =
+    [
+        new("main", "refs/heads/main", GraphRefKind.LocalBranch, "m2"),
+        new("feat", "refs/heads/feat", GraphRefKind.LocalBranch, "f1"),
+        new("origin/main", "refs/remotes/origin/main", GraphRefKind.RemoteBranch, "m2"),
+    ];
+
+    private static GraphSnapshot Snap(IReadOnlyList<GraphCommit> log, IReadOnlyList<GraphWorktree> wts, int pageSize = 100) =>
+        GraphSnapshot.Build("C:/r", GraphScope.All, GraphLogQuery.Everything, log, Refs, wts, "main", pageSize);
+
+    [Fact]
+    public void Snapshot_PutsAWipRowPerDirtyWorktreeOnTopWithItsOwnTether()
+    {
+        var main = new GraphWorktree("C:/r", "main", "m2", Changes: 3, IsCurrent: true);
+        var feat = new GraphWorktree("C:/r--feat", "feat", "f1", Changes: 1, IsCurrent: false);
+        var clean = new GraphWorktree("C:/r--old", null, "m1", Changes: 0, IsCurrent: false);
+        var s = Snap([C("m2", "m1"), C("f1", "m1"), C("m1")], [feat, main, clean]);
+
+        Assert.Equal([main.WipHash, feat.WipHash, "m2", "f1", "m1"], s.Commits.Select(c => c.Hash));
+        Assert.True(s.Commits[0].IsWorkInProgress);
+        Assert.Equal(3, s.RealCommitCount);
+        // The primary branch's WIP heads lane 0, and the chain carries on through main.
+        Assert.Equal([0, 1, 0, 1, 0], s.Rows.Select(r => r.Lane));
+        Assert.Equal([new GraphTether(0, 2, 0, main), new GraphTether(1, 3, 1, feat)], s.Tethers);
+
+        Assert.True(s.IsTether(1, E(0, 0, 0)));
+        Assert.True(s.IsTether(2, E(0, 0, 0)));
+        Assert.False(s.IsTether(3, E(0, 0, 0))); // below main's HEAD: an ordinary line again
+        Assert.True(s.IsTether(3, E(1, 1, 1)));
+        Assert.False(s.IsTether(4, E(1, 0, 1)));
+
+        Assert.Equal([clean], s.WorktreesAt("m1"));
+        Assert.Equal(["main", "origin/main"], s.RefsAt("m2").Select(r => r.Name));
+        Assert.Equal(2, s.RowOf("m2"));
+        Assert.Equal(-1, s.RowOf("nope"));
+    }
+
+    private static GraphCommit At(string hash, long time, params string[] parents) => new(hash, parents, "Jon", "jon@x", time, hash);
+
+    [Fact]
+    public void Snapshot_WeavesStashRowsInByWhenTheyWereMade()
+    {
+        var main = new GraphWorktree("C:/r", "main", "m3", Changes: 1, IsCurrent: true);
+        var fresh = new GraphStash("s0", "m1", "stash@{0}", "On main: popped and stashed again", 40);
+        var onM2 = new GraphStash("s1", "m2", "stash@{1}", "On main: mid", 25);
+        var skewed = new GraphStash("s2", "f1", "stash@{2}", "On feat: clock behind", 5);
+        var old = new GraphStash("s3", "m1", "stash@{3}", "On main: old", 12);
+        var older = new GraphStash("s4", "m1", "stash@{4}", "On main: older", 11);
+        var lost = new GraphStash("s5", "gone", "stash@{5}", "On main: ancient", 1);
+        var s = GraphSnapshot.Build("C:/r", GraphScope.All, GraphLogQuery.Everything,
+            [At("m3", 30, "m2"), At("m2", 20, "m1"), At("f1", 15, "m1"), At("m1", 10)],
+            Refs, [main], "main", 100, stashes: [fresh, onM2, skewed, old, older, lost]);
+
+        // Above the first commit no newer than it, never below its own commit, newest first where they meet; one made
+        // on a commit outside the page gets no row. The WIP row stays on top.
+        Assert.Equal([main.WipHash, fresh.RowHash, "m3", onM2.RowHash, "m2", skewed.RowHash, "f1", old.RowHash, older.RowHash, "m1"],
+            s.Commits.Select(c => c.Hash));
+        Assert.True(s.Commits[1].IsStash && s.Commits[1].IsPseudo);
+        Assert.Equal(4, s.RealCommitCount);
+        Assert.Equal(onM2, s.StashAt(3));
+        Assert.Null(s.StashAt(2));
+        Assert.Equal([1, 3, 5, 7, 8], s.StashTethers.Select(t => t.StashRow));
+        Assert.Equal([9, 4, 6, 9, 9], s.StashTethers.Select(t => t.BaseRow));
+        var t0 = s.StashTethers[0];
+        Assert.True(s.IsTether(2, s.Rows[2].Up.Single(e => e.Color == t0.Lane)));
+
+        // Every stash is listed, each as a ref on its own row.
+        Assert.Equal(6, s.Stashes.Count);
+        Assert.Equal(["stash@{1}"], s.RefsAt(onM2.RowHash).Select(r => r.Name));
+    }
+
+    [Fact]
+    public void Snapshot_StashOnACommitInALaterPageGetsItsRowWhenThatPageLoads()
+    {
+        var fresh = new GraphStash("s0", "m1", "stash@{0}", "On main: new", 40);
+        var old = new GraphStash("s1", "m1", "stash@{1}", "On main: old", 12);
+        var first = GraphSnapshot.Build("C:/r", GraphScope.All, GraphLogQuery.Everything, [At("m3", 30, "m2"), At("m2", 20, "m1")],
+            Refs, [], "main", pageSize: 2, stashes: [fresh, old]);
+        Assert.Equal(["m3", "m2"], first.Commits.Select(c => c.Hash));
+        Assert.Empty(first.StashTethers);
+
+        // The page above is laid out already, so the newer one heads the new page.
+        var s = first.Append([At("f1", 15, "m1"), At("m1", 10)], pageSize: 2);
+        Assert.Equal(["m3", "m2", fresh.RowHash, "f1", old.RowHash, "m1"], s.Commits.Select(c => c.Hash));
+        Assert.Equal(4, s.RealCommitCount);
+        Assert.Equal([2, 4], s.StashTethers.Select(t => t.StashRow));
+        Assert.Equal([5, 5], s.StashTethers.Select(t => t.BaseRow));
+    }
+
+    [Fact]
+    public void Snapshot_LaneZeroFollowsTheGraphsOwnWorktreeNotTheTrunk()
+    {
+        // The graph is on feat (made from m1); main has moved on to m2, and both are dirty.
+        var feat = new GraphWorktree("C:/r--feat", "feat", "f1", Changes: 2, IsCurrent: true);
+        var main = new GraphWorktree("C:/r", "main", "m2", Changes: 1, IsCurrent: false);
+        var s = Snap([C("m2", "m1"), C("f1", "m1"), C("m1")], [main, feat]);
+
+        // Its changes are the top row, and they run straight down lane 0 through f1 to m1; main branches off.
+        Assert.Equal([feat.WipHash, main.WipHash, "m2", "f1", "m1"], s.Commits.Select(c => c.Hash));
+        Assert.Equal([0, 1, 1, 0, 0], s.Rows.Select(r => r.Lane));
+
+        // Clean, it starts at its HEAD; with no worktree of the graph's own, the trunk keeps lane 0.
+        Assert.Equal("f1", GraphSnapshot.PrimaryTip([feat with { Changes = 0 }], Refs, "main"));
+        Assert.Equal("m2", GraphSnapshot.PrimaryTip([main with { Changes = 0 }], Refs, "main"));
+        Assert.Equal(main.WipHash, GraphSnapshot.PrimaryTip([main], Refs, "main"));
+    }
+
+    [Fact]
+    public void Snapshot_LaneZeroStartsAtTheUpstreamWhenTheCheckoutIsOnlyBehindIt()
+    {
+        // Local main is at m1 with changes; origin/main has moved on to m3.
+        var here = new GraphWorktree("C:/r", "main", "m1", Changes: 2, IsCurrent: true);
+        GraphRef[] refs =
+        [
+            new("main", "refs/heads/main", GraphRefKind.LocalBranch, "m1") { Upstream = "origin/main", Behind = 2 },
+            new("origin/main", "refs/remotes/origin/main", GraphRefKind.RemoteBranch, "m3"),
+        ];
+        var s = GraphSnapshot.Build("C:/r", GraphScope.All, GraphLogQuery.Everything, [C("m3", "m2"), C("m2", "m1"), C("m1", "m0"), C("m0")],
+            refs, [here], "main", 100);
+
+        // One straight line from origin/main down through the checkout; the changes stay the top row, tethered to m1.
+        Assert.Equal([here.WipHash, "m3", "m2", "m1", "m0"], s.Commits.Select(c => c.Hash));
+        Assert.Equal([1, 0, 0, 0, 0], s.Rows.Select(r => r.Lane));
+        Assert.Equal([new GraphTether(0, 3, 1, here)], s.Tethers);
+
+        // With work of its own (diverged), the checkout keeps lane 0; so it does when the upstream isn't in the walk.
+        GraphRef[] diverged = [refs[0] with { Ahead = 1 }, refs[1]];
+        Assert.Equal(here.WipHash, GraphSnapshot.PrimaryTip([here], diverged, "main"));
+        Assert.Equal(here.WipHash, GraphSnapshot.PrimaryTip([here], refs, "main", loaded: h => h != "m3"));
+        Assert.Equal("m3", GraphSnapshot.PrimaryTip([here], refs, "main"));
+    }
+
+    [Fact]
+    public void PrimaryTip_ATrunkOutsideTheWalkDoesNotHoldLaneZero()
+    {
+        GraphRef[] refs = [new("main", "refs/heads/main", GraphRefKind.LocalBranch, "m2")];
+        Assert.Equal("m2", GraphSnapshot.PrimaryTip([], refs, "main", _ => true));
+        Assert.Null(GraphSnapshot.PrimaryTip([], refs, "main", _ => false));
+    }
+
+    [Fact]
+    public void Stash_SplitsGitsPrefixOffAndKeepsItOnARename()
+    {
+        var named = new GraphStash("s0", "m1", "stash@{0}", "On main: spike on feeds", 1);
+        var auto = new GraphStash("s1", "m1", "stash@{1}", "WIP on feat/x: abc1234 Fix it: properly", 1);
+        var bare = new GraphStash("s2", "m1", "stash@{2}", "renamed by hand", 1);
+
+        Assert.Equal("spike on feeds", named.Text);
+        Assert.Equal("On main: tidy", named.RenamedMessage("tidy"));
+        Assert.Equal("abc1234 Fix it: properly", auto.Text);
+        Assert.Equal("On feat/x: tidy", auto.RenamedMessage("tidy"));
+        Assert.Equal("renamed by hand", bare.Text);
+        Assert.Equal("tidy", bare.RenamedMessage("tidy"));
+    }
+
+    [Fact]
+    public void Snapshot_AppendResolvesATetherToAnUnloadedHead()
+    {
+        var detached = new GraphWorktree("C:/r--x", null, "m1", Changes: 2, IsCurrent: false);
+        var s = Snap([C("m2", "m1")], [detached], pageSize: 1);
+
+        Assert.True(s.HasMore);
+        Assert.Equal(int.MaxValue, s.Tethers[0].HeadRow);
+        Assert.True(s.IsTether(1, s.Rows[1].Up.Single(e => e.Color == s.Tethers[0].Lane)));
+
+        var more = s.Append([C("m1")], pageSize: 1);
+        Assert.Equal(2, more.Tethers[0].HeadRow);
+        Assert.Equal(2, more.RealCommitCount);
+        Assert.Equal(s.Rows, more.Rows.Take(2));
+        Assert.Throws<InvalidOperationException>(() => s.Append([C("m0")], 1));
+    }
+
+    [Fact]
+    public void Find_RefThenHashThenTextCyclingFromTheCurrentRow()
+    {
+        GraphCommit Named(string hash, string subject, params string[] parents) => new(hash, parents, "Jon", "j@x", 0, subject);
+        var s = GraphSnapshot.Build("C:/r", GraphScope.All, GraphLogQuery.Everything,
+            [Named("aaaa1111", "Fix the feed", "cccc3333"), Named("bbbb2222", "Feed images", "cccc3333"), Named("cccc3333", "Root")],
+            [new("main", "refs/heads/main", GraphRefKind.LocalBranch, "aaaa1111"), new("feat", "refs/heads/feat", GraphRefKind.LocalBranch, "bbbb2222")],
+            [], "main", 100);
+
+        Assert.Equal(1, s.Find("FEAT", -1)); // ref name, any case
+        Assert.Equal(2, s.Find("cccc", -1)); // hash prefix
+        Assert.Equal(0, s.Find("feed", -1)); // subject text...
+        Assert.Equal(1, s.Find("feed", 0)); // ...then the next match
+        Assert.Equal(0, s.Find("feed", 1)); // ...wrapping round
+        Assert.Equal(-1, s.Find("nothing", 0));
+        Assert.Equal(-1, s.Find("  ", 0));
+        Assert.Equal(0, s.LaneOf("aaaa1111"));
+        Assert.Equal(-1, s.LaneOf("nope"));
+
+        Assert.Equal([0, 1], s.FindAll("FEED")); // message, any case
+        Assert.Equal([1], s.FindAll("fea")); // a branch shown on the row
+        Assert.Equal([2], s.FindAll("cccc")); // hash prefix
+        Assert.Equal([0, 1, 2], s.FindAll("jon")); // author
+        Assert.Empty(s.FindAll(" "));
+    }
+
+    [Fact]
+    public void WorktreeContaining_PicksTheDeepestWorktreeAboveTheFolder()
+    {
+        var main = new GraphWorktree(@"C:\src\perch", "main", "m2", 0, true);
+        var nested = new GraphWorktree(@"C:\src\perch\.claude\worktrees\x", "feat", "f1", 0, false);
+        var sibling = new GraphWorktree(@"C:\src\perch--feeds", "feeds", "m1", 0, false);
+        var s = Snap([C("m2", "m1"), C("m1")], [main, nested, sibling]);
+
+        Assert.Same(main, s.WorktreeContaining(@"C:\src\perch\src\Perch.App"));
+        Assert.Same(nested, s.WorktreeContaining(@"C:\src\perch\.claude\worktrees\x\docs"));
+        Assert.Same(sibling, s.WorktreeContaining(@"C:\src\perch--feeds"));
+        Assert.Null(s.WorktreeContaining(@"C:\src\perch-other"));
+        Assert.Null(s.WorktreeContaining(null));
+        if (OperatingSystem.IsWindows())
+            Assert.Same(main, s.WorktreeContaining(@"c:\SRC\Perch/"));
+    }
+
+    [Fact]
+    public void PrimaryBranch_PrefersLocalTrunkThenRemote()
+    {
+        Assert.Equal("main", GraphLoader.PrimaryBranch(Refs));
+        Assert.Equal("upstream/master", GraphLoader.PrimaryBranch(
+            [new("feat", "refs/heads/feat", GraphRefKind.LocalBranch, "a"), new("upstream/master", "refs/remotes/upstream/master", GraphRefKind.RemoteBranch, "b")]));
+        Assert.Null(GraphLoader.PrimaryBranch([]));
+    }
+
+    // ---- base refs ------------------------------------------------------------------------------------
+
+    [Fact]
+    public void BaseRef_ForkPrefersUpstreamThenOriginThenLocal()
+    {
+        // The fork convention: branch from upstream, commit to origin (your fork). upstream/main should win.
+        string[] refs = ["feature/x", "main", "origin/main", "origin/feature/x", "upstream/main", "origin/HEAD"];
+        Assert.Equal(["upstream/main", "origin/main", "main"], GitBaseRefs.Pick("feature/x", refs));
+    }
+
+    [Fact]
+    public void BaseRef_RanksTrunkNamesWithinATier()
+    {
+        string[] refs = ["develop", "master", "main", "some-feature", "topic/work"];
+        Assert.Equal(["main", "master", "develop"], GitBaseRefs.Pick("some-feature", refs));
+    }
+
+    [Fact]
+    public void BaseRef_ExcludesCurrentBranchAndHeadPseudoRefs()
+    {
+        string[] refs = ["main", "origin/main", "origin/HEAD", "upstream/HEAD"];
+        Assert.Equal(["origin/main"], GitBaseRefs.Pick("main", refs));
+    }
+
+    [Fact]
+    public void BaseRef_EmptyWhenNoTrunkRefsExist()
+    {
+        string[] refs = ["feature/a", "topic/b", "origin/feature/a"];
+        Assert.Empty(GitBaseRefs.Pick("feature/a", refs));
+    }
+
+    // A deterministic history in topological order: a trunk with short-lived branches that fork off, sometimes
+    // merge back, and sometimes are left dangling, plus occasional merges of the trunk into a branch.
+    private static List<GraphCommit> Synthetic(int count, int seed)
+    {
+        var rng = new Random(seed);
+        // Build oldest-first, then reverse into topo order (newest first).
+        var built = new List<GraphCommit>(count);
+        var trunk = "t0";
+        built.Add(C(trunk));
+        var open = new List<string>(); // branch tips
+        var n = 1;
+        while (built.Count < count)
+        {
+            var roll = rng.Next(100);
+            if (roll < 50 || open.Count == 0)
+            {
+                var h = "t" + n++;
+                if (open.Count > 0 && rng.Next(100) < 15)
+                {
+                    var k = rng.Next(open.Count);
+                    built.Add(C(h, trunk, open[k]));
+                    open.RemoveAt(k);
+                }
+                else built.Add(C(h, trunk));
+                trunk = h;
+                if (rng.Next(100) < 12 && open.Count < 12) open.Add(trunk);
+            }
+            else
+            {
+                var k = rng.Next(open.Count);
+                var h = "b" + n++;
+                built.Add(rng.Next(100) < 4 ? C(h, open[k], trunk) : C(h, open[k]));
+                open[k] = h;
+                if (rng.Next(100) < 3) open.RemoveAt(k);
+            }
+        }
+        built.Reverse();
+        return built;
+    }
+}

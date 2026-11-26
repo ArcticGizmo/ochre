@@ -248,7 +248,7 @@ Exit (from the roadmap): turn every module off and the kernel still works; turn 
 
 Planned 2026-11-26 from a survey of Perch main (still `9275e0b`) and the sprig CLI. Findings that shape it: Perch's git code (`GitRunner` 289 lines, `GitCheckoutScanner` 137, `GitWorktrees` 107, `WorktreeLayout` 193) and sprig code (`SprigCli`, `SprigStatus`, `SprigStatusFold`, 680 lines with 38 tests) are UI-free and port cleanly. The git graph is about 2.9k lines plus a 1.1k-line `GitRepoService`, so it gets its own slice and ports only what the loader calls. Perch has no Jira REST code; that module is new. sprig answers every command with `--json` (`checkout -b`, `workspaces`, `watch`, `free`, `logs`), with failures as `{ok:false, code, error}`. The contracts are in [ADR 0012](decisions/0012-module-contracts.md).
 
-Slices are ordered so the exit criterion's three parts come first; the Jira module and git graph follow.
+Slices are ordered so the exit criterion's three parts come first; the git graph and then the Jira module follow.
 
 ### Slice 1: module host
 
@@ -304,16 +304,18 @@ Slices are ordered so the exit criterion's three parts come first; the Jira modu
   - **Dev settings**: `OCHRE_DEV_DESKTOP` stands in for the user's current desktop ("here" is that desktop, and windows are brought to it), while saved desktops are honoured on restore. Headless alone keeps every window "here", and its off-screen position is never saved. `ochre-cli dev windows`, `dev move-window <id> <guid>`, and `--window <id>` on `dev eval`/`dev capture` drive several windows. The instance pipe could answer before the message loop started; shell calls now wait for it.
   - **Not built here**: the roadmap's "jump to task" hotkey.
 
-### Slice 5: Jira module
-
-- New code. `TaskSource`: import an issue as a task (key, summary, description as notes, link back). `LinkResolver`: title, summary and live status for a `jira` link, shown on the task; `ochre task fetch <link>` returns detail marked as untrusted (security threat 2).
-- Credentials: site, email and an API token, the token in Windows Credential Manager (`CredWrite`/`CredRead` behind a Core `ISecretStore`), never in settings or logs. Set up from the module's settings section.
-- Needs a Jira site to test against; ask before this slice starts.
-
-### Slice 6: git graph
+### Slice 5: git graph
 
 - Port the graph model (`GraphModels`, `LaneAllocator`, `GraphSnapshot`, `GraphLogReader`, `GraphLoader` and the status calls they need) with `GitGraphTests`. Render it in the web UI (rows, lanes and edges as SVG, refs, worktrees and stashes), paged 2,000 commits at a time. Read-only first; write operations (`GitOps`) and avatars wait.
 - Larger visual change: starts from a design artefact.
+- Model ported 2026-11-26 from Perch `9275e0b` into `src/Ochre.Core/Git/Graph/`, with the matching `GitGraphTests` and the base-ref ranking (`GitBaseRefs`, from `GitRepoService`) for the Branch scope. Left behind with their tests: checkout and drop planning, `GitOps`, branch visibility (hidden branches), tag trees, commit info and avatars. The UI waits on the design artefact.
+
+### Slice 6: Jira module
+
+- Moved after the git graph on 2026-11-26 at the user's request; it isn't part of the exit criterion.
+- New code. `TaskSource`: import an issue as a task (key, summary, description as notes, link back). `LinkResolver`: title, summary and live status for a `jira` link, shown on the task; `ochre task fetch <link>` returns detail marked as untrusted (security threat 2).
+- Credentials: site, email and an API token, the token in Windows Credential Manager (`CredWrite`/`CredRead` behind a Core `ISecretStore`), never in settings or logs. Set up from the module's settings section.
+- Needs a Jira site to test against; ask before this slice starts.
 
 ### Slice 7: exit run
 

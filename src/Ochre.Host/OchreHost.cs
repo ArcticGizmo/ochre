@@ -15,7 +15,7 @@ namespace Ochre.Host;
 /// </summary>
 internal sealed class OchreHost : IDisposable
 {
-    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log, ITerminalPlatform terminalPlatform, IUrlOpener urls)
+    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log, ITerminalPlatform terminalPlatform, IDataProtector protector, IUrlOpener urls)
     {
         Urls = urls;
         Profile = profile;
@@ -41,7 +41,13 @@ internal sealed class OchreHost : IDisposable
         Terminals.Output += (t, data, seq) =>
             Windows.Broadcast(BridgeDispatcher.SerializeEvent("terminals.output", new TerminalOutputEvent(t.Id, data, seq), AppJson.Default.TerminalOutputEvent));
         Terminals.Changed += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("terminals.changed", new Empty(), AppJson.Default.Empty));
+        TerminalSaver = new TerminalPersistence(Terminals, new TerminalStore(paths.Terminals, protector), log);
+        var restored = TerminalSaver.RestoreAll();
+        if (restored > 0) log.Info($"restored {restored} terminal tab(s)");
     }
+
+    /// <summary>Saves the terminal tabs and their (encrypted) scrollback so they come back after a quit.</summary>
+    public TerminalPersistence TerminalSaver { get; }
 
     /// <summary>Terminal tabs; their shells keep running with every window closed, until the host quits.</summary>
     public TerminalManager Terminals { get; }
@@ -70,6 +76,9 @@ internal sealed class OchreHost : IDisposable
 
     public void Dispose()
     {
+        // Saved before the shells close, so the scrollback includes everything up to the quit.
+        TerminalSaver.SaveNow();
+        TerminalSaver.Dispose();
         Terminals.Dispose();
         Sessions.Dispose();
         Tasks.Dispose();

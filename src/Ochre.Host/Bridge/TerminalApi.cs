@@ -38,7 +38,7 @@ internal static class TerminalApi
             CheckSize(r.Cols, r.Rows);
             try
             {
-                return Dto(terminals.Open(r.Profile, folder, taskId, command, r.Cols, r.Rows));
+                return Dto(terminals.Open(r.Profile, folder, taskId, command, r.Cols, r.Rows, r.KeepScrollback));
             }
             catch (ArgumentException)
             {
@@ -96,6 +96,25 @@ internal static class TerminalApi
             return Dto(t);
         });
 
+        bridge.Handle("terminals.setKeepScrollback", j.TerminalKeepScrollbackRequest, j.TerminalDto, r =>
+        {
+            var t = Find(terminals, r.Id);
+            terminals.SetKeepScrollback(t, r.Keep);
+            return Dto(t);
+        });
+
+        bridge.Handle("terminals.rerun", j.TerminalIdRequest, j.Ack, r =>
+        {
+            Refusing(() => terminals.Rerun(Find(terminals, r.Id)));
+            return new Ack();
+        });
+
+        bridge.Handle("terminals.dismissRestore", j.TerminalIdRequest, j.Ack, r =>
+        {
+            terminals.DismissRestore(Find(terminals, r.Id));
+            return new Ack();
+        });
+
         bridge.Handle("terminals.close", j.TerminalIdRequest, j.Ack, r =>
         {
             terminals.Close(Find(terminals, r.Id));
@@ -141,5 +160,8 @@ internal static class TerminalApi
         t.StartupCommand,
         t.Running,
         t.ExitCode,
-        t.OpenedAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
+        t.OpenedAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
+        t.KeepScrollback,
+        t.RestoredFrom?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
+        t.OfferRerun);
 }

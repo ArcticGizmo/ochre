@@ -46,6 +46,9 @@ public static class BridgeContract
         new("terminals.resize", typeof(TerminalResizeRequest), typeof(Ack)),
         new("terminals.restart", typeof(TerminalIdRequest), typeof(TerminalDto)),
         new("terminals.setTask", typeof(TerminalSetTaskRequest), typeof(TerminalDto)),
+        new("terminals.setKeepScrollback", typeof(TerminalKeepScrollbackRequest), typeof(TerminalDto)),
+        new("terminals.rerun", typeof(TerminalIdRequest), typeof(Ack)),
+        new("terminals.dismissRestore", typeof(TerminalIdRequest), typeof(Ack)),
         new("terminals.close", typeof(TerminalIdRequest), typeof(Ack)),
     ];
 

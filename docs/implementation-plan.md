@@ -227,9 +227,10 @@ Planned 2026-11-26. Perch has no terminal code, so everything here is new or lif
 
 ### Slice 3: restore across quit
 
-- `terminals.json` (tabs, order, profile, folder, task, startup command, title) written atomically on every change; scrollback written encrypted with DPAPI (`IDataProtector` in Core, `ProtectedData` in Platform.Windows) every 30 s while it changes and on quit. A per-tab "Don't keep scrollback" switch (security threat 6) keeps nothing on disk for that tab.
+- `terminals.json` (tabs in order, profile, folder, task, startup command, title) written atomically on every change; scrollback written encrypted with DPAPI (`IDataProtector` in Core, `ProtectedData` in Platform.Windows) every 30 s while it changes and on quit. A per-tab "Don't keep scrollback" switch (security threat 6) keeps nothing on disk for that tab.
 - On host start every saved tab comes back with its old scrollback, a "restored" divider, and a fresh shell in its last known folder. The startup command is **not** re-run (explicit over magic); the tab offers "Run `<command>` again".
 - Closing every window leaves PTYs running (ADR 0008); quitting closes them, which ends the shells and the programs attached to their consoles. If hand testing shows orphaned dev servers, put each terminal in a Job Object.
+- Done 2026-11-26; see `docs/testing/m3-restore-testing.md`. DPAPI is called directly (`CryptProtectData`, with Ochre's own entropy) rather than through a package. No orphans after a quit, so no Job Object. A list that exists but can't be read is never overwritten that session, and only scrollback files of tabs this session knew are deleted. ConPTY clears the screen when a shell starts, which erased the restored output: xterm's `scrollOnEraseInDisplay` now pushes cleared screens into scrollback (so `cls` keeps history too), the divider clears and homes the cursor before drawing, and a restored tab opens scrolled to the divider. Terminals are also saved when Windows ends the session. **Tests:** `TerminalPersistenceTests` (data loss and threat 6).
 
 ### Slice 4: exit run
 

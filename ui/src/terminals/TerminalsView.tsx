@@ -57,6 +57,12 @@ export function TerminalsView({ terminals, tasks, selected, onSelect, onNew, onO
   if (!current.running) {
     menu.push({ key: 'restart', label: 'Restart shell', onSelect: () => void request('terminals.restart', { id: current.id }).catch(fail) });
   }
+  menu.push({
+    key: 'keep',
+    label: 'Keep scrollback when Ochre quits',
+    current: current.keepScrollback,
+    onSelect: () => void request('terminals.setKeepScrollback', { id: current.id, keep: !current.keepScrollback }).catch(fail),
+  });
   menu.push({ key: 'close', label: 'Close terminal…', danger: true, separatorBefore: true, onSelect: () => close(current) });
 
   return (
@@ -107,9 +113,30 @@ export function TerminalsView({ terminals, tasks, selected, onSelect, onNew, onO
         <Menu ariaLabel="Terminal actions" buttonClass="link more" label={<span aria-hidden="true">⋯</span>} items={menu} />
       </div>
 
+      {current.restoredFrom && (
+        <div className="term-restored" role="status">
+          <span>
+            Restored after Ochre restarted. A new shell is running in <PathText path={current.folder} />
+            {current.offerRerun && current.startupCommand && (
+              <>
+                ; <code>{current.startupCommand}</code> was not started again
+              </>
+            )}
+            .
+          </span>
+          <span className="spacer" />
+          {current.offerRerun && current.startupCommand && current.running && (
+            <button className="primary" title={current.startupCommand} onClick={() => void request('terminals.rerun', { id: current.id }).catch(fail)}>
+              Run it again
+            </button>
+          )}
+          <button onClick={() => void request('terminals.dismissRestore', { id: current.id }).catch(fail)}>Dismiss</button>
+        </div>
+      )}
+
       <div className="term-surface">
         <Suspense fallback={<p className="empty">Loading terminal...</p>}>
-          <XtermPane key={current.id} id={current.id} onLinkHover={setHoverUrl} onError={onError} />
+          <XtermPane key={current.id} id={current.id} restored={current.restoredFrom !== null} onLinkHover={setHoverUrl} onError={onError} />
         </Suspense>
       </div>
 

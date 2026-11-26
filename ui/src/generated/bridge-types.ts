@@ -78,6 +78,7 @@ export interface OpenTerminalRequest {
   startupCommand: string | null;
   cols: number;
   rows: number;
+  keepScrollback: boolean;
 }
 
 export interface OpenUrlRequest {
@@ -307,6 +308,9 @@ export interface TerminalDto {
   running: boolean;
   exitCode: number | null;
   openedAt: string;
+  keepScrollback: boolean;
+  restoredFrom: string | null;
+  offerRerun: boolean;
 }
 
 export interface TerminalIdRequest {
@@ -316,6 +320,11 @@ export interface TerminalIdRequest {
 export interface TerminalInputRequest {
   id: string;
   data: string;
+}
+
+export interface TerminalKeepScrollbackRequest {
+  id: string;
+  keep: boolean;
 }
 
 export interface TerminalOutputEvent {
@@ -383,6 +392,9 @@ export interface Requests {
   'terminals.resize': { req: TerminalResizeRequest; res: Ack };
   'terminals.restart': { req: TerminalIdRequest; res: TerminalDto };
   'terminals.setTask': { req: TerminalSetTaskRequest; res: TerminalDto };
+  'terminals.setKeepScrollback': { req: TerminalKeepScrollbackRequest; res: TerminalDto };
+  'terminals.rerun': { req: TerminalIdRequest; res: Ack };
+  'terminals.dismissRestore': { req: TerminalIdRequest; res: Ack };
   'terminals.close': { req: TerminalIdRequest; res: Ack };
 }
 

@@ -56,6 +56,7 @@ public sealed record OpenUrlRequest(string Url, bool NewWindow);
 [JsonSerializable(typeof(TerminalSetTaskRequest))]
 [JsonSerializable(typeof(TerminalSnapshot))]
 [JsonSerializable(typeof(TerminalOutputEvent))]
+[JsonSerializable(typeof(TerminalKeepScrollbackRequest))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity, window lifecycle and settings.</summary>

@@ -34,7 +34,7 @@ internal static class Program
         log.Info($"starting {AppInfoProvider.Version} profile={(profile.IsDefault ? "default" : profile.Name)}");
 
         var urls = new UrlOpener();
-        using var host = new OchreHost(profile, paths, log, new Ochre.Platform.Windows.Terminals.ConPtyPlatform(), urls);
+        using var host = new OchreHost(profile, paths, log, new Ochre.Platform.Windows.Terminals.ConPtyPlatform(), new DataProtector(), urls);
         var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), urls);
         host.Attach(shell);
         var agents = new AgentCommands(host.Tasks, host.ParkRequests);
@@ -43,6 +43,8 @@ internal static class Program
         {
             try
             {
+                // Windows may end the process before the normal quit path runs.
+                host.TerminalSaver.SaveNow();
                 host.Shutdown.OnSessionEnding();
             }
             catch (Exception ex)

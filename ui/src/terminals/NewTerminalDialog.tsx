@@ -23,6 +23,7 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
   const [otherFolder, setOtherFolder] = useState('');
   const [profile, setProfile] = useState('');
   const [command, setCommand] = useState('');
+  const [keep, setKeep] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +32,7 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
     setTask(taskId ?? NONE);
     setOtherFolder('');
     setCommand('');
+    setKeep(true);
     setError(null);
     request('terminals.profiles', {})
       .then((list) => {
@@ -69,7 +71,7 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
     setBusy(true);
     setError(null);
     try {
-      const t = await request('terminals.open', { profile, folder: cwd, taskId: task || null, startupCommand: command.trim() || null, cols: 120, rows: 30 });
+      const t = await request('terminals.open', { profile, folder: cwd, taskId: task || null, startupCommand: command.trim() || null, cols: 120, rows: 30, keepScrollback: keep });
       onOpened(t.id);
     } catch (e) {
       setError((e as Error).message);
@@ -136,7 +138,14 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
       <label className="field">
         <span>Startup command (optional)</span>
         <input className="mono" value={command} maxLength={1000} onChange={(e) => setCommand(e.target.value)} placeholder="e.g. pnpm dev" />
-        <small className="muted">Typed into the shell once it starts.</small>
+        <small className="muted">Typed into the shell once it starts. After Ochre restarts, the tab offers to run it again; it never runs by itself.</small>
+      </label>
+      <label className="check-field">
+        <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+        <span>
+          Keep scrollback when Ochre quits
+          <small>Saved encrypted for your Windows account. Turn off for a tab that will show secrets.</small>
+        </span>
       </label>
       {error && <p className="error">{error}</p>}
     </Dialog>

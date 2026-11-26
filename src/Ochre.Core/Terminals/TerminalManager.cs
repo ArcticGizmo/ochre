@@ -35,6 +35,15 @@ public sealed class Terminal
     public bool Running { get; internal set; }
     public int? ExitCode { get; internal set; }
 
+    /// <summary>Save its scrollback (encrypted) for the next start; off for a tab that will show secrets.</summary>
+    public bool KeepScrollback { get; internal set; } = true;
+
+    /// <summary>When Ochre last saved it, for a tab brought back after a restart; null once the user dismisses that.</summary>
+    public DateTimeOffset? RestoredFrom { get; internal set; }
+
+    /// <summary>Brought back with a startup command that hasn't been run again. It never reruns by itself.</summary>
+    public bool OfferRerun { get; internal set; }
+
     internal Lock Gate { get; } = new();
     internal IPseudoConsole? Console { get; set; }
     internal TerminalOutputFilter Filter { get; set; } = new();
@@ -47,6 +56,7 @@ public sealed class Terminal
     internal int Rows { get; set; }
     internal bool Closed { get; set; }
     internal bool MetadataChanged { get; set; }
+    internal bool ScrollbackDirty { get; set; }
 }
 
 /// <summary>
@@ -100,10 +110,10 @@ public sealed class TerminalManager : IDisposable
     }
 
     /// <summary>Opens a terminal. Callers validate the folder, task and command; this only checks the profile exists.</summary>
-    public Terminal Open(string profileId, string folder, string? taskId, string? startupCommand, int cols, int rows)
+    public Terminal Open(string profileId, string folder, string? taskId, string? startupCommand, int cols, int rows, bool keepScrollback = true)
     {
         var profile = Profiles.FirstOrDefault(p => p.Id == profileId) ?? throw new ArgumentException($"unknown shell '{profileId}'", nameof(profileId));
-        var terminal = new Terminal("t-" + Guid.NewGuid().ToString("N")[..8], profile, folder, taskId, startupCommand, ScrollbackChars);
+        var terminal = new Terminal("t-" + Guid.NewGuid().ToString("N")[..8], profile, folder, taskId, startupCommand, ScrollbackChars) { KeepScrollback = keepScrollback };
         terminal.FlushTimer = new Timer(_ => Flush(terminal), null, Timeout.Infinite, Timeout.Infinite);
         try
         {
@@ -119,6 +129,107 @@ public sealed class TerminalManager : IDisposable
         _log.Info($"terminal {terminal.Id} opened ({profile.Id})");
         Changed?.Invoke();
         return terminal;
+    }
+
+    /// <summary>
+    /// Brings back a tab saved before Ochre last quit: its old scrollback, a divider, then a fresh shell in its last
+    /// known folder. The startup command is offered, not run (explicit over magic). A shell that won't start leaves
+    /// the tab readable, exited, so the scrollback isn't lost.
+    /// </summary>
+    public Terminal Restore(SavedTerminal saved, string? scrollback, DateTimeOffset? savedAt, int cols = 120, int rows = 30)
+    {
+        var profile = Profiles.FirstOrDefault(p => p.Id == saved.ProfileId) ?? Profiles.FirstOrDefault()
+            ?? throw new InvalidOperationException("no shell to restore a terminal with");
+        var folder = Directory.Exists(saved.Folder) ? saved.Folder : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var terminal = new Terminal(saved.Id, profile, folder, saved.TaskId, saved.StartupCommand, ScrollbackChars)
+        {
+            Title = saved.Title,
+            KeepScrollback = saved.KeepScrollback,
+            RestoredFrom = savedAt ?? DateTimeOffset.UtcNow,
+            OfferRerun = saved.StartupCommand is not null,
+        };
+        terminal.FlushTimer = new Timer(_ => Flush(terminal), null, Timeout.Infinite, Timeout.Infinite);
+        terminal.Scrollback.Append((scrollback ?? "") + Divider(savedAt));
+        terminal.Seq = 1;
+        lock (_gate) _terminals.Add(terminal);
+        try
+        {
+            Start(terminal, cols, rows);
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            lock (terminal.Gate)
+            {
+                terminal.Running = false;
+                terminal.ExitCode = -1;
+                terminal.Pending.Append($"\u001b[2m[the shell could not be started: {ex.Message}]\u001b[0m\r\n");
+                FlushLocked(terminal);
+            }
+            _log.Warn($"terminal {terminal.Id} restored without a shell: {ex.Message}");
+        }
+        _log.Info($"terminal {terminal.Id} restored ({profile.Id})");
+        Changed?.Invoke();
+        return terminal;
+    }
+
+    // Puts the screen back to normal whatever the old program left on (alternate screen, mouse reporting, bracketed
+    // paste, hidden cursor), then a divider, so a restored tab is always readable. ConPTY places its cursor by
+    // absolute position, so the old stream can end mid-screen: clearing first (which the UI's xterm turns into a push
+    // to scrollback) and homing the cursor keeps the divider from overwriting old lines.
+    private static string Divider(DateTimeOffset? savedAt)
+    {
+        const string reset = "\u001b[0m\u001b[?1049l\u001b[?1000l\u001b[?1002l\u001b[?1003l\u001b[?1006l\u001b[?2004l\u001b[?1l\u001b[?25h\u001b[2J\u001b[H";
+        var when = savedAt is { } at ? $" · saved {at.ToLocalTime():d MMM HH:mm}" : "";
+        return $"{reset}\u001b[38;2;143;179;224m──── restored{when} · new shell {DateTimeOffset.Now:d MMM HH:mm} ────\u001b[0m\r\n";
+    }
+
+    /// <summary>Types the startup command again in a restored tab, once the user asks.</summary>
+    public void Rerun(Terminal terminal)
+    {
+        IPseudoConsole? console;
+        lock (terminal.Gate)
+        {
+            if (!terminal.OfferRerun || terminal.StartupCommand is null) throw new InvalidOperationException("there's no command to run again");
+            console = terminal.Running ? terminal.Console : null;
+            if (console is null) throw new InvalidOperationException("that terminal's shell has exited");
+            terminal.OfferRerun = false;
+            terminal.RestoredFrom = null;
+        }
+        console.Write(terminal.StartupCommand + "\r");
+        Changed?.Invoke();
+    }
+
+    public void DismissRestore(Terminal terminal)
+    {
+        terminal.OfferRerun = false;
+        terminal.RestoredFrom = null;
+        Changed?.Invoke();
+    }
+
+    public void SetKeepScrollback(Terminal terminal, bool keep)
+    {
+        lock (terminal.Gate)
+        {
+            terminal.KeepScrollback = keep;
+            terminal.ScrollbackDirty = keep;
+        }
+        Changed?.Invoke();
+    }
+
+    /// <summary>The scrollback of each tab that keeps it and has changed since the last call.</summary>
+    public IReadOnlyList<(string Id, string Text)> TakeScrollbackToSave()
+    {
+        var result = new List<(string, string)>();
+        foreach (var t in All)
+        {
+            lock (t.Gate)
+            {
+                if (t.Closed || !t.KeepScrollback || !t.ScrollbackDirty) continue;
+                t.ScrollbackDirty = false;
+                result.Add((t.Id, t.Scrollback.Text()));
+            }
+        }
+        return result;
     }
 
     /// <summary>Starts a fresh shell in a terminal whose shell has exited, in its last known folder.</summary>
@@ -270,6 +381,7 @@ public sealed class TerminalManager : IDisposable
         terminal.Pending.Clear();
         terminal.Seq++;
         terminal.Scrollback.Append(text);
+        terminal.ScrollbackDirty = true;
         try
         {
             Output?.Invoke(terminal, text, terminal.Seq);

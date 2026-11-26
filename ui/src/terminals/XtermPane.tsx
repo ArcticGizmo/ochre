@@ -10,19 +10,34 @@ interface Props {
   /** The link under the pointer, so the view can show where it goes before it's opened. */
   onLinkHover: (url: string | null) => void;
   onError: (message: string) => void;
+  /** Brought back after a restart: open scrolled to the divider, with the old output above it. */
+  restored: boolean;
+}
+
+// The new shell's screen sits below the divider, so without this a restored tab opens looking empty.
+function showRestoreDivider(term: Terminal) {
+  const buffer = term.buffer.active;
+  for (let y = buffer.length - 1; y >= 0; y--) {
+    if (buffer.getLine(y)?.translateToString(true).includes('──── restored')) {
+      term.scrollToLine(Math.max(0, y - Math.floor(term.rows / 2)));
+      return;
+    }
+  }
 }
 
 /**
  * One terminal drawn with xterm.js. The host owns the shell and its scrollback (ADR 0011); this replays the
  * scrollback, then applies only chunks numbered after it. Loaded lazily so xterm stays off the window-open path.
  */
-export default function XtermPane({ id, onLinkHover, onError }: Props) {
+export default function XtermPane({ id, onLinkHover, onError, restored }: Props) {
   const box = useRef<HTMLDivElement>(null);
   // Kept in refs so a parent re-render doesn't tear the terminal down.
   const hoverRef = useRef(onLinkHover);
   const errorRef = useRef(onError);
+  const restoredRef = useRef(restored);
   hoverRef.current = onLinkHover;
   errorRef.current = onError;
+  restoredRef.current = restored;
 
   useEffect(() => {
     const el = box.current;
@@ -55,6 +70,9 @@ export default function XtermPane({ id, onLinkHover, onError }: Props) {
       fontSize: 13,
       scrollback: 10000,
       cursorBlink: true,
+      // A new shell under ConPTY starts by clearing the screen; this keeps what was there (a restored tab's old
+      // output, or anything before a `cls`) in the scrollback, as Windows Terminal does.
+      scrollOnEraseInDisplay: true,
       linkHandler,
       theme: {
         background: '#141312',
@@ -140,6 +158,7 @@ export default function XtermPane({ id, onLinkHover, onError }: Props) {
         lastSeq = snapshot.seq;
         term.write(snapshot.data, () => {
           replaying = false;
+          if (restoredRef.current) showRestoreDivider(term);
         });
         early.forEach(apply);
         early.length = 0;

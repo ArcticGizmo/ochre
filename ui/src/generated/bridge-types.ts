@@ -3,6 +3,8 @@
 
 export type AttentionKindDto = 'permission' | 'question' | 'plan' | 'elsewhere' | 'waiting' | 'finished' | 'failed';
 
+export type EditorFileProblemDto = 'none' | 'missing' | 'tooLarge' | 'binary' | 'notUtf8';
+
 export type GraphRefKindDto = 'local' | 'remote' | 'tag' | 'stash';
 
 export type GraphRowKindDto = 'commit' | 'wip' | 'stash';
@@ -108,6 +110,90 @@ export interface CreateTaskRequest {
   title: string;
   notes: string | null;
   repos: string[] | null;
+}
+
+export interface EditorChangeDto {
+  path: string;
+  origPath: string | null;
+  status: string;
+  added: number | null;
+  removed: number | null;
+  binary: boolean;
+}
+
+export interface EditorChangedEvent {
+  taskId: string;
+  folder: string;
+  path: string;
+  version: string;
+}
+
+export interface EditorFileDto {
+  folder: string;
+  path: string;
+  text: string | null;
+  version: string;
+  size: number;
+  bom: boolean;
+  problem: EditorFileProblemDto;
+  readOnly: boolean;
+}
+
+export interface EditorFileListDto {
+  folder: string;
+  paths: string[];
+  git: boolean;
+  truncated: boolean;
+}
+
+export interface EditorFileRequest {
+  taskId: string;
+  folder: string;
+  path: string;
+}
+
+export interface EditorFolderChangesDto {
+  folder: string;
+  missing: boolean;
+  git: boolean;
+  changes: EditorChangeDto[];
+  truncated: boolean;
+}
+
+export interface EditorFolderRequest {
+  taskId: string;
+  folder: string;
+}
+
+export interface EditorLocateDto {
+  folder: string | null;
+  path: string | null;
+}
+
+export interface EditorLocateRequest {
+  taskId: string;
+  path: string;
+}
+
+export interface EditorTaskRequest {
+  taskId: string;
+}
+
+export interface EditorWatchRequest {
+  files: EditorFileRequest[];
+}
+
+export interface EditorWriteDto {
+  saved: boolean;
+  version: string;
+}
+
+export interface EditorWriteRequest {
+  taskId: string;
+  folder: string;
+  path: string;
+  text: string;
+  version: string;
 }
 
 export type Empty = Record<string, never>;
@@ -823,6 +909,13 @@ export interface Requests {
   'roost.assign': { req: RoostAssignRequest; res: RoostGridDto };
   'roost.unassign': { req: RoostSessionRequest; res: RoostGridDto };
   'roost.zoom': { req: RoostZoomRequest; res: RoostGridDto };
+  'editor.list': { req: EditorFolderRequest; res: EditorFileListDto };
+  'editor.read': { req: EditorFileRequest; res: EditorFileDto };
+  'editor.write': { req: EditorWriteRequest; res: EditorWriteDto };
+  'editor.head': { req: EditorFileRequest; res: EditorFileDto };
+  'editor.changes': { req: EditorTaskRequest; res: EditorFolderChangesDto[] };
+  'editor.locate': { req: EditorLocateRequest; res: EditorLocateDto };
+  'editor.watch': { req: EditorWatchRequest; res: Ack };
 }
 
 export interface Events {
@@ -838,4 +931,5 @@ export interface Events {
   'terminals.output': TerminalOutputEvent;
   'terminals.changed': Empty;
   'roost.changed': RoostChangedEvent;
+  'editor.changed': EditorChangedEvent;
 }

@@ -150,23 +150,7 @@ internal static partial class GraphApi
     private static List<GraphChangeDto> Changes(string worktree)
     {
         if (GitStatusReader.Read(worktree) is not { } status) return [];
-        return status.Changes.Select(c => new GraphChangeDto(c.Path, Letter(c))).ToList();
-    }
-
-    private static string Letter(GitFileChange c)
-    {
-        if (c.Untracked) return "?";
-        var kind = c.Unstaged != GitChangeKind.None ? c.Unstaged : c.Staged;
-        return kind switch
-        {
-            GitChangeKind.Added => "A",
-            GitChangeKind.Deleted => "D",
-            GitChangeKind.Renamed => "R",
-            GitChangeKind.Copied => "C",
-            GitChangeKind.TypeChanged => "T",
-            GitChangeKind.Unmerged => "U",
-            _ => "M",
-        };
+        return status.Changes.Select(c => new GraphChangeDto(c.Path, GitStatusReader.Letter(c))).ToList();
     }
 
     [GeneratedRegex("^[0-9a-f]{40}([0-9a-f]{24})?$")]

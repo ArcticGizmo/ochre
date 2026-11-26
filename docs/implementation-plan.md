@@ -487,14 +487,21 @@ Slice 1 is host-only and needs nothing else. Slices 2 to 5 are UI and share one 
 
 - New module project `modules/Ochre.Modules.Editor/` (`editor`, on by default). Core gets `Ochre.Core.Files.TaskPaths` (resolve a task, one of its folders and a relative path to a file, by ADR 0015's rules) so the git module can use the same checks for worktree diffs.
 - Bridge, each naming a task and one of its folders:
-  - `files.list`: the folder's files (`ProjectFileScan`: `git ls-files`, or the bounded walk outside git), capped at 20,000 with a "truncated" flag.
-  - `files.read`: text (UTF-8, BOM noted), its version (SHA-256), size and line ending; or why it can't be opened (too big, binary, not UTF-8 so read-only, gone).
-  - `files.write`: text plus the version it edited. Written atomically, keeping the BOM; a version that no longer matches answers `conflict` with the version now on disk, and nothing is written.
-  - `files.head`: the text at HEAD for a path `git status` lists as changed in that folder (empty for an untracked file), so a diff's left side never runs git on a path the page made up.
-  - `files.changes {taskId}`: every changed file in every folder of the task (status letter, lines added and removed from `git diff --numstat HEAD`), kept 3 s like `git.status`, cleared on `git.changed`.
-  - `files.watch {paths}` per window (like `attention.viewing`): which files the window has open. One `FileSystemWatcher` per folder with watched files; a change raises `files.changed {taskId, folder, path, version}` after a 200 ms settle, broadcast to every window. A window's list is dropped when it closes.
-- **Tests**: `TaskPaths` (security: rooted, `..`, a link inside the folder, device names, `::$DATA`, a folder the task doesn't record, `.git` on write); `files.write` (data loss: stale version refused and the file untouched, BOM kept, CRLF kept as sent, atomic replace leaves no temp file); `files.head` refuses a path status didn't list.
+  - `editor.list`: the folder's files (`ProjectFileScan`: `git ls-files`, or the bounded walk outside git), capped at 20,000 with a "truncated" flag.
+  - `editor.read`: text (UTF-8, BOM noted), its version (SHA-256), size and line ending; or why it can't be opened (too big, binary, not UTF-8 so read-only, gone).
+  - `editor.write`: text plus the version it edited. Written atomically, keeping the BOM; a version that no longer matches answers `conflict` with the version now on disk, and nothing is written.
+  - `editor.head`: the text at HEAD for a path `git status` lists as changed in that folder (empty for an untracked file), so a diff's left side never runs git on a path the page made up.
+  - `editor.changes {taskId}`: every changed file in every folder of the task (status letter, lines added and removed from `git diff --numstat HEAD`), kept 3 s like `git.status`, cleared on `git.changed`.
+  - `editor.watch {paths}` per window (like `attention.viewing`): which files the window has open. One `FileSystemWatcher` per folder with watched files; a change raises `editor.changed {taskId, folder, path, version}` after a 200 ms settle, broadcast to every window. A window's list is dropped when it closes.
+- **Tests**: `TaskPaths` (security: rooted, `..`, a link inside the folder, device names, `::$DATA`, a folder the task doesn't record, `.git` on write); `editor.write` (data loss: stale version refused and the file untouched, BOM kept, CRLF kept as sent, atomic replace leaves no temp file); `editor.head` refuses a path status didn't list.
 - Checked through the bridge in a headless dev host before any UI exists.
+- Done 2026-11-26; see `docs/testing/m6-files-host-testing.md`. 22 cases in `TaskPathsTests`, 6 in `TextFilesTests`, 5 in `EditorApiTests`. Copied from Perch `9275e0b`: `ProjectFileScan` (`src/Perch.Core/Data/ProjectFileScan.cs`, now `Ochre.Core.Files`, its cap raised to 20,000 and the folder's own paths kept relative to it); its tests' walk case is covered by the editor's own. Perch's `GetFileAtRef` became `GitFolderChanges.ReadAt` with `cat-file` (raw, so no filter or textconv runs, and its size is checked first). Decisions made while building:
+  - **Messages are `editor.*`** (first planned as `files.*`): a module's events must start with its id, so the requests follow.
+  - **Saving is capped at 512 KB**: the bridge takes at most a million characters a message, and JSON escaping grows text. Larger files (to 5 MB) open read-only.
+  - **`.git` is refused for reads too**, not only writes; nothing lists it, so the rule is simpler whole. A step that answers to a name it doesn't list under (an 8.3 short name) is refused, so `GIT~1` can't stand for `.git`.
+  - **A save never creates a file**, and refuses a file that isn't plain UTF-8 or is over the cap. One save at a time across the app, so two windows can't both pass the version check.
+  - **Per-window watches** needed a new module hook, `IModuleContext.OnWindowClosed`, keyed by the window's dispatcher. A burst of writes settles for 200 ms; a file held without sharing is retried a few times.
+  - **Changes** come from `git status --porcelain=v2 -z --untracked-files=all` (every file of an untracked folder, so each can be opened; capped at 2,000) and `git diff --numstat -z --no-renames HEAD`. A folder below its repo root sees only its own changes, relative to it. `editor.head` checks the path against that list, asking git again once when the 3-second cache doesn't have it. The change letter moved to Core (`GitStatusReader.Letter`), shared with the git graph.
 
 ### Slice 2: the Files view
 
@@ -508,20 +515,20 @@ Slice 1 is host-only and needs nothing else. Slices 2 to 5 are UI and share one 
 
 ### Slice 3: Changes and diffs
 
-- The Files view's sidebar gets a **Changes (N)** tab beside the tree: `files.changes` grouped by folder, each file with its status letter and +/- counts, refreshed on window focus and on `git.changed`.
+- The Files view's sidebar gets a **Changes (N)** tab beside the tree: `editor.changes` grouped by folder, each file with its status letter and +/- counts, refreshed on window focus and on `git.changed`.
 - A changed file opens as a diff against HEAD in Monaco's diff editor (side by side, or inline when the view is narrow); the right side is the file on disk and edits save like any tab. Untracked files diff against empty; a deleted file shows its HEAD text, read-only; binary and oversized files say so.
 - The task page shows the count beside its folders ("Changes (12)"), opening the view on Changes.
 
 ### Slice 4: diffs in the git graph
 
 - Lives in the git module, using `ui/src/editor/` (works with the editor module off).
-- `graph.files {token, hash}`: a commit's changed files (`git show --name-status -z --format= <hash>`; a merge against its first parent), for a hash the graph showed. `graph.diff {token, hash, path}`: the text before (first parent) and after, for a path that call listed, capped as `files.read` is. The commit details pane lists the files; one opens as a read-only diff beside it.
+- `graph.files {token, hash}`: a commit's changed files (`git show --name-status -z --format= <hash>`; a merge against its first parent), for a hash the graph showed. `graph.diff {token, hash, path}`: the text before (first parent) and after, for a path that call listed, capped as `editor.read` is. The commit details pane lists the files; one opens as a read-only diff beside it.
 - A worktree row's changed files (`graph.changes`, already listed) open their diff against HEAD too, through the same check.
 
 ### Slice 5: paths in threads and Ctrl+P
 
-- **Paths in threads**: a tool card whose input has a file path (`Read`, `Edit`, `MultiEdit`, `Write`, `NotebookEdit`) shows it as a link when the editor module is on (a new `ctx.openFile`, absent when it's off). `files.locate {taskId, path}` maps an absolute path to one of the task's folders and a relative path, or says it's outside them. It opens at the line where it's known (`Read`'s offset; an `Edit`'s old text found in the file).
-- **Ctrl+P**: a picker over the task's files (`files.list` for each folder, folder name shown when the task has several), matched on the file name first, then the path; Enter opens it in this window's Files view. A focused terminal keeps Ctrl+P, as it keeps Ctrl+K.
+- **Paths in threads**: a tool card whose input has a file path (`Read`, `Edit`, `MultiEdit`, `Write`, `NotebookEdit`) shows it as a link when the editor module is on (a new `ctx.openFile`, absent when it's off). `editor.locate {taskId, path}` maps an absolute path to one of the task's folders and a relative path, or says it's outside them. It opens at the line where it's known (`Read`'s offset; an `Edit`'s old text found in the file).
+- **Ctrl+P**: a picker over the task's files (`editor.list` for each folder, folder name shown when the task has several), matched on the file name first, then the path; Enter opens it in this window's Files view. A focused terminal keeps Ctrl+P, as it keeps Ctrl+K.
 
 ### Slice 6: exit run
 

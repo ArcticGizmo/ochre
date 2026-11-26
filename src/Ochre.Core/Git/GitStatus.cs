@@ -137,6 +137,81 @@ internal static class GitStatusReader
         return new GitRepoStatus(branch, upstream, ahead, behind, changes);
     }
 
+    /// <summary>
+    /// Parses <c>git status --porcelain=v2 -z</c>: the same records as <see cref="ParseStatusV2"/>, each ended by a NUL,
+    /// with a rename's original path as the record after it rather than after a tab. Paths arrive exactly as stored,
+    /// with no quoting.
+    /// </summary>
+    internal static GitRepoStatus ParseStatusV2Z(string output)
+    {
+        string? branch = null, upstream = null;
+        int ahead = 0, behind = 0;
+        var changes = new List<GitFileChange>();
+        var records = output.Split('\0');
+
+        for (var i = 0; i < records.Length; i++)
+        {
+            var line = records[i];
+            if (line.Length == 0) continue;
+            switch (line[0])
+            {
+                case '#':
+                    ParseBranchHeader(line, ref branch, ref upstream, ref ahead, ref behind);
+                    break;
+
+                case '1':
+                {
+                    var p = line.Split(' ', 9);
+                    if (p.Length < 9) break;
+                    var (st, un) = MapXy(p[1]);
+                    changes.Add(new GitFileChange(p[8], null, st, un, false));
+                    break;
+                }
+
+                case '2':
+                {
+                    var p = line.Split(' ', 10);
+                    var orig = i + 1 < records.Length ? records[++i] : null;
+                    if (p.Length < 10) break;
+                    var (st, un) = MapXy(p[1]);
+                    changes.Add(new GitFileChange(p[9], orig, st, un, false));
+                    break;
+                }
+
+                case 'u':
+                {
+                    var p = line.Split(' ', 11);
+                    if (p.Length < 11) break;
+                    changes.Add(new GitFileChange(p[10], null, GitChangeKind.Unmerged, GitChangeKind.Unmerged, false));
+                    break;
+                }
+
+                case '?':
+                    if (line.Length > 2) changes.Add(new GitFileChange(line[2..], null, GitChangeKind.None, GitChangeKind.None, true));
+                    break;
+            }
+        }
+
+        return new GitRepoStatus(branch, upstream, ahead, behind, changes);
+    }
+
+    /// <summary>One letter for a change, as a file list shows it: the worktree's change if there is one, else the index's.</summary>
+    internal static string Letter(GitFileChange c)
+    {
+        if (c.Untracked) return "?";
+        var kind = c.Unstaged != GitChangeKind.None ? c.Unstaged : c.Staged;
+        return kind switch
+        {
+            GitChangeKind.Added => "A",
+            GitChangeKind.Deleted => "D",
+            GitChangeKind.Renamed => "R",
+            GitChangeKind.Copied => "C",
+            GitChangeKind.TypeChanged => "T",
+            GitChangeKind.Unmerged => "U",
+            _ => "M",
+        };
+    }
+
     // Folds one "# branch.*" header into the accumulating branch/upstream/ahead/behind.
     private static void ParseBranchHeader(string line, ref string? branch, ref string? upstream, ref int ahead, ref int behind)
     {

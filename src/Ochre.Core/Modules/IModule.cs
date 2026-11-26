@@ -57,6 +57,9 @@ internal interface IModuleContext
     /// <summary>Registers the module's bridge handlers on every window's dispatcher, now and for windows opened later.</summary>
     void AddBridge(Action<BridgeDispatcher> register);
 
+    /// <summary>A window closed; its dispatcher (the one <see cref="AddBridge"/> was given) is a key for per-window state.</summary>
+    void OnWindowClosed(Action<BridgeDispatcher> handler);
+
     /// <summary>Sends an event to every open window. Safe from any thread.</summary>
     void Broadcast<T>(string name, T payload, JsonTypeInfo<T> info);
 

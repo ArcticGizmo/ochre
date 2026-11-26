@@ -1,4 +1,5 @@
 using Ochre.Core.Modules;
+using Ochre.Modules.Editor;
 using Ochre.Modules.Git;
 using Ochre.Modules.Notifications;
 using Ochre.Modules.Roost;
@@ -22,5 +23,6 @@ internal static class ModuleCatalog
         new ShutdownParkModule(),
         new NotificationsModule(),
         new RoostModule(),
+        new EditorModule(),
     ];
 }

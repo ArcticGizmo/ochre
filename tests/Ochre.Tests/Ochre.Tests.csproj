@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\modules\Ochre.Modules.Git\Ochre.Modules.Git.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Sprig\Ochre.Modules.Sprig.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Roost\Ochre.Modules.Roost.csproj" />
+    <ProjectReference Include="..\..\modules\Ochre.Modules.Editor\Ochre.Modules.Editor.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="fixtures\**\*.*" CopyToOutputDirectory="PreserveNewest" />

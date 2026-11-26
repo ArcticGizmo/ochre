@@ -77,11 +77,14 @@ internal sealed class WindowHost : IWindowHost
     {
         lock (_gate) _sessions.Remove(session);
         _host.AttentionViews.Remove(session.Window);
+        _host.Modules.WindowClosed(session.Dispatcher);
     }
 
     private sealed class Session(WindowHost owner, BridgeDispatcher dispatcher, Action<string> post, IShellWindow window) : IWindowSession
     {
         public IShellWindow Window => window;
+
+        public BridgeDispatcher Dispatcher => dispatcher;
 
         public void Post(string message) => post(message);
 

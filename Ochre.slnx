@@ -6,6 +6,7 @@
     <Project Path="src/Ochre.Platform.Windows/Ochre.Platform.Windows.csproj" />
   </Folder>
   <Folder Name="/modules/">
+    <Project Path="modules/Ochre.Modules.Editor/Ochre.Modules.Editor.csproj" />
     <Project Path="modules/Ochre.Modules.Git/Ochre.Modules.Git.csproj" />
     <Project Path="modules/Ochre.Modules.Notifications/Ochre.Modules.Notifications.csproj" />
     <Project Path="modules/Ochre.Modules.Roost/Ochre.Modules.Roost.csproj" />

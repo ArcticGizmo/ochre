@@ -96,6 +96,25 @@ internal sealed class ModuleHost : IDisposable
         }
     }
 
+    /// <summary>A window closed: running modules drop what they kept for it. One failing doesn't stop the rest.</summary>
+    public void WindowClosed(BridgeDispatcher dispatcher)
+    {
+        foreach (var r in _running)
+        {
+            foreach (var handler in r.Context.WindowClosedHandlers)
+            {
+                try
+                {
+                    handler(dispatcher);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or ObjectDisposedException)
+                {
+                    _kernel.Log.Error($"module {r.Module.Id} failed handling a closed window", ex);
+                }
+            }
+        }
+    }
+
     /// <summary>Windows is ending the session. Each handler runs in turn; one failing doesn't stop the rest.</summary>
     public void SessionEnding()
     {
@@ -137,6 +156,7 @@ internal sealed class ModuleHost : IDisposable
     {
         public List<Action<BridgeDispatcher>> Bridges { get; } = [];
         public List<Action> SessionEndingHandlers { get; } = [];
+        public List<Action<BridgeDispatcher>> WindowClosedHandlers { get; } = [];
         public List<IWorktreeProvider> WorktreeProviders { get; } = [];
 
         public AppLog Log => kernel.Log;
@@ -156,6 +176,8 @@ internal sealed class ModuleHost : IDisposable
                 : throw new InvalidOperationException($"no {typeof(T).Name} on this platform");
 
         public void AddBridge(Action<BridgeDispatcher> register) => Bridges.Add(register);
+
+        public void OnWindowClosed(Action<BridgeDispatcher> handler) => WindowClosedHandlers.Add(handler);
 
         public void Broadcast<T>(string name, T payload, JsonTypeInfo<T> info)
         {

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using Ochre.Core.Claude;
-using Ochre.Modules.Git;
+using Ochre.Core.Git;
 using Xunit;
 
 namespace Ochre.Tests;

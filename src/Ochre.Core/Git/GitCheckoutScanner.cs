@@ -1,4 +1,4 @@
-namespace Ochre.Modules.Git;
+namespace Ochre.Core.Git;
 
 /// <summary>
 /// Reads what a checkout is from disk rather than running <c>git</c>: a task can name several folders and every

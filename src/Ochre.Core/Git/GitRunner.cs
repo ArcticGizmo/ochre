@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Ochre.Core.Claude;
 
-namespace Ochre.Modules.Git;
+namespace Ochre.Core.Git;
 
 /// <summary>
 /// The one place Ochre starts <c>git</c>. Ochre runs git by itself in repos it didn't choose: the status of every

@@ -1,4 +1,5 @@
 using Ochre.Core.Claude;
+using Ochre.Core.Git;
 using Ochre.Core.Modules;
 using Ochre.Core.Tasks;
 using Ochre.Modules.Git;
@@ -49,8 +50,8 @@ public sealed class GitWorktreeProviderTests : IDisposable
         Assert.Equal("main", plan.Base);
 
         var made = await _provider.CreateAsync(repo, "t-0001/fix", CancellationToken.None);
-        Assert.True(File.Exists(Path.Combine(made.Path, "a.txt")));
-        Assert.Equal("t-0001/fix", GitStatusReader.Read(made.Path)!.Value.Branch);
+        Assert.True(File.Exists(Path.Combine(made.Path!, "a.txt")));
+        Assert.Equal("t-0001/fix", GitStatusReader.Read(made.Path!)!.Value.Branch);
 
         // Checked out now, so a second one on the same branch is refused.
         var refused = await Assert.ThrowsAsync<WorktreeException>(() => _provider.PlanAsync(repo, "t-0001/fix", CancellationToken.None));
@@ -63,25 +64,25 @@ public sealed class GitWorktreeProviderTests : IDisposable
         if (_git is null) return;
         var repo = Repo();
         var made = await _provider.CreateAsync(repo, "t-0002", CancellationToken.None);
-        var worktree = new TaskWorktree(made.Path, repo, _provider.Id, made.Branch, null);
+        var worktree = new TaskWorktree(made.Path!, repo, _provider.Id, made.Branch, null);
 
         var clean = await _provider.CheckAsync(worktree, CancellationToken.None);
         Assert.Equal(new WorktreeCheck(true, "t-0002", 0, 0), clean);
 
-        File.WriteAllText(Path.Combine(made.Path, "b.txt"), "work\n");
-        Git(made.Path, "add", "-A");
-        Git(made.Path, "commit", "-q", "-m", "work");
-        File.WriteAllText(Path.Combine(made.Path, "c.txt"), "not committed\n");
+        File.WriteAllText(Path.Combine(made.Path!, "b.txt"), "work\n");
+        Git(made.Path!, "add", "-A");
+        Git(made.Path!, "commit", "-q", "-m", "work");
+        File.WriteAllText(Path.Combine(made.Path!, "c.txt"), "not committed\n");
 
         var busy = await _provider.CheckAsync(worktree, CancellationToken.None);
         Assert.Equal(new WorktreeCheck(true, "t-0002", 1, 1), busy);
 
         // Uncommitted work: refused without the user's say-so.
         await Assert.ThrowsAsync<WorktreeException>(() => _provider.RemoveAsync(worktree, discardChanges: false, deleteBranch: false, CancellationToken.None));
-        Assert.True(Directory.Exists(made.Path));
+        Assert.True(Directory.Exists(made.Path!));
 
         await _provider.RemoveAsync(worktree, discardChanges: true, deleteBranch: false, CancellationToken.None);
-        Assert.False(Directory.Exists(made.Path));
+        Assert.False(Directory.Exists(made.Path!));
         Assert.True(BranchExists(repo, "t-0002"));
 
         // Gone from disk: removing again only tidies up, and now deletes the branch as asked.
@@ -100,21 +101,21 @@ public sealed class GitWorktreeProviderTests : IDisposable
         if (_git is null) return;
         var repo = Repo();
         var made = await _provider.CreateAsync(repo, "t-0003", CancellationToken.None);
-        var worktree = new TaskWorktree(made.Path, repo, _provider.Id, made.Branch, null);
-        Git(repo, "worktree", "remove", made.Path);
-        Directory.CreateDirectory(made.Path);
+        var worktree = new TaskWorktree(made.Path!, repo, _provider.Id, made.Branch, null);
+        Git(repo, "worktree", "remove", made.Path!);
+        Directory.CreateDirectory(made.Path!);
 
         var check = await _provider.CheckAsync(worktree, CancellationToken.None);
         Assert.False(check.Exists);
         Assert.Equal(0, check.Changed);
         await _provider.RemoveAsync(worktree, discardChanges: false, deleteBranch: false, CancellationToken.None);
-        Assert.False(Directory.Exists(made.Path));
+        Assert.False(Directory.Exists(made.Path!));
 
-        Directory.CreateDirectory(made.Path);
-        File.WriteAllText(Path.Combine(made.Path, "keep.txt"), "mine\n");
+        Directory.CreateDirectory(made.Path!);
+        File.WriteAllText(Path.Combine(made.Path!, "keep.txt"), "mine\n");
         Assert.True((await _provider.CheckAsync(worktree, CancellationToken.None)).Exists);
         await Assert.ThrowsAsync<WorktreeException>(() => _provider.RemoveAsync(worktree, discardChanges: true, deleteBranch: false, CancellationToken.None));
-        Assert.True(File.Exists(Path.Combine(made.Path, "keep.txt")));
+        Assert.True(File.Exists(Path.Combine(made.Path!, "keep.txt")));
     }
 
     [Theory]
@@ -131,5 +132,5 @@ public sealed class GitWorktreeProviderTests : IDisposable
     [InlineData("a@{1}", false)]
     [InlineData("a*", false)]
     public void Branch_names_are_checked_before_git_sees_them(string name, bool ok) =>
-        Assert.Equal(ok, GitWorktreeProvider.IsBranchName(name));
+        Assert.Equal(ok, GitBranches.IsValidName(name));
 }

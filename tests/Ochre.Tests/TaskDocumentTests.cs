@@ -281,7 +281,7 @@ public class TaskDocumentTests
         Assert.Equal(
             [
                 new TaskWorktree(@"C:\git\example-app.worktrees\t-0050-fix", @"C:\git\example-app", "git-worktree", "t-0050-fix", new DateTimeOffset(2026, 11, 26, 10, 0, 0, TimeSpan.Zero)),
-                new TaskWorktree(@"C:\git\example-app.worktrees\slot-2", @"C:\git\example-app", "sprig", null, null),
+                new TaskWorktree(@"C:\git\example-app.worktrees\slot-2", @"C:\git\example-app", "sprig", null, null, "slot-2"),
             ],
             doc.Worktrees);
         Assert.Equal(2, doc.ToSummary("T-0050").Worktrees.Count);
@@ -298,10 +298,10 @@ public class TaskDocumentTests
         var doc = TaskDocument.Parse(Lf(WithWorktrees));
         var created = new DateTimeOffset(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
 
-        doc.AddWorktree(new TaskWorktree(@"C:\git\example-app.worktrees\t-0050-more", @"C:\git\example-app", "git-worktree", "t-0050-more", created));
+        doc.AddWorktree(new TaskWorktree(@"C:\git\example-app.worktrees\t-0050-more", @"C:\git\example-app", "git-worktree", "t-0050-more", created, "web/3"));
         var added = doc.Serialize();
         Assert.Contains(
-            "  - path: C:\\git\\example-app.worktrees\\t-0050-more\n    repo: C:\\git\\example-app\n    provider: git-worktree\n    branch: t-0050-more\n    created: 2026-11-26T12:00:00Z\n---",
+            "  - path: C:\\git\\example-app.worktrees\\t-0050-more\n    repo: C:\\git\\example-app\n    provider: git-worktree\n    branch: t-0050-more\n    created: 2026-11-26T12:00:00Z\n    key: web/3\n---",
             added,
             StringComparison.Ordinal);
 

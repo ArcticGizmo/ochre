@@ -33,7 +33,8 @@ internal static class WorktreeApi
         {
             var (id, repo, provider, branch) = Check(r, store, modules);
             var plan = await Refusing(() => provider.CreateAsync(repo, branch, CancellationToken.None)).ConfigureAwait(true);
-            var worktree = new TaskWorktree(plan.Path, repo, provider.Id, plan.Branch, DateTimeOffset.UtcNow);
+            var path = plan.Path ?? throw new BridgeRejectException($"{provider.Name} made the checkout but didn't say where");
+            var worktree = new TaskWorktree(path, repo, provider.Id, plan.Branch, DateTimeOffset.UtcNow, plan.Key);
             try
             {
                 await store.UpdateAsync(id, UserAuthor, doc =>
@@ -44,7 +45,7 @@ internal static class WorktreeApi
             }
             catch (Exception ex) when (ex is KeyNotFoundException or TaskFormatException)
             {
-                throw new BridgeRejectException($"the worktree was made at {plan.Path}, but the task couldn't record it: {ex.Message}");
+                throw new BridgeRejectException($"the worktree was made at {path}, but the task couldn't record it: {ex.Message}");
             }
             return ToDto(worktree);
         });
@@ -54,9 +55,9 @@ internal static class WorktreeApi
             var worktree = Find(r.TaskId, r.Path, store);
             var agents = RunningAgentsIn(worktree.Path, sessions);
             if (modules.WorktreeProvider(worktree.Provider) is not { } provider)
-                return new WorktreeCheckDto(Directory.Exists(worktree.Path), worktree.Branch, 0, null, agents, false);
+                return new WorktreeCheckDto(Directory.Exists(worktree.Path), worktree.Branch, 0, null, agents, false, false, "Remove", "");
             var check = await Refusing(() => provider.CheckAsync(worktree, CancellationToken.None)).ConfigureAwait(true);
-            return new WorktreeCheckDto(check.Exists, check.Branch, check.Changed, check.UnpushedCommits, agents, true);
+            return new WorktreeCheckDto(check.Exists, check.Branch, check.Changed, check.UnpushedCommits, agents, true, check.CanDiscardChanges, provider.RemoveLabel, provider.RemoveDescription);
         });
 
         bridge.Handle("worktrees.remove", j.RemoveWorktreeRequest, j.Ack, async r =>
@@ -84,7 +85,7 @@ internal static class WorktreeApi
     }
 
     public static WorktreeDto ToDto(TaskWorktree w) =>
-        new(w.Path, w.Repo, w.Provider, w.Branch, w.Created?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture), Directory.Exists(w.Path));
+        new(w.Path, w.Repo, w.Provider, w.Branch, w.Created?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture), Directory.Exists(w.Path), w.Key);
 
     private static (string Id, string Repo, IWorktreeProvider Provider, string Branch) Check(WorktreeRequest r, TaskStore store, ModuleHost modules)
     {

@@ -64,7 +64,7 @@ Free-form notes, decisions, gotchas.
 ```
 
 - Plan items carry **stable ids** (`{#p3}`) so agents address items by id, not by position.
-- `worktrees` lists the checkouts made for the task by a worktree provider (ADR 0012): the git module's `git-worktree`, later sprig. It is the one list of a task's checkouts; agents and terminals can start in any of them, and with the provider's module off they are plain folders. Keys a provider adds that this version doesn't know are kept on every write.
+- `worktrees` lists the checkouts made for the task by a worktree provider (ADR 0012): the git module's `git-worktree`, or the sprig module's `sprig`, whose entries also carry `key:` (the sprig workspace, e.g. `shop/2`). It is the one list of a task's checkouts; agents and terminals can start in any of them, and with the provider's module off they are plain folders. Keys a provider adds that this version doesn't know are kept on every write.
 - `links` is the **data-source hub**: kind + ref + a short title and summary. Detail is fetched on demand through the module that owns the link kind (`LinkResolver`).
 
 ## Lifecycle

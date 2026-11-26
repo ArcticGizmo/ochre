@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\src\Ochre.Core\Ochre.Core.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Terminals\Ochre.Modules.Terminals.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Git\Ochre.Modules.Git.csproj" />
+    <ProjectReference Include="..\..\modules\Ochre.Modules.Sprig\Ochre.Modules.Sprig.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="fixtures\**\*.*" CopyToOutputDirectory="PreserveNewest" />

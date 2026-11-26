@@ -20,7 +20,8 @@ public sealed record ParkNote(DateTimeOffset At, string Note);
 /// <param name="Repo">The task repo it was made from.</param>
 /// <param name="Provider">The provider that made it and can remove it (<c>git-worktree</c>).</param>
 /// <param name="Branch">The branch checked out there, as created.</param>
-public sealed record TaskWorktree(string Path, string Repo, string Provider, string? Branch, DateTimeOffset? Created);
+/// <param name="Key">The provider's own name for it, e.g. a sprig workspace key (<c>shop/2</c>).</param>
+public sealed record TaskWorktree(string Path, string Repo, string Provider, string? Branch, DateTimeOffset? Created, string? Key = null);
 
 /// <param name="Line">Index of the item's line in the task body; only valid for the document it came from.</param>
 public sealed record PlanItem(string? Id, string Text, bool Done, int Indent, int Line, IReadOnlyList<PlanItem> Children)

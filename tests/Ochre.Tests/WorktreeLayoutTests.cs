@@ -1,3 +1,4 @@
+using Ochre.Core.Git;
 using Ochre.Modules.Git;
 using Xunit;
 

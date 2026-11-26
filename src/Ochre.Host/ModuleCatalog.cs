@@ -1,6 +1,7 @@
 using Ochre.Core.Modules;
 using Ochre.Modules.Git;
 using Ochre.Modules.ShutdownPark;
+using Ochre.Modules.Sprig;
 using Ochre.Modules.Terminals;
 
 namespace Ochre.Host;
@@ -14,6 +15,7 @@ internal static class ModuleCatalog
     public static IReadOnlyList<IModule> Create() =>
     [
         new GitModule(),
+        new SprigModule(),
         new TerminalsModule(),
         new ShutdownParkModule(),
     ];

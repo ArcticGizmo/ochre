@@ -1,4 +1,4 @@
-using Ochre.Modules.Git;
+using Ochre.Core.Git;
 using Xunit;
 
 namespace Ochre.Tests;

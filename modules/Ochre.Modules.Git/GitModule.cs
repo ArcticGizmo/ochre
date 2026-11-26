@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Ochre.Core.Bridge;
+using Ochre.Core.Git;
 using Ochre.Core.Modules;
 using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;

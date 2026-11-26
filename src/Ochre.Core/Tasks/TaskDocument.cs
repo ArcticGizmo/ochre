@@ -182,7 +182,7 @@ public sealed partial class TaskDocument
 
     /// <summary>Entries without a path or provider are left out here but kept in the file.</summary>
     public IReadOnlyList<TaskWorktree> Worktrees => Mappings("worktrees")
-        .Select(m => new TaskWorktree(Scalar(m, "path") ?? "", Scalar(m, "repo") ?? "", Scalar(m, "provider") ?? "", Scalar(m, "branch"), ParseTimestamp(Scalar(m, "created"))))
+        .Select(m => new TaskWorktree(Scalar(m, "path") ?? "", Scalar(m, "repo") ?? "", Scalar(m, "provider") ?? "", Scalar(m, "branch"), ParseTimestamp(Scalar(m, "created")), Scalar(m, "key")))
         .Where(w => w.Path.Length > 0 && w.Provider.Length > 0)
         .ToList();
 
@@ -191,6 +191,7 @@ public sealed partial class TaskDocument
         var map = new YamlMappingNode { { "path", SingleLine(worktree.Path) }, { "repo", SingleLine(worktree.Repo) }, { "provider", SingleLine(worktree.Provider) } };
         if (worktree.Branch is { } branch) map.Add("branch", SingleLine(branch));
         if (worktree.Created is { } created) map.Add("created", Format(created));
+        if (worktree.Key is { } key) map.Add("key", SingleLine(key));
         SequenceFor("worktrees").Add(map);
         _frontDirty = true;
     }

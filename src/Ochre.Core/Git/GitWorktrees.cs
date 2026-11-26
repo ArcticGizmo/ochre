@@ -1,4 +1,4 @@
-namespace Ochre.Modules.Git;
+namespace Ochre.Core.Git;
 
 /// <summary>One linked worktree of a repository: its folder and the branch checked out there (null when detached).</summary>
 internal sealed record GitWorktree(string Path, string? Branch);

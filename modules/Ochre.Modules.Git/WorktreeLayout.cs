@@ -1,3 +1,5 @@
+using Ochre.Core.Git;
+
 namespace Ochre.Modules.Git;
 
 /// <summary>Where a <see cref="WorktreeLayout"/> came from: the user's existing worktrees, a hint in an ignore file,

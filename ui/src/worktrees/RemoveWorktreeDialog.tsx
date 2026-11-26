@@ -44,7 +44,7 @@ export function RemoveWorktreeDialog({ taskId, worktree, onClose }: Props) {
     };
   }, [taskId, path]);
 
-  const blocked = !check || !check.providerRunning || check.runningAgents > 0 || (check.changed > 0 && !discard);
+  const blocked = !check || !check.providerRunning || check.runningAgents > 0 || (check.changed > 0 && (!check.canDiscardChanges || !discard));
 
   async function remove() {
     if (!worktree || !check || blocked) return;
@@ -63,7 +63,7 @@ export function RemoveWorktreeDialog({ taskId, worktree, onClose }: Props) {
   return (
     <Dialog
       open={worktree !== null}
-      title="Remove this worktree?"
+      title={check?.providerRunning ? `${check.removeLabel}?` : 'Remove this worktree?'}
       onClose={onClose}
       onSubmit={remove}
       actions={
@@ -72,7 +72,7 @@ export function RemoveWorktreeDialog({ taskId, worktree, onClose }: Props) {
             Cancel
           </button>
           <button type="submit" className="danger" disabled={busy || blocked}>
-            Remove worktree
+            {check?.providerRunning ? check.removeLabel : 'Remove worktree'}
           </button>
         </>
       }
@@ -87,8 +87,11 @@ export function RemoveWorktreeDialog({ taskId, worktree, onClose }: Props) {
       {check && check.runningAgents > 0 && <p className="error">{plural(check.runningAgents, 'agent')} working in this folder. Stop them first.</p>}
       {check && check.providerRunning && (
         <>
-          <p>{check.exists ? 'The folder and everything in it is deleted from disk, and the worktree comes off the task.' : 'The folder is already gone; this tidies up and takes it off the task.'}</p>
-          {check.changed > 0 && (
+          <p>{check.exists ? check.removeDescription : 'There is nothing of the task left in it; this tidies up and takes it off the task.'}</p>
+          {check.changed > 0 && !check.canDiscardChanges && (
+            <p className="error">{plural(check.changed, 'uncommitted change')} in it. Commit or stash them first.</p>
+          )}
+          {check.changed > 0 && check.canDiscardChanges && (
             <label className="check-field">
               <input type="checkbox" checked={discard} onChange={(e) => setDiscard(e.target.checked)} />
               <span>

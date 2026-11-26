@@ -143,6 +143,8 @@ public sealed class ModuleHostTests : IDisposable
     {
         public string Id => id;
         public string Name => id;
+        public string RemoveLabel => "Remove";
+        public string RemoveDescription => "";
         public Task<WorktreePlan> PlanAsync(string repo, string branch, CancellationToken ct) => throw new NotSupportedException();
         public Task<WorktreePlan> CreateAsync(string repo, string branch, CancellationToken ct) => throw new NotSupportedException();
         public Task<WorktreeCheck> CheckAsync(TaskWorktree worktree, CancellationToken ct) => throw new NotSupportedException();

@@ -282,6 +282,73 @@ export interface ShellProfileDto {
   name: string;
 }
 
+export interface SprigActRequest {
+  taskId: string;
+  key: string;
+  action: string;
+  app: string | null;
+}
+
+export interface SprigActResult {
+  ok: boolean;
+  code: string | null;
+  error: string | null;
+  needsSprig: boolean;
+}
+
+export interface SprigAppDto {
+  name: string;
+  shortName: string;
+  state: string;
+  port: number | null;
+  exit: number | null;
+  error: string | null;
+  doing: string | null;
+  hasLog: boolean;
+}
+
+export interface SprigLogDto {
+  app: string;
+  path: string;
+  text: string;
+  truncated: boolean;
+}
+
+export interface SprigLogRequest {
+  taskId: string;
+  key: string;
+  app: string;
+}
+
+export interface SprigTaskRequest {
+  taskId: string;
+}
+
+export interface SprigTaskStatus {
+  feed: string;
+  hostRunning: boolean;
+  workspaces: SprigWorkspaceDto[];
+}
+
+export interface SprigWorkspaceDto {
+  key: string;
+  label: string;
+  state: string;
+  stateText: string;
+  inTrouble: boolean;
+  activity: string;
+  ready: number;
+  of: number;
+  error: string | null;
+  folders: string[];
+  apps: SprigAppDto[];
+}
+
+export interface SprigWorkspaceRequest {
+  taskId: string;
+  key: string;
+}
+
 export interface StartSessionRequest {
   taskId: string;
   cwd: string;
@@ -412,6 +479,9 @@ export interface WorktreeCheckDto {
   unpushedCommits: number | null;
   runningAgents: number;
   providerRunning: boolean;
+  canDiscardChanges: boolean;
+  removeLabel: string;
+  removeDescription: string;
 }
 
 export interface WorktreeDto {
@@ -421,6 +491,7 @@ export interface WorktreeDto {
   branch: string | null;
   created: string | null;
   exists: boolean;
+  key: string | null;
 }
 
 export interface WorktreePathRequest {
@@ -429,7 +500,7 @@ export interface WorktreePathRequest {
 }
 
 export interface WorktreePlanDto {
-  path: string;
+  path: string | null;
   branch: string;
   newBranch: boolean;
   base: string | null;
@@ -481,6 +552,10 @@ export interface Requests {
   'worktrees.check': { req: WorktreePathRequest; res: WorktreeCheckDto };
   'worktrees.remove': { req: RemoveWorktreeRequest; res: Ack };
   'git.status': { req: GitStatusRequest; res: GitFolderStatus[] };
+  'sprig.status': { req: SprigTaskRequest; res: SprigTaskStatus };
+  'sprig.act': { req: SprigActRequest; res: SprigActResult };
+  'sprig.log': { req: SprigLogRequest; res: SprigLogDto };
+  'sprig.open': { req: SprigWorkspaceRequest; res: SprigActResult };
   'terminals.profiles': { req: Empty; res: ShellProfileDto[] };
   'terminals.list': { req: Empty; res: TerminalDto[] };
   'terminals.open': { req: OpenTerminalRequest; res: TerminalDto };
@@ -501,6 +576,7 @@ export interface Events {
   'sessions.update': SessionUpdateEvent;
   'sessions.changed': Empty;
   'git.changed': GitChangedEvent;
+  'sprig.changed': Empty;
   'terminals.output': TerminalOutputEvent;
   'terminals.changed': Empty;
 }

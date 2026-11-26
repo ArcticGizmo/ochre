@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using Ochre.Core.Git;
 using Ochre.Core.Modules;
 using Ochre.Core.Tasks;
 
@@ -10,7 +10,7 @@ namespace Ochre.Modules.Git;
 /// asked for, so they run as <see cref="GitRunner.Trust.UserAction"/>: the repo's hooks run as they would in a
 /// terminal.
 /// </summary>
-internal sealed partial class GitWorktreeProvider : IWorktreeProvider
+internal sealed class GitWorktreeProvider : IWorktreeProvider
 {
     private const int ReadTimeoutMs = 10_000;
 
@@ -19,13 +19,8 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
 
     public string Id => "git-worktree";
     public string Name => "Git worktree";
-
-    // Narrower than git's own rules (git check-ref-format): no spaces, globs or control characters, no component
-    // starting with a dot or ending in .lock, no "..", "//" or leading dash, so it is also a safe folder name.
-    [GeneratedRegex(@"^(?!-)(?!.*\.\.)(?!.*//)(?!.*(?:^|/)\.)(?!.*\.lock(?:/|$))(?!.*[/.]$)[A-Za-z0-9._/-]{1,100}$")]
-    private static partial Regex BranchName();
-
-    public static bool IsBranchName(string branch) => BranchName().IsMatch(branch);
+    public string RemoveLabel => "Remove worktree";
+    public string RemoveDescription => "The folder and everything in it is deleted from disk, and the worktree comes off the task.";
 
     public Task<WorktreePlan> PlanAsync(string repo, string branch, CancellationToken ct) => Task.Run(() => Plan(repo, branch), ct);
 
@@ -33,11 +28,12 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
     {
         var plan = Plan(repo, branch);
         var root = RepoOf(repo).Set.Root;
+        var path = plan.Path!;
         string[] args = plan.NewBranch
-            ? ["worktree", "add", "-b", plan.Branch, plan.Path]
-            : ["worktree", "add", plan.Path, plan.Branch];
+            ? ["worktree", "add", "-b", plan.Branch, path]
+            : ["worktree", "add", path, plan.Branch];
         var r = GitRunner.Run(root, WriteTimeoutMs, GitRunner.Trust.UserAction, null, args);
-        if (r.Exit != 0) throw new WorktreeException(Error(r));
+        if (r.Exit != 0) throw new WorktreeException(GitBranches.Error(r));
         return plan;
     }, ct);
 
@@ -49,8 +45,8 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
         var changed = registered && exists ? GitStatusReader.Read(worktree.Path)?.Changes.Count ?? 0 : 0;
         var branch = CurrentBranch(worktree);
         var root = GitWorktreeScanner.Read(worktree.Repo)?.Root ?? worktree.Repo;
-        int? unpushed = branch is null ? 0 : UnpushedCommits(root, branch);
-        if (unpushed is null && !BranchExists(root, branch!)) (branch, unpushed) = (null, 0);
+        int? unpushed = branch is null ? 0 : GitBranches.UnpushedCommits(root, branch);
+        if (unpushed is null && GitBranches.Exists(root, branch!) == false) (branch, unpushed) = (null, 0);
         return new WorktreeCheck(exists, branch, changed, unpushed);
     }, ct);
 
@@ -58,10 +54,9 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
     {
         var branch = CurrentBranch(worktree);
         var root = GitWorktreeScanner.Read(worktree.Repo)?.Root ?? worktree.Repo;
-        GitRunner.Result r;
         if (Directory.Exists(worktree.Path) && IsRegistered(worktree))
         {
-            r = discardChanges
+            var r = discardChanges
                 ? GitRunner.Run(root, WriteTimeoutMs, GitRunner.Trust.UserAction, null, "worktree", "remove", "--force", worktree.Path)
                 : GitRunner.Run(root, WriteTimeoutMs, GitRunner.Trust.UserAction, null, "worktree", "remove", worktree.Path);
             if (r.Exit != 0)
@@ -70,7 +65,7 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
                 // open. What's left is an empty folder, which a second try clears.
                 if (!IsRegistered(worktree))
                     throw new WorktreeException("git removed the worktree's files but couldn't delete the folder itself; a terminal, editor or other program probably has it open. Close it, then remove again to finish.");
-                throw new WorktreeException(Error(r));
+                throw new WorktreeException(GitBranches.Error(r));
             }
         }
         else
@@ -92,19 +87,15 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
             GitRunner.Run(root, ReadTimeoutMs, GitRunner.Trust.UserAction, null, "worktree", "prune");
         }
 
-        if (deleteBranch && branch is not null && BranchExists(root, branch))
-        {
-            r = GitRunner.Run(root, ReadTimeoutMs, GitRunner.Trust.UserAction, null, "branch", "-D", branch);
-            if (r.Exit != 0) throw new WorktreeException($"the worktree is removed, but {branch} wasn't deleted: {Error(r)}");
-        }
+        if (deleteBranch && branch is not null && GitBranches.Exists(root, branch) == true && GitBranches.Delete(root, branch) is { } why)
+            throw new WorktreeException($"the worktree is removed, but {branch} wasn't deleted: {why}");
     }, ct);
 
     /// <summary>Where <c>git worktree add</c> would put <paramref name="branch"/>, or why it can't. Blocking IO.</summary>
     internal static WorktreePlan Plan(string repo, string branch)
     {
         branch = branch.Trim();
-        if (!IsBranchName(branch))
-            throw new WorktreeException("a branch name is letters, digits and . _ - /, with no spaces, no \"..\" and no part starting with a dot");
+        if (!GitBranches.IsValidName(branch)) throw new WorktreeException(GitBranches.NameRule);
         var (set, common) = RepoOf(repo);
         if (set.PathOfBranch(branch) is { } at) throw new WorktreeException($"{branch} is already checked out in {at}");
 
@@ -114,7 +105,7 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
         if (File.Exists(path) || (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any()))
             throw new WorktreeException($"{path} already exists");
 
-        var exists = BranchExists(set.Root, branch);
+        var exists = GitBranches.Exists(set.Root, branch) ?? throw new WorktreeException($"git couldn't say whether {branch} exists in {set.Root}");
         var from = exists ? null : GitWorktreeScanner.BranchOfHead(Path.Combine(common, "HEAD")) ?? "the current commit";
         return new WorktreePlan(path, branch, !exists, from);
     }
@@ -149,25 +140,6 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
         }
     }
 
-    private static bool BranchExists(string root, string branch)
-    {
-        var r = GitRunner.Run(root, ReadTimeoutMs, "rev-parse", "--verify", "--quiet", "refs/heads/" + branch);
-        return r.Exit switch
-        {
-            0 => true,
-            1 => false,
-            _ => throw new WorktreeException(Error(r)),
-        };
-    }
-
-    // Commits on the branch that no other local branch or remote-tracking ref has; null when git couldn't say
-    // (for one, because the branch is gone).
-    private static int? UnpushedCommits(string root, string branch)
-    {
-        var r = GitRunner.Run(root, ReadTimeoutMs, "rev-list", "--count", "refs/heads/" + branch, "--not", "--exclude=" + branch, "--branches", "--remotes");
-        return r.Exit == 0 && int.TryParse(r.Stdout.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : null;
-    }
-
     private static string? ReadIfExists(string path)
     {
         try
@@ -178,16 +150,5 @@ internal sealed partial class GitWorktreeProvider : IWorktreeProvider
         {
             return null;
         }
-    }
-
-    // git's own message without its "fatal:"/"error:" prefixes; the user acts on it.
-    internal static string Error(GitRunner.Result r)
-    {
-        if (r.Exit == -1) return "git didn't finish (it timed out, or couldn't be started)";
-        var lines = r.Stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(l => !l.StartsWith("hint:", StringComparison.Ordinal))
-            .Select(l => l.StartsWith("fatal: ", StringComparison.Ordinal) ? l[7..] : l.StartsWith("error: ", StringComparison.Ordinal) ? l[7..] : l)
-            .ToList();
-        return lines.Count > 0 ? string.Join(" ", lines) : $"git exited with code {r.Exit}";
     }
 }

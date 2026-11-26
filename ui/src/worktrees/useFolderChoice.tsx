@@ -31,8 +31,11 @@ export function useFolderChoice({ taskId, title, repos, worktrees, otherMayBeEmp
 
   const existing = worktrees.filter((w) => w.exists);
   const canMake = taskId !== null && providers.length > 0 && repos.length > 0;
-  // Providers arrive after the dialog opens; fall back to the first until the user picks.
-  const wanted: NewWorktree = { ...newWorktree, repo: newWorktree.repo || repos[0] || '', provider: newWorktree.provider || providers[0]?.id || '' };
+  // The task remembers its last choice by what it made last; providers arrive after the dialog opens, so this is
+  // worked out on each render until the user picks.
+  const latest = [...worktrees].sort((a, b) => (b.created ?? '').localeCompare(a.created ?? ''))[0]?.provider;
+  const preferred = providers.find((p) => p.id === latest)?.id ?? providers[0]?.id ?? '';
+  const wanted: NewWorktree = { ...newWorktree, repo: newWorktree.repo || repos[0] || '', provider: newWorktree.provider || preferred };
 
   function reset(first: string | null) {
     setFolder(first ?? repos[0] ?? OTHER);

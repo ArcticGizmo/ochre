@@ -83,7 +83,7 @@ export function NewWorktreeFields({ taskId, repos, providers, value, onChange }:
         {plan && (
           <small className="muted worktree-plan">
             {plan.newBranch ? `New branch from ${plan.base ?? 'the current commit'}, in ` : 'Checks out the existing branch in '}
-            <PathText path={plan.path} />
+            {plan.path ? <PathText path={plan.path} /> : `a ${providers.find((p) => p.id === value.provider)?.name.toLowerCase() ?? 'folder'} it picks`}
           </small>
         )}
         {problem && <small className="error">{problem}</small>}

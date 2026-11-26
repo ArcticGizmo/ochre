@@ -1,4 +1,4 @@
-using Ochre.Core.Terminals;
+using Ochre.Modules.Terminals;
 using Xunit;
 
 namespace Ochre.Tests;

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Ochre.Core.Terminals;
+namespace Ochre.Modules.Terminals;
 
 /// <summary>
 /// The tail of a terminal's filtered output. Trimmed by whole chunks, which the filter ends on sequence boundaries,

@@ -242,11 +242,67 @@ Planned 2026-11-26. Perch has no terminal code, so everything here is new or lif
 - "View as terminal" for an agent's thread (roadmap, "to look at"): stays unbuilt until dogfooding asks for it.
 - Split panes, search in scrollback, per-tab themes.
 
-## M4 onwards (outline)
+## M4: module host and first modules
+
+Exit (from the roadmap): turn every module off and the kernel still works; turn sprig on and a task's worktree is a sprig slot; two tasks open in two windows on two virtual desktops come back on those desktops after quitting and relaunching.
+
+Planned 2026-11-26 from a survey of Perch main (still `9275e0b`) and the sprig CLI. Findings that shape it: Perch's git code (`GitRunner` 289 lines, `GitCheckoutScanner` 137, `GitWorktrees` 107, `WorktreeLayout` 193) and sprig code (`SprigCli`, `SprigStatus`, `SprigStatusFold`, 680 lines with 38 tests) are UI-free and port cleanly. The git graph is about 2.9k lines plus a 1.1k-line `GitRepoService`, so it gets its own slice and ports only what the loader calls. Perch has no Jira REST code; that module is new. sprig answers every command with `--json` (`checkout -b`, `workspaces`, `watch`, `free`, `logs`), with failures as `{ok:false, code, error}`. The contracts are in [ADR 0012](decisions/0012-module-contracts.md).
+
+Slices are ordered so the exit criterion's three parts come first; the Jira module and git graph follow.
+
+### Slice 1: module host
+
+- `IModule` and `IModuleContext` in Core (ADR 0012). A module contributes bridge handlers with their contract entries, events, shutdown and session-ending hooks, and (from slice 2) extension points. Which modules are on is kept in `settings.json` (`modules: { id: bool }`), read at start; a change takes effect on restart, and Settings offers "Restart Ochre now".
+- First-party modules live in `modules/<Name>/` as their own projects, referencing Core (and the platform services handed to them through the context). The bridge contract is assembled from the kernel's list plus each loaded module's; BridgeGen reads every module so the UI's types never depend on what's switched on.
+- The UI gets a module registry (`ui/src/modules/`): each module declares its contributions (a title-bar view, a task-detail section), and the app renders those of modules `app.info` reports as on.
+- Move the terminal behind a module (`terminal`, on by default): Core's terminal code, its bridge API and messages, its tests. ConPTY and DPAPI stay in `Ochre.Platform.Windows` behind Core interfaces.
+- Auto-park on shutdown becomes a module (`shutdown-park`, off by default), replacing its setting; an existing `autoParkOnShutdown: true` turns the module on once.
+- **Tests:** the kernel with every module off (task store, session lifecycle with the fake `claude`, agent commands) runs through `ModuleHost` with nothing loaded; a module that throws on start is reported and left off rather than taking the host down.
+- Done 2026-11-26; see `docs/testing/m4-modules-testing.md`. `SessionManager` is internal to Core, so the module contracts are internal and shared with the module assemblies, the host and BridgeGen through `InternalsVisibleTo` (ADR 0012, Consequences). `Empty`, `Ack` and the contract records moved to `Ochre.Core.Bridge`; BridgeGen accepts records from the host's, Core's and each module's `Bridge` namespace and refuses two records with one name. Restart quits, releases the instance pipe and mutex, then starts a new host. The Terminals view now derives its selected tab rather than writing a fallback back, so a just-opened tab isn't lost to a list fetched a moment earlier.
+
+### Slice 2: git module and worktrees
+
+- Port `GitRunner`, `GitCheckoutScanner`, `GitWorktrees` (and the parts of `GitRepoService` that read status) with their tests. Commit names Perch, the paths and `9275e0b`.
+- Show each task repo's branch, dirty count and ahead/behind on the task and on Today (deferred from M2), refreshed on window focus and after an agent's turn, never on a tight timer.
+- Kernel extension point `WorktreeProvider` (ADR 0012): create, list, remove a checkout for a task. The git module provides `git-worktree` (`git worktree add` under a `WorktreeLayout` path). "Start agent" and "Open terminal" can start in a new worktree for the task; the task records it (a `worktrees` list in its frontmatter, preserved by older versions as an unknown key).
+- With the git module off, the task shows its repos as plain folders and agents start in them, as today.
+
+### Slice 3: sprig module
+
+- Port `SprigCli`, `SprigStatus`, `SprigStatusFold` with their tests. A second `WorktreeProvider`, `sprig`: `sprig checkout -b <branch> --json` makes the slot; the task's worktree records `provider: sprig` and the workspace key. Nothing starts by itself; "Start apps" runs `sprig up`.
+- One `sprig watch --json` process while the module is on feeds app status (state, port, readiness) to the task and Today; a logs panel tails an app's `logFile` (read with `FileShare.ReadWrite`). "Give slot back" runs `sprig free`, confirmed in a dialog. Errors show sprig's own `code` and message.
+- Which provider a new worktree uses is chosen in the dialog when both are on; the task remembers its last choice.
+
+### Slice 4: multiple windows
+
+- Open a task in its own window (task context menu, a button on the task, `ochre open T-0042`). A window remembers its task (or none), size, position and virtual desktop (`GetWindowDesktopId`) in `%LOCALAPPDATA%\Ochre\windows.json`; on relaunch each window reopens on its desktop (`MoveWindowToDesktop`), falling back to the current one if that desktop is gone.
+- Opening a task already shown in a window on another desktop asks: bring that window here, or open another view here. It never switches desktops.
+- Position is per monitor: port `PlacementMath` and its tests, so a window whose monitor is gone comes back on the primary.
+
+### Slice 5: Jira module
+
+- New code. `TaskSource`: import an issue as a task (key, summary, description as notes, link back). `LinkResolver`: title, summary and live status for a `jira` link, shown on the task; `ochre task fetch <link>` returns detail marked as untrusted (security threat 2).
+- Credentials: site, email and an API token, the token in Windows Credential Manager (`CredWrite`/`CredRead` behind a Core `ISecretStore`), never in settings or logs. Set up from the module's settings section.
+- Needs a Jira site to test against; ask before this slice starts.
+
+### Slice 6: git graph
+
+- Port the graph model (`GraphModels`, `LaneAllocator`, `GraphSnapshot`, `GraphLogReader`, `GraphLoader` and the status calls they need) with `GitGraphTests`. Render it in the web UI (rows, lanes and edges as SVG, refs, worktrees and stashes), paged 2,000 commits at a time. Read-only first; write operations (`GitOps`) and avatars wait.
+- Larger visual change: starts from a design artefact.
+
+### Slice 7: exit run
+
+- Walk the exit criterion by hand, write `docs/testing/m4-testing.md`.
+
+### Not in M4
+
+- Third-party plugins (M7). The contracts are shaped so they can be served out of process later, but nothing loads code that isn't built into Ochre.
+- Live module toggling without a restart; git write operations from the graph; graph avatars.
+
+## M5 onwards (outline)
 
 Re-plan each milestone in detail when it starts. Notes worth keeping now:
 
-- **M4: module host.** This is where the contracts from ADR 0007 get designed, using the real features built in M1 to M3 as the examples. Move terminal, git and others behind modules, then add the "every module off" kernel test. Git graph, Jira, sprig and multi-window follow.
 - **M5 to M8** stay as written in the roadmap; too far out to plan usefully.
 
 ## Housekeeping before starting

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ochre.Core\Ochre.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ochre" />
+    <InternalsVisibleTo Include="Ochre.BridgeGen" />
+    <InternalsVisibleTo Include="Ochre.Tests" />
+  </ItemGroup>
+</Project>

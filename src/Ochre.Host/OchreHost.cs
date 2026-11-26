@@ -1,21 +1,23 @@
 using Ochre.Core;
 using Ochre.Core.Bridge;
 using Ochre.Core.Hosting;
+using Ochre.Core.Modules;
 using Ochre.Core.Platform;
 using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
-using Ochre.Core.Terminals;
 using Ochre.Host.Bridge;
 
 namespace Ochre.Host;
 
 /// <summary>
 /// Owns everything stateful (ADR 0008). Windows are views: closing the last one leaves the host and everything
-/// it owns running until the user quits from the tray.
+/// it owns running until the user quits from the tray. The kernel is built here; features beyond it are modules
+/// (ADR 0007, 0012).
 /// </summary>
 internal sealed class OchreHost : IDisposable
 {
-    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log, ITerminalPlatform terminalPlatform, IDataProtector protector, IUrlOpener urls)
+    /// <param name="services">Platform services modules may ask for, keyed by their Core interface.</param>
+    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log, IUrlOpener urls, IReadOnlyDictionary<Type, object> services)
     {
         Urls = urls;
         Profile = profile;
@@ -29,28 +31,21 @@ internal sealed class OchreHost : IDisposable
         var ledger = new SessionLedger(paths.SessionLedger);
         Sessions = new SessionManager(Tasks, ledger, log, profile, new SessionSystem { LocateCli = AgentCli.Locate });
         Sessions.LoadDormant();
-        Shutdown = new ShutdownParker(Tasks, Sessions, ledger, () => Settings.AutoParkOnShutdown, log);
-        Shutdown.ClearAtStart();
         Sessions.Changed += (session, changes) =>
             Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.update", SessionApi.Update(session, changes), AppJson.Default.SessionUpdateEvent));
         Sessions.ListChanged += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.changed", new Empty(), AppJson.Default.Empty));
         Sessions.StartObserving();
         Parking = new ParkCoordinator(Tasks, Sessions, ParkRequests, log);
         Parking.Changed += id => Windows.Broadcast(BridgeDispatcher.SerializeEvent("tasks.changed", new TaskChangedEvent(id), AppJson.Default.TaskChangedEvent));
-        Terminals = new TerminalManager(terminalPlatform, log);
-        Terminals.Output += (t, data, seq) =>
-            Windows.Broadcast(BridgeDispatcher.SerializeEvent("terminals.output", new TerminalOutputEvent(t.Id, data, seq), AppJson.Default.TerminalOutputEvent));
-        Terminals.Changed += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("terminals.changed", new Empty(), AppJson.Default.Empty));
-        TerminalSaver = new TerminalPersistence(Terminals, new TerminalStore(paths.Terminals, protector), log);
-        var restored = TerminalSaver.RestoreAll();
-        if (restored > 0) log.Info($"restored {restored} terminal tab(s)");
+
+        Modules = new ModuleHost(
+            ModuleCatalog.Create(),
+            Settings.ModuleEnabled,
+            new ModuleKernel(log, paths.LocalRoot, Tasks, Sessions, ledger, services, Windows.Broadcast));
+        Modules.StartAll();
     }
 
-    /// <summary>Saves the terminal tabs and their (encrypted) scrollback so they come back after a quit.</summary>
-    public TerminalPersistence TerminalSaver { get; }
-
-    /// <summary>Terminal tabs; their shells keep running with every window closed, until the host quits.</summary>
-    public TerminalManager Terminals { get; }
+    public ModuleHost Modules { get; }
 
     /// <summary>Opens web links in the user's browser.</summary>
     public IUrlOpener Urls { get; }
@@ -61,9 +56,6 @@ internal sealed class OchreHost : IDisposable
 
     public OchreSettings Settings { get; }
 
-    /// <summary>Parks tasks when Windows ends the session, if the user turned that on.</summary>
-    internal ShutdownParker Shutdown { get; }
-
     public OchreProfile Profile { get; }
     public OchrePaths Paths { get; }
     public AppLog Log { get; }
@@ -72,14 +64,20 @@ internal sealed class OchreHost : IDisposable
     public SessionManager Sessions { get; }
     public IShell? Shell { get; private set; }
 
+    /// <summary>Set when the user asked to restart (to apply module changes); Program starts a new host after this one exits.</summary>
+    public bool RestartRequested { get; private set; }
+
     public void Attach(IShell shell) => Shell = shell;
+
+    public void RequestRestart()
+    {
+        RestartRequested = true;
+        Shell?.Quit();
+    }
 
     public void Dispose()
     {
-        // Saved before the shells close, so the scrollback includes everything up to the quit.
-        TerminalSaver.SaveNow();
-        TerminalSaver.Dispose();
-        Terminals.Dispose();
+        Modules.Dispose();
         Sessions.Dispose();
         Tasks.Dispose();
     }

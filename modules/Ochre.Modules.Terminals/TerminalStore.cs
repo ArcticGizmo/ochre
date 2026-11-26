@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using Ochre.Core.Claude;
 using Ochre.Core.Platform;
 
-namespace Ochre.Core.Terminals;
+namespace Ochre.Modules.Terminals;
 
 /// <summary>A terminal tab as saved for the next start: where it ran and how, never what it printed.</summary>
 public sealed record SavedTerminal(string Id, string ProfileId, string Folder, string? TaskId, string? StartupCommand, string? Title, bool KeepScrollback);

@@ -1,4 +1,27 @@
-namespace Ochre.Host.Bridge;
+using System.Text.Json.Serialization;
+using Ochre.Core.Bridge;
+
+namespace Ochre.Modules.Terminals.Bridge;
+
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    RespectNullableAnnotations = true,
+    RespectRequiredConstructorParameters = true)]
+[JsonSerializable(typeof(Empty))]
+[JsonSerializable(typeof(Ack))]
+[JsonSerializable(typeof(IReadOnlyList<ShellProfileDto>))]
+[JsonSerializable(typeof(IReadOnlyList<TerminalDto>))]
+[JsonSerializable(typeof(TerminalDto))]
+[JsonSerializable(typeof(OpenTerminalRequest))]
+[JsonSerializable(typeof(TerminalIdRequest))]
+[JsonSerializable(typeof(TerminalInputRequest))]
+[JsonSerializable(typeof(TerminalResizeRequest))]
+[JsonSerializable(typeof(TerminalSetTaskRequest))]
+[JsonSerializable(typeof(TerminalKeepScrollbackRequest))]
+[JsonSerializable(typeof(TerminalSnapshot))]
+[JsonSerializable(typeof(TerminalOutputEvent))]
+internal sealed partial class TerminalsJson : JsonSerializerContext;
 
 // Bridge shapes for terminal tabs (ADR 0011). Output is broadcast to every window with a sequence number; a window
 // joining a terminal takes its scrollback with terminals.attach and applies only chunks numbered after it.

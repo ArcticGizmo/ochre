@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
 import { on, request, type AppInfo, type TaskListItem } from './bridge';
+import { runningModules, type AppContext } from './modules';
 import { SessionView } from './sessions/SessionView';
 import { SettingsDialog } from './SettingsDialog';
 import { useSessions } from './sessions/useSessions';
@@ -8,17 +9,12 @@ import { TaskBoard } from './tasks/TaskBoard';
 import { TaskList } from './tasks/TaskList';
 import { TaskView } from './tasks/TaskView';
 import { Today } from './tasks/Today';
-import { NewTerminalDialog } from './terminals/NewTerminalDialog';
-import { TerminalsView } from './terminals/TerminalsView';
-import { useTerminals } from './terminals/useTerminals';
 
-type View = 'today' | 'tasks' | 'board' | 'terminals';
-
-const views: { key: View; label: string }[] = [
+// The kernel's views; modules add theirs after these (ADR 0012).
+const kernelViews: { key: string; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'tasks', label: 'Tasks' },
   { key: 'board', label: 'Board' },
-  { key: 'terminals', label: 'Terminals' },
 ];
 
 interface Thread {
@@ -30,7 +26,9 @@ export function App() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   // All of this is per window, so two windows can each sit on their own view and task.
-  const [view, setView] = useState<View>('today');
+  const [view, setView] = useState('today');
+  // Each module view's parameter (e.g. which terminal tab), kept per window.
+  const [viewParams, setViewParams] = useState<Record<string, string | null>>({});
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   // An agent's thread shown in place of the selected task (Tasks), or in place of Today (Today).
@@ -40,10 +38,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const live = useSessions();
-  const terminals = useTerminals();
-  const [terminal, setTerminal] = useState<string | null>(null);
-  // Open while the New terminal dialog is up; holds the task it was opened from.
-  const [newTerminal, setNewTerminal] = useState<{ taskId: string | null } | null>(null);
+  const modules = useMemo(() => runningModules(info?.modules ?? []), [info]);
 
   const refreshList = useCallback(() => {
     request('tasks.list', {})
@@ -59,36 +54,39 @@ export function App() {
     return on('tasks.changed', refreshList);
   }, [refreshList]);
 
-  const openTask = (id: string) => {
+  const openTask = useCallback((id: string) => {
     setView('tasks');
     setSelected(id);
     setTaskThread(null);
-  };
+  }, []);
 
-  const show = (v: View) => {
+  const show = (v: string) => {
     setView(v);
     // Today's tab always lands on Today itself, not on a thread left open there.
     if (v === 'today') setThread(null);
   };
 
-  const openTerminal = (id: string) => {
-    setView('terminals');
-    setTerminal(id);
-  };
+  const setParam = useCallback((key: string, param: string | null) => setViewParams((p) => ({ ...p, [key]: param })), []);
+
+  const ctx: AppContext = useMemo(
+    () => ({
+      tasks,
+      openTask,
+      showView: (key, param) => {
+        setView(key);
+        if (param !== undefined) setParam(key, param);
+      },
+      onError: setError,
+    }),
+    [tasks, openTask, setParam],
+  );
+
+  const moduleView = modules.find((m) => m.view?.key === view)?.view;
+  const taskSections = modules.flatMap((m) => (m.TaskSection ? [{ id: m.id, Section: m.TaskSection }] : []));
 
   let body;
-  if (view === 'terminals') {
-    body = (
-      <TerminalsView
-        terminals={terminals}
-        tasks={tasks}
-        selected={terminal}
-        onSelect={setTerminal}
-        onNew={() => setNewTerminal({ taskId: null })}
-        onOpenTask={openTask}
-        onError={setError}
-      />
-    );
+  if (moduleView) {
+    body = moduleView.render({ param: viewParams[moduleView.key] ?? null, setParam: (p) => setParam(moduleView.key, p), ctx });
   } else if (view === 'today') {
     body = (
       <main className="content">
@@ -140,9 +138,8 @@ export function App() {
               id={selected}
               openSession={taskThread}
               onOpenSession={setTaskThread}
-              terminals={terminals}
-              onOpenTerminal={openTerminal}
-              onNewTerminal={(taskId) => setNewTerminal({ taskId })}
+              sections={taskSections}
+              ctx={ctx}
               onError={setError}
               onDeleted={() => setSelected(null)}
             />
@@ -154,16 +151,18 @@ export function App() {
     );
   }
 
+  const views: { key: string; label: string; Badge?: ComponentType }[] = [...kernelViews, ...modules.flatMap((m) => (m.view ? [m.view] : []))];
+
   return (
     <div className="app">
       <header className="titlebar">
         <span className="brand">Ochre</span>
         {info?.profile && <span className="profile">{info.profile}</span>}
         <nav className="main-nav" aria-label="Main">
-          {views.map((v) => (
-            <button key={v.key} className={view === v.key ? 'nav on' : 'nav'} aria-current={view === v.key ? 'page' : undefined} onClick={() => show(v.key)}>
-              {v.label}
-              {v.key === 'terminals' && terminals.length > 0 && <span className="nav-count">{terminals.length}</span>}
+          {views.map(({ key, label, Badge }) => (
+            <button key={key} className={view === key ? 'nav on' : 'nav'} aria-current={view === key ? 'page' : undefined} onClick={() => show(key)}>
+              {label}
+              {Badge && <Badge />}
             </button>
           ))}
         </nav>
@@ -191,16 +190,6 @@ export function App() {
       )}
       <div className="body">{body}</div>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <NewTerminalDialog
-        open={newTerminal !== null}
-        taskId={newTerminal?.taskId ?? null}
-        tasks={tasks}
-        onClose={() => setNewTerminal(null)}
-        onOpened={(id) => {
-          setNewTerminal(null);
-          openTerminal(id);
-        }}
-      />
       <NewTaskDialog
         open={creating}
         onClose={() => setCreating(false)}

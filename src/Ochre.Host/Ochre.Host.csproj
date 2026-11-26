@@ -9,6 +9,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Ochre.Core\Ochre.Core.csproj" />
     <ProjectReference Include="..\Ochre.Platform.Windows\Ochre.Platform.Windows.csproj" />
+    <ProjectReference Include="..\..\modules\Ochre.Modules.Terminals\Ochre.Modules.Terminals.csproj" />
+    <ProjectReference Include="..\..\modules\Ochre.Modules.ShutdownPark\Ochre.Modules.ShutdownPark.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ochre.BridgeGen" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\ui\dist\**" LinkBase="wwwroot" CopyToOutputDirectory="PreserveNewest" />

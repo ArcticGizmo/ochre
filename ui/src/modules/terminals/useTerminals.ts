@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { on, request, type TerminalDto } from '../bridge';
+import { on, request, type TerminalDto } from '../../bridge';
 
 /** The host's terminal tabs, refetched whenever one opens, closes, exits or changes title, folder or task. */
 export function useTerminals(): TerminalDto[] {

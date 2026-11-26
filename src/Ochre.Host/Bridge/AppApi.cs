@@ -5,12 +5,19 @@ using Ochre.Core.Platform;
 
 namespace Ochre.Host.Bridge;
 
-public sealed record Empty;
-public sealed record Ack(bool Ok = true);
-public sealed record AppInfo(string Version, string Profile);
+/// <param name="Modules">The ids of the modules running this session (ADR 0012); the UI shows only their contributions.</param>
+public sealed record AppInfo(string Version, string Profile, IReadOnlyList<string> Modules);
 
-/// <param name="AutoParkOnShutdown">Park tasks with running agents, with an automatic note, when Windows shuts down or signs out.</param>
-public sealed record SettingsDto(bool AutoParkOnShutdown);
+/// <param name="Enabled">The user's choice, or the module's default; applies at the next start.</param>
+/// <param name="Running">Running this session.</param>
+/// <param name="Error">Why it failed to start this session, if it did.</param>
+public sealed record ModuleDto(string Id, string Name, string Description, bool Enabled, bool Running, string? Error);
+
+public sealed record SettingsDto(IReadOnlyList<ModuleDto> Modules);
+
+public sealed record ModuleChoiceDto(string Id, bool Enabled);
+
+public sealed record SettingsUpdateRequest(IReadOnlyList<ModuleChoiceDto> Modules);
 
 /// <param name="NewWindow">Open a new browser window (middle click) rather than reuse the last one.</param>
 public sealed record OpenUrlRequest(string Url, bool NewWindow);
@@ -44,19 +51,9 @@ public sealed record OpenUrlRequest(string Url, bool NewWindow);
 [JsonSerializable(typeof(SetEffortRequest))]
 [JsonSerializable(typeof(BindSessionRequest))]
 [JsonSerializable(typeof(SettingsDto))]
+[JsonSerializable(typeof(SettingsUpdateRequest))]
 [JsonSerializable(typeof(OpenUrlRequest))]
 [JsonSerializable(typeof(SessionUpdateEvent))]
-[JsonSerializable(typeof(IReadOnlyList<ShellProfileDto>))]
-[JsonSerializable(typeof(IReadOnlyList<TerminalDto>))]
-[JsonSerializable(typeof(TerminalDto))]
-[JsonSerializable(typeof(OpenTerminalRequest))]
-[JsonSerializable(typeof(TerminalIdRequest))]
-[JsonSerializable(typeof(TerminalInputRequest))]
-[JsonSerializable(typeof(TerminalResizeRequest))]
-[JsonSerializable(typeof(TerminalSetTaskRequest))]
-[JsonSerializable(typeof(TerminalSnapshot))]
-[JsonSerializable(typeof(TerminalOutputEvent))]
-[JsonSerializable(typeof(TerminalKeepScrollbackRequest))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity, window lifecycle and settings.</summary>
@@ -65,12 +62,20 @@ internal static class AppApi
     public static void Register(BridgeDispatcher bridge, OchreHost host)
     {
         var j = AppJson.Default;
-        bridge.Handle("app.info", j.Empty, j.AppInfo, _ => new AppInfo(AppInfoProvider.Version, host.Profile.IsDefault ? "" : host.Profile.Name));
-        bridge.Handle("settings.get", j.Empty, j.SettingsDto, _ => new SettingsDto(host.Settings.AutoParkOnShutdown));
-        bridge.Handle("settings.update", j.SettingsDto, j.SettingsDto, r =>
+        bridge.Handle("app.info", j.Empty, j.AppInfo, _ =>
+            new AppInfo(AppInfoProvider.Version, host.Profile.IsDefault ? "" : host.Profile.Name, host.Modules.RunningIds));
+        bridge.Handle("settings.get", j.Empty, j.SettingsDto, _ => Settings(host));
+        bridge.Handle("settings.update", j.SettingsUpdateRequest, j.SettingsDto, r =>
         {
-            host.Settings.AutoParkOnShutdown = r.AutoParkOnShutdown;
-            return new SettingsDto(host.Settings.AutoParkOnShutdown);
+            var known = host.Modules.States.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
+            if (r.Modules.Any(m => !known.Contains(m.Id))) throw new BridgeRejectException("unknown module");
+            host.Settings.SetModules(r.Modules.ToDictionary(m => m.Id, m => m.Enabled, StringComparer.Ordinal));
+            return Settings(host);
+        });
+        bridge.Handle("app.restart", j.Empty, j.Ack, _ =>
+        {
+            host.RequestRestart();
+            return new Ack();
         });
         // Links from untrusted text (terminal output) open here; OpenTargets keeps it to web and mail links.
         bridge.Handle("app.openUrl", j.OpenUrlRequest, j.Ack, r =>
@@ -86,6 +91,9 @@ internal static class AppApi
             return new Ack();
         });
     }
+
+    private static SettingsDto Settings(OchreHost host) =>
+        new(host.Modules.States.Select(m => new ModuleDto(m.Id, m.Name, m.Description, m.Enabled, m.Running, m.Error)).ToList());
 }
 
 internal static class AppInfoProvider

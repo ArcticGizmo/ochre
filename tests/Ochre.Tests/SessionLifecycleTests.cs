@@ -89,6 +89,31 @@ public sealed class SessionLifecycleTests : IDisposable
     }
 
     [Fact]
+    public async Task The_kernel_works_with_every_module_off()
+    {
+        // ADR 0007: no module, and no platform service a module would need, is required for tasks and agents.
+        var sessions = NewManager();
+        var ledger = new SessionLedger(Path.Combine(_root, "sessions.json"));
+        using var modules = new Ochre.Core.Modules.ModuleHost(
+            [new Ochre.Modules.Terminals.TerminalsModule()],
+            _ => false,
+            new Ochre.Core.Modules.ModuleKernel(_log, _root, _store, sessions, ledger, new Dictionary<Type, object>(), _ => { }));
+        modules.StartAll();
+        Assert.Empty(modules.RunningIds);
+
+        var taskId = await NewTask();
+        var (s, refusal) = await sessions.StartAsync(taskId, _repo, "alpha", null, "Read the task.", trustFolder: false);
+        Assert.Equal(StartRefusal.None, refusal);
+        Assert.NotNull(s);
+        await _store.UpdateAsync(taskId, "user", doc =>
+        {
+            doc.AddItem("Works without modules", null);
+            return "added a step";
+        });
+        Assert.Contains(_store.Get(taskId)!.Plan, i => i.Text == "Works without modules");
+    }
+
+    [Fact]
     public async Task An_untrusted_folder_is_asked_about_and_trusted_only_on_yes()
     {
         var sessions = NewManager();

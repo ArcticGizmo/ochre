@@ -1,7 +1,8 @@
 using System.Text;
+using Ochre.Core;
 using Ochre.Core.Platform;
 
-namespace Ochre.Core.Terminals;
+namespace Ochre.Modules.Terminals;
 
 /// <summary>One terminal tab: a shell in a pseudoconsole, and the scrollback every window replays (ADR 0011).</summary>
 public sealed class Terminal

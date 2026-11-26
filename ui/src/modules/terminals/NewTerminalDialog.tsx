@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { request, type ShellProfileDto, type TaskListItem } from '../bridge';
-import { Dialog } from '../Dialog';
+import { request, type ShellProfileDto, type TaskListItem } from '../../bridge';
+import { Dialog } from '../../Dialog';
 
 interface Props {
   open: boolean;

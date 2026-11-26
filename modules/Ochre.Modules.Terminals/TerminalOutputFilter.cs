@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Ochre.Core.Terminals;
+namespace Ochre.Modules.Terminals;
 
 /// <summary>
 /// Filters a terminal's output before it is stored or reaches any window (security.md threat 7, ADR 0011).

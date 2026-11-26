@@ -1,40 +1,51 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { request, type TaskListItem, type TerminalDto } from '../bridge';
-import { ConfirmDialog, Dialog } from '../Dialog';
-import { Menu, type MenuItem } from '../Menu';
-import { PathText } from '../PathText';
-import { folderLeaf, terminalName } from './useTerminals';
+import { request, type TaskListItem, type TerminalDto } from '../../bridge';
+import { ConfirmDialog, Dialog } from '../../Dialog';
+import { Menu, type MenuItem } from '../../Menu';
+import { PathText } from '../../PathText';
+import type { AppContext } from '../types';
+import { NewTerminalDialog } from './NewTerminalDialog';
+import { folderLeaf, terminalName, useTerminals } from './useTerminals';
 
 // xterm.js is only fetched once a terminal is shown, keeping it off the window-open path.
 const XtermPane = lazy(() => import('./XtermPane'));
 
 interface Props {
-  terminals: TerminalDto[];
-  tasks: TaskListItem[];
   /** The tab this window shows; per window, so two windows can sit on different tabs. */
   selected: string | null;
   onSelect: (id: string | null) => void;
-  onNew: () => void;
-  onOpenTask: (taskId: string) => void;
-  onError: (message: string) => void;
+  ctx: AppContext;
 }
 
-export function TerminalsView({ terminals, tasks, selected, onSelect, onNew, onOpenTask, onError }: Props) {
+export function TerminalsView({ selected, onSelect, ctx }: Props) {
+  const terminals = useTerminals();
+  const tasks = ctx.tasks;
+  const onError = ctx.onError;
   const [hoverUrl, setHoverUrl] = useState<string | null>(null);
   const [closing, setClosing] = useState<TerminalDto | null>(null);
   const [attaching, setAttaching] = useState<TerminalDto | null>(null);
+  const [creating, setCreating] = useState(false);
+  // Derived, never written back: a tab just opened may not be in the list fetched so far, and must stay selected.
   const current = terminals.find((t) => t.id === selected) ?? terminals[0] ?? null;
-
-  // A tab closed here or in another window: fall back to the first remaining one.
-  useEffect(() => {
-    if (current?.id !== selected) onSelect(current?.id ?? null);
-  }, [current?.id, selected, onSelect]);
 
   const fail = (e: Error) => onError(e.message);
   const close = (t: TerminalDto) => {
     if (t.running) setClosing(t);
     else void request('terminals.close', { id: t.id }).catch(fail);
   };
+  const onNew = () => setCreating(true);
+  const newDialog = (
+    <NewTerminalDialog
+      open={creating}
+      taskId={null}
+      tasks={tasks}
+      onClose={() => setCreating(false)}
+      onOpened={(id) => {
+        setCreating(false);
+        onSelect(id);
+      }}
+    />
+  );
 
   if (!current) {
     return (
@@ -43,6 +54,7 @@ export function TerminalsView({ terminals, tasks, selected, onSelect, onNew, onO
         <button className="primary" onClick={onNew}>
           New terminal
         </button>
+        {newDialog}
       </div>
     );
   }
@@ -96,7 +108,7 @@ export function TerminalsView({ terminals, tasks, selected, onSelect, onNew, onO
         {task ? (
           <span>
             Task{' '}
-            <button className="link term-task" onClick={() => onOpenTask(task.id)}>
+            <button className="link term-task" onClick={() => ctx.openTask(task.id)}>
               {task.id}
             </button>{' '}
             <span className="muted">{task.title}</span>
@@ -166,6 +178,7 @@ export function TerminalsView({ terminals, tasks, selected, onSelect, onNew, onO
       </ConfirmDialog>
 
       <AttachTaskDialog terminal={attaching} tasks={tasks} onClose={() => setAttaching(null)} onError={onError} />
+      {newDialog}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 using System.Text;
 using Ochre.Core;
 using Ochre.Core.Platform;
-using Ochre.Core.Terminals;
+using Ochre.Modules.Terminals;
 using Xunit;
 
 namespace Ochre.Tests;

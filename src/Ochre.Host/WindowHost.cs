@@ -37,7 +37,7 @@ internal sealed class WindowHost : IWindowHost
         AppApi.Register(dispatcher, _host);
         TaskApi.Register(dispatcher, _host.Tasks, _host.Parking);
         SessionApi.Register(dispatcher, _host.Sessions);
-        TerminalApi.Register(dispatcher, _host.Terminals, _host.Tasks);
+        _host.Modules.RegisterBridge(dispatcher);
         CheckAgainstContract(dispatcher);
         var session = new Session(this, dispatcher, post);
         lock (_gate) _sessions.Add(session);
@@ -46,12 +46,15 @@ internal sealed class WindowHost : IWindowHost
 
     private bool _contractChecked;
 
-    /// <summary>A handler missing from BridgeContract (or the reverse) means the generated UI types are stale (ADR 0009).</summary>
+    /// <summary>
+    /// A handler missing from the kernel's or a running module's contract (or the reverse) means the generated UI
+    /// types are stale (ADR 0009, 0012).
+    /// </summary>
     private void CheckAgainstContract(BridgeDispatcher dispatcher)
     {
         if (_contractChecked) return;
         _contractChecked = true;
-        var declared = BridgeContract.Requests.Select(r => r.Type).ToHashSet(StringComparer.Ordinal);
+        var declared = BridgeContract.Requests.Concat(_host.Modules.RunningRequests).Select(r => r.Type).ToHashSet(StringComparer.Ordinal);
         var registered = dispatcher.RegisteredTypes.ToHashSet(StringComparer.Ordinal);
         foreach (var missing in declared.Except(registered)) _host.Log.Error($"bridge contract declares '{missing}' but no handler is registered");
         foreach (var extra in registered.Except(declared)) _host.Log.Error($"bridge handler '{extra}' is not in BridgeContract; regenerate the UI types");

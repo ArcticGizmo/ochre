@@ -10,4 +10,11 @@
     <InternalsVisibleTo Include="ochre" />
     <InternalsVisibleTo Include="Ochre.Tests" />
   </ItemGroup>
+  <!-- In-process modules are first-party code built with Ochre (ADR 0012), so the module contracts and Core's
+       helpers stay internal to Ochre's own assemblies; third-party plugins will run out of process (M7). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ochre.Modules.Terminals" />
+    <InternalsVisibleTo Include="Ochre.Modules.ShutdownPark" />
+    <InternalsVisibleTo Include="Ochre.BridgeGen" />
+  </ItemGroup>
 </Project>

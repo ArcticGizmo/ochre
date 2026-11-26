@@ -20,21 +20,39 @@ internal static class Program
         var profile = OchreProfile.Current;
         var command = args.Contains("--tray") ? "tray" : args.Contains("--close-window") ? "close" : "open";
 
-        using var instance = InstanceChannel.Claim(profile);
-        if (instance is null)
+        bool restart;
+        using (var instance = InstanceChannel.Claim(profile))
         {
-            if (command != "tray") InstanceChannel.Send(profile, command, null, TimeSpan.FromSeconds(10));
-            return 0;
+            if (instance is null)
+            {
+                if (command != "tray") InstanceChannel.Send(profile, command, null, TimeSpan.FromSeconds(10));
+                return 0;
+            }
+            if (command == "close") return 0;
+            restart = RunHost(profile, instance, openWindow: command == "open");
         }
-        if (command == "close") return 0;
 
+        // Started only now that this instance's pipe and mutex are released, so the new one can claim them.
+        if (restart) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, WorkingDirectory = AppContext.BaseDirectory });
+        return 0;
+    }
+
+    /// <summary>Runs the host until the user quits; true when they asked for a restart.</summary>
+    private static bool RunHost(OchreProfile profile, InstanceChannel instance, bool openWindow)
+    {
         var paths = new OchrePaths(profile);
         using var log = new AppLog(paths.Logs);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => log.Error("unhandled exception", e.ExceptionObject as Exception);
         log.Info($"starting {AppInfoProvider.Version} profile={(profile.IsDefault ? "default" : profile.Name)}");
 
         var urls = new UrlOpener();
-        using var host = new OchreHost(profile, paths, log, new Ochre.Platform.Windows.Terminals.ConPtyPlatform(), new DataProtector(), urls);
+        var services = new Dictionary<Type, object>
+        {
+            [typeof(Ochre.Core.Platform.ITerminalPlatform)] = new Ochre.Platform.Windows.Terminals.ConPtyPlatform(),
+            [typeof(Ochre.Core.Platform.IDataProtector)] = new DataProtector(),
+            [typeof(Ochre.Core.Platform.IUrlOpener)] = urls,
+        };
+        using var host = new OchreHost(profile, paths, log, urls, services);
         var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), urls);
         host.Attach(shell);
         var agents = new AgentCommands(host.Tasks, host.ParkRequests);
@@ -43,9 +61,7 @@ internal static class Program
         {
             try
             {
-                // Windows may end the process before the normal quit path runs.
-                host.TerminalSaver.SaveNow();
-                host.Shutdown.OnSessionEnding();
+                host.Modules.SessionEnding();
             }
             catch (Exception ex)
             {
@@ -55,9 +71,9 @@ internal static class Program
         };
         instance.Listen((cmd, arg) => cmd == "agent" ? agents.HandleAsync(AgentRequest.Parse(arg)) : HandleCommand(shell, host, profile, cmd, arg));
 
-        shell.Run(openWindow: command == "open");
-        log.Info("stopped");
-        return 0;
+        shell.Run(openWindow);
+        log.Info(host.RestartRequested ? "stopped; restarting" : "stopped");
+        return host.RestartRequested;
     }
 
     private static async Task<string> HandleCommand(WindowsShell shell, OchreHost host, OchreProfile profile, string command, string? argument)
@@ -83,8 +99,10 @@ internal static class Program
                 return argument;
             case "dev-session-ending":
                 // What Windows' shutdown request does, without shutting down; the cancel check runs as it would.
-                host.Shutdown.OnSessionEnding();
-                return $"ok; tasks are put back in {ShutdownParker.CancelledAfter.TotalSeconds:0} s unless Ochre stops first";
+                host.Modules.SessionEnding();
+                return host.Modules.RunningIds.Contains("shutdown-park")
+                    ? $"ok; tasks are put back in {ShutdownParker.CancelledAfter.TotalSeconds:0} s unless Ochre stops first"
+                    : "ok; the shutdown-park module is off, so nothing was parked";
 #endif
             default:
                 await Task.CompletedTask.ConfigureAwait(false);

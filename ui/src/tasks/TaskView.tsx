@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { on, request, type PlanItemDto, type TaskDetail, type TaskStateDto, type TerminalDto } from '../bridge';
+import { useCallback, useEffect, useState, type ComponentType } from 'react';
+import { on, request, type PlanItemDto, type TaskDetail, type TaskStateDto } from '../bridge';
 import { ConfirmDialog } from '../Dialog';
 import { renderMarkdown } from '../markdown';
 import { Menu } from '../Menu';
@@ -9,7 +9,7 @@ import { StartAgentDialog } from '../sessions/StartAgentDialog';
 import { useSessions } from '../sessions/useSessions';
 import { ParkDialog } from './ParkDialog';
 import { LinkSuggestions } from '../sessions/OutsideSessions';
-import { terminalName } from '../terminals/useTerminals';
+import type { AppContext, TaskSectionProps } from '../modules';
 import { agentStatus, agentWord, ParkNote, sessionName, stateLabel, states, when } from './present';
 
 interface Props {
@@ -17,15 +17,14 @@ interface Props {
   /** The agent whose thread this window shows in place of the task; per window, so two windows can differ. */
   openSession: string | null;
   onOpenSession: (sessionId: string | null) => void;
-  /** Every terminal; the task shows the ones attached to it. */
-  terminals: TerminalDto[];
-  onOpenTerminal: (terminalId: string) => void;
-  onNewTerminal: (taskId: string) => void;
+  /** Sections the running modules add below Agents (ADR 0012). */
+  sections: { id: string; Section: ComponentType<TaskSectionProps> }[];
+  ctx: AppContext;
   onError: (message: string) => void;
   onDeleted: () => void;
 }
 
-export function TaskView({ id, openSession, onOpenSession, terminals, onOpenTerminal, onNewTerminal, onError, onDeleted }: Props) {
+export function TaskView({ id, openSession, onOpenSession, sections, ctx, onError, onDeleted }: Props) {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [gone, setGone] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -283,13 +282,9 @@ export function TaskView({ id, openSession, onOpenSession, terminals, onOpenTerm
         />
       </section>
 
-      <section>
-        <h3>Terminals</h3>
-        <TaskTerminals terminals={terminals.filter((t) => t.taskId === task.id)} onOpen={onOpenTerminal} />
-        <button className="start-agent" onClick={() => onNewTerminal(task.id)}>
-          Open terminal
-        </button>
-      </section>
+      {sections.map(({ id: moduleId, Section }) => (
+        <Section key={moduleId} task={task} ctx={ctx} />
+      ))}
 
       {task.links.length > 0 && (
         <section>
@@ -488,29 +483,5 @@ function Repos({ repos, onSave }: { repos: string[]; onSave: (repos: string[]) =
         <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\path\to\repo" />
       </form>
     </div>
-  );
-}
-
-function TaskTerminals({ terminals, onOpen }: { terminals: TerminalDto[]; onOpen: (id: string) => void }) {
-  if (terminals.length === 0) return <p className="empty">No terminals.</p>;
-  return (
-    <ul className="plain agents">
-      {terminals.map((t) => (
-        <li key={t.id}>
-          <span className={t.running ? 'status status-idle' : 'status status-dormant'}>
-            <span className="dot" />
-            {t.running ? 'running' : `exited ${t.exitCode}`}
-          </span>
-          <span className="who" title={t.folder}>
-            {terminalName(t)}
-          </span>
-          <PathText path={t.folder} />
-          {terminalName(t) !== t.profileName && <span className="muted">{t.profileName}</span>}
-          <button className="link" onClick={() => onOpen(t.id)}>
-            Open
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }

@@ -1,9 +1,8 @@
 using System.Globalization;
 using Ochre.Core.Bridge;
 using Ochre.Core.Tasks;
-using Ochre.Core.Terminals;
 
-namespace Ochre.Host.Bridge;
+namespace Ochre.Modules.Terminals.Bridge;
 
 /// <summary>
 /// Terminal messages from the UI. The renderer chooses a shell only by profile id and a folder; it never sends a
@@ -16,7 +15,7 @@ internal static class TerminalApi
 
     public static void Register(BridgeDispatcher bridge, TerminalManager terminals, TaskStore tasks)
     {
-        var j = AppJson.Default;
+        var j = TerminalsJson.Default;
 
         bridge.Handle("terminals.profiles", j.Empty, j.IReadOnlyListShellProfileDto, _ =>
             (IReadOnlyList<ShellProfileDto>)terminals.Profiles.Select(p => new ShellProfileDto(p.Id, p.Name)).ToList());

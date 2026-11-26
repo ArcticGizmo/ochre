@@ -23,6 +23,5 @@ public sealed class OchrePaths
     public string Settings => Path.Combine(RoamingRoot, "settings.json");
     public string Logs => Path.Combine(LocalRoot, "logs");
     public string WebView => Path.Combine(LocalRoot, "webview");
-    public string Terminals => Path.Combine(LocalRoot, "terminals");
     public string SessionLedger => Path.Combine(LocalRoot, "sessions.json");
 }

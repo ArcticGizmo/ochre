@@ -3,7 +3,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal, type ILinkHandler } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
-import { on, request, type TerminalOutputEvent } from '../bridge';
+import { on, request, type TerminalOutputEvent } from '../../bridge';
 
 interface Props {
   id: string;

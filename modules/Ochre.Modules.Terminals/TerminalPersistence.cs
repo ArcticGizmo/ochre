@@ -1,4 +1,6 @@
-namespace Ochre.Core.Terminals;
+using Ochre.Core;
+
+namespace Ochre.Modules.Terminals;
 
 /// <summary>
 /// Keeps the terminal tabs on disk so they come back after a quit (M3 slice 3). The list is saved shortly after any

@@ -1,12 +1,11 @@
+using Ochre.Core.Bridge;
+
 namespace Ochre.Host.Bridge;
 
-public sealed record RequestContract(string Type, Type Request, Type Response);
-
-public sealed record EventContract(string Name, Type Payload);
-
 /// <summary>
-/// Every message the UI may send and every event the host may push (ADR 0009). tools/Ochre.BridgeGen generates
-/// ui/src/generated/bridge-types.ts from this list; the host checks its registered handlers against it at startup.
+/// The kernel's messages and events (ADR 0009); each module declares its own (ADR 0012). tools/Ochre.BridgeGen
+/// generates ui/src/generated/bridge-types.ts from these plus every first-party module's, and the host checks its
+/// registered handlers against the kernel's and the started modules' lists.
 /// </summary>
 public static class BridgeContract
 {
@@ -15,8 +14,9 @@ public static class BridgeContract
         new("app.info", typeof(Empty), typeof(AppInfo)),
         new("app.ready", typeof(Empty), typeof(Ack)),
         new("app.openUrl", typeof(OpenUrlRequest), typeof(Ack)),
+        new("app.restart", typeof(Empty), typeof(Ack)),
         new("settings.get", typeof(Empty), typeof(SettingsDto)),
-        new("settings.update", typeof(SettingsDto), typeof(SettingsDto)),
+        new("settings.update", typeof(SettingsUpdateRequest), typeof(SettingsDto)),
         new("tasks.list", typeof(Empty), typeof(IReadOnlyList<TaskListItem>)),
         new("tasks.get", typeof(TaskIdRequest), typeof(TaskDetail)),
         new("tasks.create", typeof(CreateTaskRequest), typeof(TaskDetail)),
@@ -38,18 +38,6 @@ public static class BridgeContract
         new("sessions.setEffort", typeof(SetEffortRequest), typeof(Ack)),
         new("sessions.bind", typeof(BindSessionRequest), typeof(Ack)),
         new("sessions.unbind", typeof(SessionIdRequest), typeof(Ack)),
-        new("terminals.profiles", typeof(Empty), typeof(IReadOnlyList<ShellProfileDto>)),
-        new("terminals.list", typeof(Empty), typeof(IReadOnlyList<TerminalDto>)),
-        new("terminals.open", typeof(OpenTerminalRequest), typeof(TerminalDto)),
-        new("terminals.attach", typeof(TerminalIdRequest), typeof(TerminalSnapshot)),
-        new("terminals.input", typeof(TerminalInputRequest), typeof(Ack)),
-        new("terminals.resize", typeof(TerminalResizeRequest), typeof(Ack)),
-        new("terminals.restart", typeof(TerminalIdRequest), typeof(TerminalDto)),
-        new("terminals.setTask", typeof(TerminalSetTaskRequest), typeof(TerminalDto)),
-        new("terminals.setKeepScrollback", typeof(TerminalKeepScrollbackRequest), typeof(TerminalDto)),
-        new("terminals.rerun", typeof(TerminalIdRequest), typeof(Ack)),
-        new("terminals.dismissRestore", typeof(TerminalIdRequest), typeof(Ack)),
-        new("terminals.close", typeof(TerminalIdRequest), typeof(Ack)),
     ];
 
     public static IReadOnlyList<EventContract> Events { get; } =
@@ -59,9 +47,5 @@ public static class BridgeContract
         new("sessions.update", typeof(SessionUpdateEvent)),
         // A session appeared or went, or an observed one's suggestions may have changed: fetch sessions.list again.
         new("sessions.changed", typeof(Empty)),
-        // A chunk of a terminal's output, numbered so a window that attached mid-stream skips what its snapshot holds.
-        new("terminals.output", typeof(TerminalOutputEvent)),
-        // A terminal opened, closed, exited, or changed title, folder or task: fetch terminals.list again.
-        new("terminals.changed", typeof(Empty)),
     ];
 }

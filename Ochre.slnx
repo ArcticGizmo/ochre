@@ -5,6 +5,10 @@
     <Project Path="src/Ochre.Host/Ochre.Host.csproj" />
     <Project Path="src/Ochre.Platform.Windows/Ochre.Platform.Windows.csproj" />
   </Folder>
+  <Folder Name="/modules/">
+    <Project Path="modules/Ochre.Modules.ShutdownPark/Ochre.Modules.ShutdownPark.csproj" />
+    <Project Path="modules/Ochre.Modules.Terminals/Ochre.Modules.Terminals.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Ochre.Tests/Ochre.Tests.csproj" />
   </Folder>

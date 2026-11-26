@@ -14,33 +14,35 @@ public sealed class OchreSettings(string path)
     private readonly Lock _gate = new();
     private JsonObject? _root;
 
-    /// <summary>When Windows shuts down or signs out, park every task with running agents, with an automatic note.</summary>
-    public bool AutoParkOnShutdown
-    {
-        get => GetBool("autoParkOnShutdown");
-        set => SetBool("autoParkOnShutdown", value);
-    }
+    // The setting the shutdown-park module replaced (ADR 0012); a true here turns the module on until the user chooses.
+    private const string LegacyAutoPark = "autoParkOnShutdown";
 
-    private bool GetBool(string key)
+    /// <summary>Whether the user switched a module on or off; null when they haven't, so its default applies.</summary>
+    public bool? ModuleEnabled(string id)
     {
         lock (_gate)
         {
             try
             {
-                return Root()[key]?.GetValue<bool>() ?? false;
+                if (Root()["modules"] is JsonObject modules && modules[id] is JsonValue v && v.TryGetValue<bool>(out var on)) return on;
+                if (id == "shutdown-park" && Root()[LegacyAutoPark] is JsonValue legacy && legacy.TryGetValue<bool>(out var park) && park) return true;
             }
             catch (InvalidOperationException)
             {
-                return false;   // the wrong type, from a hand edit
+                // The wrong type, from a hand edit: treat as not chosen.
             }
+            return null;
         }
     }
 
-    private void SetBool(string key, bool value)
+    /// <summary>Records the user's choices; they apply at the next start.</summary>
+    public void SetModules(IReadOnlyDictionary<string, bool> choices)
     {
         lock (_gate)
         {
-            Root()[key] = value;
+            if (Root()["modules"] is not JsonObject modules) Root()["modules"] = modules = [];
+            foreach (var (id, on) in choices) modules[id] = on;
+            Root().Remove(LegacyAutoPark);
             AtomicFile.Write(path, Root().ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
     }

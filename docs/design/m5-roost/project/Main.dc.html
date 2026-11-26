@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent grid</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.badge{font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#d9b44a;color:#1b1a19;display:inline-flex;align-items:center;justify-content:center}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid rgba(232,151,74,.4);background:rgba(232,151,74,.12);color:#e8974a}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:3px 10px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:28px;box-sizing:border-box}
+.btn:hover{background:#2e2c2a}
+.btn.allow{background:#2f4a2a;border-color:#4f7a44;color:#cfe8c4;font-weight:600}
+.btn.deny{color:#f0a8a0;border-color:#6b3a35;background:#242322}
+.btn.primary{background:#cc7722;border-color:#cc7722;color:#1b1a19;font-weight:600}
+.icon{width:28px;height:28px;padding:0;justify-content:center;background:none;border-color:transparent;color:#a39d96}
+.icon:hover{background:#2e2c2a;color:#e8e4df}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:8px 12px;border-bottom:1px solid #33312f}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:2px 10px;border:1px dashed #5c5854;border-radius:999px;font-size:13px;background:none;color:#e8e4df;font-family:inherit;cursor:pointer}
+.chip .st{font-size:12px;color:#a39d96}
+.hollow{background:transparent;border:1.5px solid #a39d96}
+.kbd{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:11px;padding:0 5px;border:1px solid #3a3836;border-bottom-width:2px;border-radius:4px;color:#a39d96}
+.stage{flex:1;min-height:0;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(12,minmax(0,1fr));gap:6px;padding:6px}
+.pane{display:flex;flex-direction:column;min-height:0;background:#242322;border:1px solid #3a3836;border-radius:8px;overflow:hidden}
+.pane.need{border-color:#d9b44a;box-shadow:0 0 0 1px rgba(217,180,74,.35)}
+.pane.focus{border-color:#cc7722}
+.phead{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 8px;border-bottom:1px solid #33312f;cursor:grab;flex:none}
+.num{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:#a39d96;border:1px solid #3a3836;border-radius:4px;padding:0 5px}
+.name{font-weight:600}
+.word{font-size:12px}
+.w-busy{color:#e8974a}
+.w-idle{color:#86b572}
+.w-wait{color:#d9b44a}
+.w-closed{color:#a39d96}
+.meta{font-size:12px;color:#a39d96;white-space:nowrap}
+.tagout{font-size:11px;padding:0 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.thread{flex:1;min-height:0;overflow:hidden;padding:8px 12px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.user{align-self:flex-end;max-width:85%;background:#2e2c2a;border-radius:8px;padding:5px 9px}
+.tool{display:flex;gap:7px;align-items:center;font-size:12.5px;color:#a39d96}
+.tool b{font-weight:400;color:#e8e4df}
+.ok{color:#86b572}
+.run{color:#e8974a}
+.working{font-size:12px;color:#e8974a}
+.card{border:1px solid #d9b44a;border-radius:8px;padding:8px 10px;background:#1f1e1d;display:flex;flex-direction:column;gap:6px}
+.cmd{background:#1b1a19;border:1px solid #33312f;border-radius:6px;padding:6px 8px;font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;white-space:pre-wrap}
+.composer{display:flex;gap:6px;padding:6px 8px;border-top:1px solid #33312f;flex:none}
+.field{flex:1;min-width:0;font:inherit;font-size:13px;color:#e8e4df;background:#1b1a19;border:1px solid #3a3836;border-radius:6px;padding:4px 8px}
+.field::placeholder{color:#7a746e}
+.readonly{padding:6px 10px;border-top:1px solid #33312f;font-size:12px;color:#a39d96;flex:none}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px; flex-wrap: wrap" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="#tasks" class="nav">Tasks</a>
+      <a href="#board" class="nav">Board</a>
+      <a href="#inbox" class="nav">Inbox <span class="badge" aria-label="1 needs you">1</span></a>
+      <a href="#git" class="nav">Git</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Grid</a>
+      <a href="#terminals" class="nav">Terminals</a>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <a href="Task.dc.html" style="font-weight: 600; color: #e8e4df; text-decoration: none">Fix the login redirect</a>
+    <span class="mono muted">T-0042</span>
+    <span class="pill"><span class="dot"></span>Active</span>
+    <span style="flex: 1"></span>
+    <span class="muted" style="font-size: 12px">Not in the grid</span>
+    <button class="chip" type="button" title="Put reviewer in the grid"><span class="dot hollow"></span>reviewer<span class="st">dormant</span></button>
+    <button class="btn" type="button" aria-haspopup="menu">Layout: 2 × 2
+      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg>
+    </button>
+    <span class="muted" style="font-size: 12px"><span class="kbd">Alt</span> <span class="kbd">1</span>–<span class="kbd">4</span> pane · <span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">Z</span> zoom · <span class="kbd">Ctrl</span> <span class="kbd">.</span> next needing you</span>
+  </div>
+
+  <main class="stage" aria-label="Agents of T-0042">
+    <section class="pane focus" style="grid-row: 1 / span 6; grid-column: 1 / span 6" aria-label="builder">
+      <div class="phead">
+        <span class="num">1</span>
+        <span class="dot w-busy" aria-hidden="true"></span>
+        <span class="name">builder</span>
+        <span class="word w-busy">working</span>
+        <span style="flex: 1"></span>
+        <span class="meta">Opus 5.5 · 48k</span>
+        <button class="btn icon" type="button" aria-label="Zoom builder"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+        <button class="btn icon" type="button" aria-label="More for builder"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="3" cy="7" r="1.2" fill="currentColor"></circle><circle cx="7" cy="7" r="1.2" fill="currentColor"></circle><circle cx="11" cy="7" r="1.2" fill="currentColor"></circle></svg></button>
+      </div>
+      <div class="thread">
+        <div class="user">Fix the redirect loop after login. Keep ReturnUrl only when it's local.</div>
+        <div>I'll find where the redirect is built, then add the check.</div>
+        <div class="tool"><span class="ok">✓</span><b>Grep</b> ReturnUrl in src/</div>
+        <div class="tool"><span class="ok">✓</span><b>Read</b> LoginController.cs</div>
+        <div class="tool"><span class="ok">✓</span><b>Edit</b> LoginController.cs <span class="muted">+6 −1</span></div>
+        <div class="tool"><span class="run">●</span><b>Bash</b> dotnet test tests/Auth.Tests</div>
+        <div class="working">working…</div>
+      </div>
+      <div class="composer">
+        <input class="field" type="text" placeholder="Message builder (queued until its turn ends)" aria-label="Message builder">
+        <button class="btn" type="button">Send</button>
+      </div>
+    </section>
+
+    <section class="pane need" style="grid-row: 1 / span 6; grid-column: 7 / span 6" aria-label="planner, needs you">
+      <div class="phead">
+        <span class="num">2</span>
+        <span class="dot w-wait" aria-hidden="true"></span>
+        <span class="name">planner</span>
+        <span class="word w-wait">needs you</span>
+        <span style="flex: 1"></span>
+        <span class="meta">Sonnet 5.5 · 21k</span>
+        <button class="btn icon" type="button" aria-label="Zoom planner"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+        <button class="btn icon" type="button" aria-label="More for planner"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="3" cy="7" r="1.2" fill="currentColor"></circle><circle cx="7" cy="7" r="1.2" fill="currentColor"></circle><circle cx="11" cy="7" r="1.2" fill="currentColor"></circle></svg></button>
+      </div>
+      <div class="thread">
+        <div class="user">Push the fix branch when the tests are green.</div>
+        <div>Tests pass on the branch. Pushing it now.</div>
+        <div class="card">
+          <div style="font-weight: 600">Allow Bash?</div>
+          <div class="cmd">git push --force-with-lease origin fix/login-redirect</div>
+          <div style="display: flex; gap: 6px; justify-content: flex-end">
+            <button class="btn deny" type="button">Deny</button>
+            <button class="btn allow" type="button">Allow</button>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <input class="field" type="text" placeholder="Message planner" aria-label="Message planner">
+        <button class="btn" type="button">Send</button>
+      </div>
+    </section>
+
+    <section class="pane" style="grid-row: 7 / span 6; grid-column: 1 / span 6" aria-label="tester">
+      <div class="phead">
+        <span class="num">3</span>
+        <span class="dot w-idle" aria-hidden="true"></span>
+        <span class="name">tester</span>
+        <span class="word w-idle">ready</span>
+        <span style="flex: 1"></span>
+        <span class="meta">Haiku 5.5 · 12k</span>
+        <button class="btn icon" type="button" aria-label="Zoom tester"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+        <button class="btn icon" type="button" aria-label="More for tester"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="3" cy="7" r="1.2" fill="currentColor"></circle><circle cx="7" cy="7" r="1.2" fill="currentColor"></circle><circle cx="11" cy="7" r="1.2" fill="currentColor"></circle></svg></button>
+      </div>
+      <div class="thread">
+        <div class="user">Add a regression test for the open redirect.</div>
+        <div class="tool"><span class="ok">✓</span><b>Write</b> LoginRedirectTests.cs <span class="muted">+42</span></div>
+        <div class="tool"><span class="ok">✓</span><b>Bash</b> dotnet test tests/Auth.Tests</div>
+        <div>Added three tests: a local ReturnUrl is kept, an absolute one is dropped, and <span class="mono">//evil.example</span> is dropped. All 586 tests pass.</div>
+      </div>
+      <div class="composer">
+        <input class="field" type="text" placeholder="Message tester" aria-label="Message tester">
+        <button class="btn primary" type="button">Send</button>
+      </div>
+    </section>
+
+    <section class="pane" style="grid-row: 7 / span 6; grid-column: 7 / span 6" aria-label="auth-service, outside Ochre">
+      <div class="phead">
+        <span class="num">4</span>
+        <span class="dot w-busy" aria-hidden="true"></span>
+        <span class="name mono" style="font-size: 13px" title="C:\Users\you\git\auth-service">auth-service</span>
+        <span class="word w-busy">working</span>
+        <span class="tagout">outside Ochre</span>
+        <span style="flex: 1"></span>
+        <span class="meta">main</span>
+        <button class="btn icon" type="button" aria-label="Zoom auth-service"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+        <button class="btn icon" type="button" aria-label="More for auth-service"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="3" cy="7" r="1.2" fill="currentColor"></circle><circle cx="7" cy="7" r="1.2" fill="currentColor"></circle><circle cx="11" cy="7" r="1.2" fill="currentColor"></circle></svg></button>
+      </div>
+      <div class="thread">
+        <div class="user">Why does the token refresh 401 after deploy?</div>
+        <div class="tool"><span class="ok">✓</span><b>Read</b> TokenService.cs</div>
+        <div>The signing key rotates on deploy but the cache keeps the old one for an hour. Checking where the cache is filled.</div>
+        <div class="tool"><span class="run">●</span><b>Grep</b> SigningKeyCache</div>
+      </div>
+      <div class="readonly">Read-only: started outside Ochre. Carry on with it where it's running.</div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

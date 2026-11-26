@@ -442,7 +442,7 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
 
 ### Slice 6: grid view
 
-- Larger visual change: starts from a design artefact the user agrees first (`docs/design/m5-roost/`).
+- Larger visual change: starts from a design artefact the user agrees first (`docs/design/m5-roost/`). Agreed 2026-11-26; see its README.
 - A **Grid** title-bar view from the module, its parameter (the task) kept per window, and a **Grid** link beside a task's agents.
 - Regions are a CSS grid from the layout's unit spans. Each pane: a header (status dot and word, role, model, context, a menu with Remove from grid and Open thread), then the thread in a compact form of `SessionView`. Controlled panes have the composer and the permission, question and plan cards; dormant ones resume on send; observed ones say "Read-only: started outside Ochre" and have no composer.
 - Placement is the user's: drag a pane's header onto another region to swap, click an empty region to choose from the unplaced sessions, choose a preset from a menu (the nine templates). Zoom a pane (button, Ctrl+Shift+Z; Esc restores); Alt+1 to Alt+8 focus regions in reading order; Ctrl+. picks the next pane needing you when one is in the grid.

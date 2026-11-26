@@ -1,0 +1,18 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-26T18:00:00Z" },
+  "title": "Ochre M5 agent grid",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Grid: a task's four agents, one needing you", "expand": "fill" },
+    "States.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 900, "title": "Layout menu, an empty region, a dormant agent", "expand": "fill" },
+    "Zoomed.dc.html": { "x": 0, "y": 1020, "w": 1440, "h": 900, "title": "One pane zoomed", "expand": "fill" },
+    "Task.dc.html": { "x": 1520, "y": 1020, "w": 1440, "h": 900, "title": "Task detail: Grid beside its agents", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "States.dc.html", "Zoomed.dc.html", "Task.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "Ochre: agent grid (M5 slice 6)", "kind": "title1", "maxW": 2960 }
+  },
+  "designSystems": []
+}

@@ -337,6 +337,62 @@ export interface RespondRequest {
   denyMessage: string | null;
 }
 
+export interface RoostAssignRequest {
+  taskId: string;
+  regionId: number;
+  sessionId: string;
+}
+
+export interface RoostChangedEvent {
+  taskId: string;
+}
+
+export interface RoostGetRequest {
+  taskId: string;
+  aspect: number;
+}
+
+export interface RoostGridDto {
+  taskId: string;
+  units: number;
+  regions: RoostRegionDto[];
+  zoomed: number | null;
+  unplaced: string[];
+  preset: string | null;
+  presets: RoostPresetDto[];
+}
+
+export interface RoostPresetDto {
+  key: string;
+  name: string;
+  regions: RoostRegionDto[];
+}
+
+export interface RoostPresetRequest {
+  taskId: string;
+  preset: string;
+}
+
+export interface RoostRegionDto {
+  id: number;
+  number: number;
+  row: number;
+  column: number;
+  rowSpan: number;
+  columnSpan: number;
+  sessionId: string | null;
+}
+
+export interface RoostSessionRequest {
+  taskId: string;
+  sessionId: string;
+}
+
+export interface RoostZoomRequest {
+  taskId: string;
+  regionId: number | null;
+}
+
 export interface SendPromptRequest {
   id: string;
   text: string;
@@ -746,6 +802,11 @@ export interface Requests {
   'terminals.rerun': { req: TerminalIdRequest; res: Ack };
   'terminals.dismissRestore': { req: TerminalIdRequest; res: Ack };
   'terminals.close': { req: TerminalIdRequest; res: Ack };
+  'roost.get': { req: RoostGetRequest; res: RoostGridDto };
+  'roost.applyPreset': { req: RoostPresetRequest; res: RoostGridDto };
+  'roost.assign': { req: RoostAssignRequest; res: RoostGridDto };
+  'roost.unassign': { req: RoostSessionRequest; res: RoostGridDto };
+  'roost.zoom': { req: RoostZoomRequest; res: RoostGridDto };
 }
 
 export interface Events {
@@ -759,4 +820,5 @@ export interface Events {
   'sprig.changed': Empty;
   'terminals.output': TerminalOutputEvent;
   'terminals.changed': Empty;
+  'roost.changed': RoostChangedEvent;
 }

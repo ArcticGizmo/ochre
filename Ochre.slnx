@@ -8,6 +8,7 @@
   <Folder Name="/modules/">
     <Project Path="modules/Ochre.Modules.Git/Ochre.Modules.Git.csproj" />
     <Project Path="modules/Ochre.Modules.Notifications/Ochre.Modules.Notifications.csproj" />
+    <Project Path="modules/Ochre.Modules.Roost/Ochre.Modules.Roost.csproj" />
     <Project Path="modules/Ochre.Modules.ShutdownPark/Ochre.Modules.ShutdownPark.csproj" />
     <Project Path="modules/Ochre.Modules.Sprig/Ochre.Modules.Sprig.csproj" />
     <Project Path="modules/Ochre.Modules.Terminals/Ochre.Modules.Terminals.csproj" />

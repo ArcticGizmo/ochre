@@ -434,6 +434,11 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
 - `RoostGrid`: one layout plus region-to-session cells and a zoomed region, taken from `RoostTabSet`'s placement rules (assign swaps, unassign, toggle zoom, sync empties a region whose session is gone) with the matching tests from `RoostTabSetTests`; tabs, `Show`, `DropOnTab`, duplication and the layout library stay behind.
 - Saved per task in the module's data folder (`roost.json`: layout regions, cells, zoom), written atomically. A task with no saved grid gets `ForCount` for its sessions, filled in start order. A session that joins later goes into an empty region if there is one, else to the "not in the grid" strip; nothing already placed moves.
 - Bridge `roost.get {taskId}`, `roost.applyPreset`, `roost.assign`, `roost.unassign`, `roost.zoom`, and a `roost.changed` event so two windows on one task agree. The host builds every layout from a preset name or its own last layout, never from regions the page sends, and checks that every placed session belongs to the task.
+- Done 2026-11-26 (no UI yet; checked through the bridge in a headless dev host). Ported from Perch `9275e0b`: `RoostGridLayout` and `RoostTemplates` (`src/Perch.Core/Data/Roost/`) whole, with `RoostGridLayoutTests` and `RoostTemplatesTests`; the JSON round trip now goes through `roost.json`'s own serializer. `RoostGrid` is new, with Perch's single-tab placement rules and its own tests (`RoostGridTests`). Decisions made while building:
+  - **"Known" sessions**: the grid remembers every session it has seen, so one the user took out isn't put back by the next sync, and only a session it has never seen fills an empty region. `roost.json` keeps it with the layout, cells and zoom.
+  - **Every call returns the whole grid** (`RoostGridDto`: regions with their numbers and sessions, the unplaced sessions, the matching preset, and the presets for the menu), so the page never works out placement itself; `roost.changed` tells other windows to fetch it again.
+  - **Aspect** shapes a grid only when it's made (`roost.get` carries the stage's width / height).
+  - A grid for a deleted task is dropped when `roost.json` is next read.
 
 ### Slice 6: grid view
 

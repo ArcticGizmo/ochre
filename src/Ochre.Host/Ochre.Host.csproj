@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\modules\Ochre.Modules.Git\Ochre.Modules.Git.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Sprig\Ochre.Modules.Sprig.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Notifications\Ochre.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\..\modules\Ochre.Modules.Roost\Ochre.Modules.Roost.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ochre.BridgeGen" />

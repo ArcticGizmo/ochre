@@ -18,6 +18,7 @@
     <InternalsVisibleTo Include="Ochre.Modules.Git" />
     <InternalsVisibleTo Include="Ochre.Modules.Sprig" />
     <InternalsVisibleTo Include="Ochre.Modules.Notifications" />
+    <InternalsVisibleTo Include="Ochre.Modules.Roost" />
     <InternalsVisibleTo Include="Ochre.BridgeGen" />
   </ItemGroup>
 </Project>

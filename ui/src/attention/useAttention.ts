@@ -40,10 +40,11 @@ export function attentionNow(): AttentionSnapshot {
 /**
  * Tells the host the user has this session's thread in front of them, which marks its finished turn read: now, when
  * the window takes focus, and when a turn finishes while it's on screen. Only while this window has focus, so a
- * thread left open in a background window doesn't swallow the item.
+ * thread left open in a background window doesn't swallow the item. Null while the thread is mounted but hidden.
  */
-export function useReportSeen(sessionId: string) {
+export function useReportSeen(sessionId: string | null) {
   useEffect(() => {
+    if (!sessionId) return;
     const report = () => {
       if (!document.hasFocus()) return;
       request('attention.seen', { sessionId }).catch(() => {});

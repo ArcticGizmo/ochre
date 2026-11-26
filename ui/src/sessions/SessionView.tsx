@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useReportSeen } from '../attention/useAttention';
 import { on, request, type AssistantPartDto, type PermissionDto, type SessionHeader, type SessionItemDto } from '../bridge';
 import { ConfirmDialog } from '../Dialog';
@@ -17,27 +17,25 @@ const models = [
 
 const efforts = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'];
 
-const modelLabel = (id: string) => models.find((m) => m.id === id)?.label ?? (id || 'Default model');
+export const modelLabel = (id: string) => models.find((m) => m.id === id)?.label ?? (id || 'Default model');
 
-interface Props {
-  id: string;
-  /** Where the back button returns to, e.g. the task id or "Today". */
-  backLabel: string;
-  /** The task's park note; this agent's line from it is shown above the composer while it's dormant. */
-  parkNote: string | null;
-  onBack: () => void;
-  onError: (message: string) => void;
+export interface SessionThread {
+  header: SessionHeader | null;
+  items: SessionItemDto[];
+  turnActive: boolean;
+  /** The host doesn't know this session (its task was deleted). */
+  gone: boolean;
 }
 
-/** The thread of one controlled session: messages, tool cards, prompts that need an answer, and a composer. */
-export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props) {
+/**
+ * One session's header and thread, kept current from the shared sessions.update stream. Every caller filters the
+ * same stream, so a grid of panes costs no extra host subscriptions.
+ */
+export function useSessionThread(id: string, onError: (message: string) => void): SessionThread {
   const [header, setHeader] = useState<SessionHeader | null>(null);
   const [items, setItems] = useState<SessionItemDto[]>([]);
   const [turnActive, setTurnActive] = useState(false);
   const [gone, setGone] = useState(false);
-  const [confirmStop, setConfirmStop] = useState(false);
-  const scroller = useRef<HTMLDivElement>(null);
-  const stick = useRef(true);
 
   const load = useCallback(() => {
     request('sessions.get', { id })
@@ -73,13 +71,65 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
     });
   }, [id, load]);
 
-  useReportSeen(id);
+  return { header, items, turnActive, gone };
+}
 
-  // Follow the thread while the reader is at the bottom; leave them alone once they scroll up.
+/** The scrolling list of messages, tool cards and prompts. Follows new output while the reader is at the bottom. */
+export function ThreadItems({ sessionId, items, turnActive, compact, hidden, emptyText, onError }: { sessionId: string; items: SessionItemDto[]; turnActive: boolean; compact?: boolean; hidden?: boolean; emptyText: string; onError: (m: string) => void }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+
+  // Scrolling a hidden element does nothing, so catch up when it's shown again.
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [items, turnActive]);
+    if (el && stick.current && !hidden) el.scrollTop = el.scrollHeight;
+  }, [items, turnActive, hidden]);
+
+  // A pane narrowed or zoomed reflows its text, which moves the bottom away from a reader who was following it.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const follow = new ResizeObserver(() => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    });
+    follow.observe(el);
+    return () => follow.disconnect();
+  }, []);
+
+  return (
+    <div
+      className="thread"
+      ref={scroller}
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      }}
+    >
+      {items.length === 0 && <p className="empty">{emptyText}</p>}
+      {items.map((item) => (
+        <Item key={item.index} sessionId={sessionId} item={item} compact={compact} onError={onError} />
+      ))}
+      {turnActive && <div className="msg assistant working">working…</div>}
+    </div>
+  );
+}
+
+interface Props {
+  id: string;
+  /** Where the back button returns to, e.g. the task id or "Today". */
+  backLabel: string;
+  /** The task's park note; this agent's line from it is shown above the composer while it's dormant. */
+  parkNote: string | null;
+  onBack: () => void;
+  onError: (message: string) => void;
+}
+
+/** The thread of one controlled session: messages, tool cards, prompts that need an answer, and a composer. */
+export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props) {
+  const { header, items, turnActive, gone } = useSessionThread(id, onError);
+  const [confirmStop, setConfirmStop] = useState(false);
+
+  useReportSeen(id);
 
   if (gone) {
     return (
@@ -166,20 +216,7 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
         <code title={header.id}>{header.id.slice(0, 8)}</code>
       </div>
 
-      <div
-        className="thread"
-        ref={scroller}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-        }}
-      >
-        {items.length === 0 && <p className="empty">Nothing yet. Write the first message below.</p>}
-        {items.map((item) => (
-          <Item key={item.index} sessionId={id} item={item} onError={onError} />
-        ))}
-        {turnActive && <div className="msg assistant working">working…</div>}
-      </div>
+      <ThreadItems sessionId={id} items={items} turnActive={turnActive} emptyText="Nothing yet. Write the first message below." onError={onError} />
 
       {ownNote && (
         <p className="own-note muted">
@@ -211,7 +248,8 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
   );
 }
 
-function Item({ sessionId, item, onError }: { sessionId: string; item: SessionItemDto; onError: (m: string) => void }) {
+// Memoised: an update replaces only the items that changed, so a streaming reply re-renders one item, not the thread.
+const Item = memo(function Item({ sessionId, item, compact, onError }: { sessionId: string; item: SessionItemDto; compact?: boolean; onError: (m: string) => void }) {
   switch (item.kind) {
     case 'user':
       return <div className="msg user">{item.text}</div>;
@@ -226,9 +264,9 @@ function Item({ sessionId, item, onError }: { sessionId: string; item: SessionIt
         </div>
       );
     case 'permission':
-      return item.permission ? <Permission sessionId={sessionId} p={item.permission} onError={onError} /> : null;
+      return item.permission ? <Permission sessionId={sessionId} p={item.permission} compact={compact} onError={onError} /> : null;
   }
-}
+});
 
 function Part({ part }: { part: AssistantPartDto }) {
   if (part.kind === 'text') {
@@ -266,7 +304,7 @@ function Part({ part }: { part: AssistantPartDto }) {
   );
 }
 
-function Permission({ sessionId, p, onError }: { sessionId: string; p: PermissionDto; onError: (m: string) => void }) {
+function Permission({ sessionId, p, compact, onError }: { sessionId: string; p: PermissionDto; compact?: boolean; onError: (m: string) => void }) {
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
 
@@ -385,7 +423,8 @@ function Permission({ sessionId, p, onError }: { sessionId: string; p: Permissio
             Allow, switch to {p.suggestedMode}
           </button>
         )}
-        <button className="primary" onClick={() => respond(true)} disabled={busy} autoFocus>
+        {/* In a grid, a prompt arriving in one pane mustn't take focus from a message being typed in another. */}
+        <button className="primary" onClick={() => respond(true)} disabled={busy} autoFocus={!compact}>
           Allow
         </button>
       </div>
@@ -393,7 +432,17 @@ function Permission({ sessionId, p, onError }: { sessionId: string; p: Permissio
   );
 }
 
-function Composer({ sessionId, queued, dormant, autoFocus, onError }: { sessionId: string; queued: number; dormant: boolean; autoFocus: boolean; onError: (m: string) => void }) {
+interface ComposerProps {
+  sessionId: string;
+  queued: number;
+  dormant: boolean;
+  autoFocus: boolean;
+  /** One line with the button beside it, for a grid pane; named so several composers can be told apart. */
+  compact?: { name: string; busy: boolean };
+  onError: (m: string) => void;
+}
+
+export function Composer({ sessionId, queued, dormant, autoFocus, compact, onError }: ComposerProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -411,14 +460,22 @@ function Composer({ sessionId, queued, dormant, autoFocus, onError }: { sessionI
     }
   }
 
+  const placeholder = compact
+    ? dormant
+      ? `Sending resumes ${compact.name} with its conversation`
+      : `Message ${compact.name}${compact.busy ? ' (queued until its turn ends)' : ''}`
+    : dormant
+      ? 'This agent is dormant. Sending resumes it with its conversation.'
+      : 'Message the agent. Enter sends, Shift+Enter adds a line.';
+
   return (
-    <div className="composer">
+    <div className={compact ? 'composer compact' : 'composer'}>
       <textarea
-        rows={3}
+        rows={compact ? 1 : 3}
         autoFocus={autoFocus}
-        aria-label="Message the agent"
+        aria-label={compact ? `Message ${compact.name}` : 'Message the agent'}
         value={text}
-        placeholder={dormant ? 'This agent is dormant. Sending resumes it with its conversation.' : 'Message the agent. Enter sends, Shift+Enter adds a line.'}
+        placeholder={placeholder}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {

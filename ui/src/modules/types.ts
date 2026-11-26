@@ -8,6 +8,13 @@ import type { TaskDetail, TaskListItem } from '../bridge';
 export interface AppContext {
   tasks: TaskListItem[];
   openTask: (taskId: string) => void;
+  /** Shows an agent's whole thread beside its task. */
+  openThread: (sessionId: string, taskId: string) => void;
+  /**
+   * The agents a module view has on screen, so their finished turns count as seen and notifications stay quiet about
+   * them. Only heard while that view is showing.
+   */
+  reportViewing: (viewKey: string, sessionIds: string[]) => void;
   /** Shows the task in a window of its own on this desktop (asking first if one on another desktop shows it). */
   openInWindow: (taskId: string) => void;
   /** Shows a view in the title bar, with a parameter it understands (e.g. which terminal tab). */
@@ -48,6 +55,8 @@ export interface ModuleUi {
   view?: ModuleView;
   /** A section of the task detail, below Agents. */
   TaskSection?: ComponentType<TaskSectionProps>;
+  /** Drawn beside the Agents heading on a task (e.g. a button that shows them in a grid). */
+  AgentsAction?: ComponentType<TaskSectionProps>;
   /** Drawn after each of a task's folders, on the task and on Today (e.g. its branch and changes). */
   FolderStatus?: ComponentType<FolderStatusProps>;
 }

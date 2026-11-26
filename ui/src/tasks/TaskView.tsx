@@ -20,6 +20,8 @@ interface Props {
   onOpenSession: (sessionId: string | null) => void;
   /** Sections the running modules add below Agents (ADR 0012). */
   sections: { id: string; Section: ComponentType<TaskSectionProps> }[];
+  /** What the running modules add beside the Agents heading. */
+  agentsActions: { id: string; Section: ComponentType<TaskSectionProps> }[];
   /** What the running modules show beside each repo and worktree. */
   folderStatuses: FolderStatuses;
   ctx: AppContext;
@@ -27,7 +29,7 @@ interface Props {
   onDeleted: () => void;
 }
 
-export function TaskView({ id, openSession, onOpenSession, sections, folderStatuses, ctx, onError, onDeleted }: Props) {
+export function TaskView({ id, openSession, onOpenSession, sections, agentsActions, folderStatuses, ctx, onError, onDeleted }: Props) {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [gone, setGone] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -244,7 +246,12 @@ export function TaskView({ id, openSession, onOpenSession, sections, folderStatu
       </section>
 
       <section>
-        <h3>Agents</h3>
+        <div className="section-head">
+          <h3>Agents</h3>
+          {agentsActions.map(({ id: moduleId, Section }) => (
+            <Section key={moduleId} task={task} ctx={ctx} />
+          ))}
+        </div>
         {task.sessions.length === 0 ? (
           <p className="empty">No agents yet.</p>
         ) : (

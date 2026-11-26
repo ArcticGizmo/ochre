@@ -448,6 +448,13 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
 - Placement is the user's: drag a pane's header onto another region to swap, click an empty region to choose from the unplaced sessions, choose a preset from a menu (the nine templates). Zoom a pane (button, Ctrl+Shift+Z; Esc restores); Alt+1 to Alt+8 focus regions in reading order; Ctrl+. picks the next pane needing you when one is in the grid.
 - A pane on screen in the active window reports `attention.seen`, so a turn finished in view never reaches the inbox's unseen list.
 - Check eight streaming panes stay responsive (one agent running a long reply, seven idle; then several streaming at once); if not, panes off-screen or zoomed away drop their thread and show the last lines until shown again.
+- Done 2026-11-26 except the eight-pane performance check, which needs eight live agents and is left to the hand run (`docs/testing/m5-grid-testing.md`). Decisions made while building:
+  - **`SessionView` split** into `useSessionThread` (header and items from the one `sessions.update` stream), `ThreadItems` and `Composer`, which the full thread and the panes share. Thread items are memoised, so a streaming reply re-renders one item rather than the thread; panes are memoised too.
+  - **New contribution point** `AgentsAction` on `ModuleUi`, drawn beside a task's Agents heading; the grid's **Grid** button is the first. `AppContext` gains `openThread` and `reportViewing`, so a module view can open a thread and say which agents it has on screen (the app ignores a list from a view that isn't showing).
+  - **Zoomed-away panes stay mounted but hidden**, so a draft and the subscription survive a zoom; a hidden pane doesn't report itself seen. Panes are cheap enough that dropping their threads wasn't needed so far.
+  - **Ctrl+.** is taken by the grid (a capture listener) only while one of its panes needs you; otherwise the app's inbox walk runs as before. Alt+N and Ctrl+. move the zoom to the target pane when another is zoomed.
+  - **Prompts in panes don't autofocus**, so a permission arriving in one pane never takes focus from a message being typed in another.
+  - **A chip in "Not in the grid"** opens a menu of regions (empty or "in place of …") as well as being draggable; empty regions list the agents inline rather than behind a click.
 
 ### Slice 7: exit run
 

@@ -95,12 +95,16 @@ export function App() {
     if (windowKnown) request('window.setTask', { task: shownTask }).catch(() => {});
   }, [windowKnown, shownTask]);
 
-  // What this window has in front of the user, so a desktop notification stays quiet about it.
+  // What this window has in front of the user, so a desktop notification stays quiet about it. A module view (the
+  // grid) reports its own list, tagged with its key so a list left behind by a view no longer showing is ignored.
   const focused = useWindowFocus();
+  const [moduleViewing, setModuleViewing] = useState<{ view: string; ids: string[] }>({ view: '', ids: [] });
   const viewedSession = view === 'today' ? (thread?.sessionId ?? null) : view === 'tasks' ? taskThread : null;
+  const viewedKey = moduleViewing.view === view ? moduleViewing.ids.join(',') : (viewedSession ?? '');
   useEffect(() => {
-    request('attention.viewing', { focused, inbox: view === 'inbox', sessionIds: viewedSession ? [viewedSession] : [] }).catch(() => {});
-  }, [focused, view, viewedSession]);
+    request('attention.viewing', { focused, inbox: view === 'inbox', sessionIds: viewedKey ? viewedKey.split(',') : [] }).catch(() => {});
+  }, [focused, view, viewedKey]);
+  const reportViewing = useCallback((key: string, ids: string[]) => setModuleViewing({ view: key, ids }), []);
 
   const shownTitle = tasks.find((t) => t.id === shownTask)?.title;
   useEffect(() => {
@@ -172,6 +176,8 @@ export function App() {
     () => ({
       tasks,
       openTask,
+      openThread,
+      reportViewing,
       openInWindow,
       showView: (key, param) => {
         setView(key);
@@ -179,11 +185,12 @@ export function App() {
       },
       onError: setError,
     }),
-    [tasks, openTask, openInWindow, setParam],
+    [tasks, openTask, openThread, reportViewing, openInWindow, setParam],
   );
 
   const moduleView = modules.find((m) => m.view?.key === view)?.view;
   const taskSections = modules.flatMap((m) => (m.TaskSection ? [{ id: m.id, Section: m.TaskSection }] : []));
+  const agentsActions = modules.flatMap((m) => (m.AgentsAction ? [{ id: m.id, Section: m.AgentsAction }] : []));
   const folderStatuses = modules.flatMap((m) => (m.FolderStatus ? [{ id: m.id, Status: m.FolderStatus }] : []));
 
   let body;
@@ -249,6 +256,7 @@ export function App() {
               openSession={taskThread}
               onOpenSession={setTaskThread}
               sections={taskSections}
+              agentsActions={agentsActions}
               folderStatuses={folderStatuses}
               ctx={ctx}
               onError={setError}

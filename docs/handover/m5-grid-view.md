@@ -14,9 +14,12 @@ M5 is planned in `docs/implementation-plan.md` (M5, seven slices, with an exit c
 | 3. Inbox view (design `docs/design/m5-inbox/`) | `33eed41` | `docs/testing/m5-inbox-testing.md` |
 | 4. Notifications module | `5388e51` | `docs/testing/m5-notifications-testing.md` |
 | 5. Roost model (`roost` module, no UI) | `a3d7d12` | `docs/testing/m5-roost-model-testing.md` |
-| 6. Grid view: design agreed, not built | this commit | |
+| 6. Grid view: design agreed | `914a3ee` | |
+| 6. Grid view built | the commit after | `docs/testing/m5-grid-testing.md` |
 
 636 tests pass (`dotnet test tests/Ochre.Tests/Ochre.Tests.csproj`).
+
+**Update, later on 2026-11-26: slice 6 is built** (Done note in the plan). Next is slice 7, the exit run (below). The grid's eight-pane performance check and the rows its testing doc lists as not yet checked by hand go into that run. The section that follows is kept as the brief slice 6 was built from.
 
 ## Next: slice 6, the grid view
 

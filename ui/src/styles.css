@@ -2703,3 +2703,383 @@ kbd {
   font-size: 13px;
   color: var(--danger);
 }
+
+/* A heading with actions beside it, on the task page. */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.task .section-head h3 {
+  margin: 0;
+}
+
+.grid-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 2px 10px;
+}
+
+.grid-link:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* The agent grid (docs/design/m5-roost). */
+.roost-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.roost-loading {
+  padding: 16px 24px;
+}
+
+.roost-tasks li {
+  align-items: center;
+}
+
+.roost-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #33312f;
+}
+
+button.link.roost-task {
+  padding: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+button.link.roost-switch,
+.roost-layout > .menu > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button.link.roost-switch {
+  padding: 4px 6px;
+}
+
+.roost-toolbar .menu-list {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.roost-label,
+.roost-keys {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.roost-chip-wrap {
+  display: inline-flex;
+}
+
+.agent-chip.roost-chip {
+  border: 1px dashed #5c5854;
+  background: none;
+  cursor: grab;
+}
+
+.roost-zoomtag {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent-text);
+}
+
+.roost-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.roost-mini:hover {
+  border-color: var(--accent);
+}
+
+.roost-layout .menu-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 440px;
+  padding: 10px;
+}
+
+.roost-layout .menu-item {
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #1f1e1d;
+}
+
+.roost-layout .menu-item:hover,
+.roost-layout .menu-item:focus-visible {
+  border-color: #5c5854;
+  background: #1f1e1d;
+}
+
+.roost-layout .menu-item.current {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.roost-layout .menu-item .check {
+  display: none;
+}
+
+.roost-thumb {
+  width: 96px;
+  height: 60px;
+  display: grid;
+  gap: 2px;
+}
+
+.roost-thumb > span {
+  background: #4a4643;
+  border-radius: 2px;
+}
+
+.roost-layout .menu-item.current .roost-thumb > span {
+  background: #a8662a;
+}
+
+.roost-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+}
+
+.roost-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  outline: none;
+}
+
+.roost-pane[hidden] {
+  display: none;
+}
+
+.roost-pane.need {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent);
+}
+
+.roost-pane.focus {
+  border-color: var(--accent);
+}
+
+.roost-pane.drop {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+
+.roost-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 8px;
+  border-bottom: 1px solid #33312f;
+  flex: none;
+  cursor: grab;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.roost-num {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 5px;
+  flex: none;
+}
+
+.roost-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.roost-name.mono {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.roost-meta {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.roost-head button.link.icon-only {
+  color: var(--muted);
+}
+
+.roost-head button.link.more {
+  padding: 0 6px;
+}
+
+.roost-head .menu-list {
+  min-width: 170px;
+}
+
+.roost-gone {
+  padding: 8px 12px;
+}
+
+/* The thread, tightened to fit a pane. */
+.roost-pane .thread {
+  border-top: none;
+  padding: 2px 10px 8px;
+  font-size: 13px;
+}
+
+.roost-pane .msg {
+  margin: 8px 0;
+  line-height: 1.45;
+}
+
+.roost-pane .msg.user {
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 12px 12px 4px 12px;
+}
+
+.roost-pane .msg.assistant {
+  margin-right: 0;
+  padding: 7px 10px 1px;
+  border-radius: 4px 12px 12px 12px;
+}
+
+.roost-pane .msg.working {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.roost-pane .card {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: #1f1e1d;
+}
+
+.roost-pane .read-only-note {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-top-color: #33312f;
+}
+
+.composer.compact {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top-color: #33312f;
+  flex: none;
+}
+
+/* One line that grows with what's typed; the placeholder stays on one line however narrow the pane. */
+.composer.compact textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  field-sizing: content;
+  min-height: 30px;
+  max-height: 120px;
+  font-size: 13px;
+  padding: 4px 8px;
+  background: var(--bg);
+}
+
+.composer.compact textarea:placeholder-shown {
+  height: 30px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A zoomed pane is as wide as the window, so its thread keeps to a readable measure. */
+.roost-pane.zoomed .thread,
+.roost-pane.zoomed .composer.compact {
+  padding-left: max(10px, calc((100% - 960px) / 2));
+  padding-right: max(10px, calc((100% - 960px) / 2));
+}
+
+.composer.compact .composer-actions {
+  margin-top: 0;
+  flex: none;
+}
+
+.roost-empty {
+  border: 1px dashed #5c5854;
+  background: #1f1e1d;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.roost-empty .note {
+  text-align: center;
+}
+
+.roost-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.roost-pick button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  text-align: left;
+  border-radius: 6px;
+}
+
+.roost-pick button:hover,
+.roost-pick button:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.roost-pick .st {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}

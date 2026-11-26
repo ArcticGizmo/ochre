@@ -469,11 +469,76 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
 - Grid tabs, saved layouts, and editing a layout by splitting, merging or dragging dividers (the model supports them; the UI waits).
 - Taking over an observed session in Ochre.
 
-## M6 onwards (outline)
+## M6: editor
+
+Exit: on a task with an agent, open a file from the task's folder tree, edit it and save it with Ctrl+S. Ask the agent to change the same file: the open, clean copy reloads; with unsaved edits, Ochre offers Reload, Compare and Keep mine instead of overwriting either side. The task's Changes list shows every file the agent changed across two of the task's folders, each opening as a diff against HEAD that can be edited and saved. A commit in the Git view lists its changed files, and each opens as a diff. A path in an agent's Edit card opens that file at the edited line. Ctrl+P finds a file by part of its name. A README shows as rendered markdown beside its source. Closing a window with an unsaved file asks first. With the `editor` module off, the task, its agents and the Git view (with its commit diffs) still work.
+
+Planned 2026-11-26 from a survey of Perch main (still `9275e0b`) and Ochre's git module. Scope agreed with the user: files are edited and saved, not only viewed; and the editor is reached from a file tree, a task-wide Changes list, the git graph, paths in agents' tool cards, and a Ctrl+P picker. Placement and the file-access rules are [ADR 0015](decisions/0015-editor-module-and-file-access.md).
+
+Findings that shape it:
+
+- **Monaco left with the spike.** The spike showed it works under the strict CSP (`script-src 'self'`, `worker-src 'self'`, with `style-src 'unsafe-inline'` for its injected styles) and that lazy-loading it keeps the entry bundle small (4.5 MB down to 579 KB). It comes back pinned, as a chunk loaded on first use, with only its built-in tokenisers (no language services beyond the JSON, CSS, HTML and TypeScript workers, which are optional and stay out unless they're cheap).
+- **Perch has the git reads, not an editor.** `GitRepoService` (Perch `src/Perch.Core/Data/GitRepoService.cs`) has `GetFileAtRef` (`git show <ref>:<path>`), working and commit diffs, `--numstat` change counts and a unified-diff parser; `ProjectFileScan` lists a folder's files with `git ls-files -z --cached --others --exclude-standard` and falls back to a bounded walk. Monaco's diff editor wants both sides' text rather than a patch, so the parser isn't needed: `GetFileAtRef`, the numstat parse and `ProjectFileScan` are copied into `src/Ochre.Core/Git/` (with their tests, if any), not the 1.1k-line service. Perch's `DiffView` (Avalonia) and `FileTreeLayout` are the behavioural spec for the Changes list and tree.
+- **Ochre already has the pieces around it.** `GitStatusReader` lists a folder's changes; `git.changed` fires when an agent's turn ends; `markdown.ts` renders sanitised markdown; the graph's token pattern (`GraphApi`) keeps git on paths and commits the host listed; `JumpDialog` is the picker to copy for Ctrl+P.
+
+Slice 1 is host-only and needs nothing else. Slices 2 to 5 are UI and share one design artefact, agreed before slice 2 starts.
+
+### Slice 1: file access in the host
+
+- New module project `modules/Ochre.Modules.Editor/` (`editor`, on by default). Core gets `Ochre.Core.Files.TaskPaths` (resolve a task, one of its folders and a relative path to a file, by ADR 0015's rules) so the git module can use the same checks for worktree diffs.
+- Bridge, each naming a task and one of its folders:
+  - `files.list`: the folder's files (`ProjectFileScan`: `git ls-files`, or the bounded walk outside git), capped at 20,000 with a "truncated" flag.
+  - `files.read`: text (UTF-8, BOM noted), its version (SHA-256), size and line ending; or why it can't be opened (too big, binary, not UTF-8 so read-only, gone).
+  - `files.write`: text plus the version it edited. Written atomically, keeping the BOM; a version that no longer matches answers `conflict` with the version now on disk, and nothing is written.
+  - `files.head`: the text at HEAD for a path `git status` lists as changed in that folder (empty for an untracked file), so a diff's left side never runs git on a path the page made up.
+  - `files.changes {taskId}`: every changed file in every folder of the task (status letter, lines added and removed from `git diff --numstat HEAD`), kept 3 s like `git.status`, cleared on `git.changed`.
+  - `files.watch {paths}` per window (like `attention.viewing`): which files the window has open. One `FileSystemWatcher` per folder with watched files; a change raises `files.changed {taskId, folder, path, version}` after a 200 ms settle, broadcast to every window. A window's list is dropped when it closes.
+- **Tests**: `TaskPaths` (security: rooted, `..`, a link inside the folder, device names, `::$DATA`, a folder the task doesn't record, `.git` on write); `files.write` (data loss: stale version refused and the file untouched, BOM kept, CRLF kept as sent, atomic replace leaves no temp file); `files.head` refuses a path status didn't list.
+- Checked through the bridge in a headless dev host before any UI exists.
+
+### Slice 2: the Files view
+
+- Larger visual change: starts from a design artefact the user agrees first (`docs/design/m6-editor/`), covering slices 2 to 5: the Files view (tree, tabs, editor, markdown preview), the Changes list and diff, the changed-on-disk bar and the conflict dialog, the Git view's commit files and diff, a path link in a tool card, and the Ctrl+P picker.
+- `monaco-editor` pinned exactly, loaded on first use with its workers through Vite; `ui/src/editor/` wraps a code view and a diff view in Ochre's colours, light and dark.
+- A **Files** title-bar view from the module, its parameter (the task and the open file) kept per window. The task's folders are the tree's roots (folder name, the path in a tooltip); a file opens in a tab; Ctrl+S saves; a dot marks unsaved tabs; find and replace are Monaco's own.
+- **Changed on disk**: a clean tab reloads and keeps its cursor and scroll; a dirty one shows a bar with Reload (discard mine), Compare (a diff of disk against mine) and Keep mine (the next save overwrites, after a confirm). A save answered with `conflict` shows the same choices.
+- **Markdown**: a `.md` file has Source, Preview and Side by side; the preview uses `markdown.ts`, links open through `app.openUrl` (middle click: a new browser window), and relative links to other files in the folder open them in the editor. Images wait.
+- **Unsaved edits on close**: closing a tab with unsaved edits asks; closing a window with any asks (the shell asks the page before it closes); quitting Ochre asks each window that has some.
+- A **Files** link beside each task folder (a `FolderStatus` contribution) opens the view on that folder.
+
+### Slice 3: Changes and diffs
+
+- The Files view's sidebar gets a **Changes (N)** tab beside the tree: `files.changes` grouped by folder, each file with its status letter and +/- counts, refreshed on window focus and on `git.changed`.
+- A changed file opens as a diff against HEAD in Monaco's diff editor (side by side, or inline when the view is narrow); the right side is the file on disk and edits save like any tab. Untracked files diff against empty; a deleted file shows its HEAD text, read-only; binary and oversized files say so.
+- The task page shows the count beside its folders ("Changes (12)"), opening the view on Changes.
+
+### Slice 4: diffs in the git graph
+
+- Lives in the git module, using `ui/src/editor/` (works with the editor module off).
+- `graph.files {token, hash}`: a commit's changed files (`git show --name-status -z --format= <hash>`; a merge against its first parent), for a hash the graph showed. `graph.diff {token, hash, path}`: the text before (first parent) and after, for a path that call listed, capped as `files.read` is. The commit details pane lists the files; one opens as a read-only diff beside it.
+- A worktree row's changed files (`graph.changes`, already listed) open their diff against HEAD too, through the same check.
+
+### Slice 5: paths in threads and Ctrl+P
+
+- **Paths in threads**: a tool card whose input has a file path (`Read`, `Edit`, `MultiEdit`, `Write`, `NotebookEdit`) shows it as a link when the editor module is on (a new `ctx.openFile`, absent when it's off). `files.locate {taskId, path}` maps an absolute path to one of the task's folders and a relative path, or says it's outside them. It opens at the line where it's known (`Read`'s offset; an `Edit`'s old text found in the file).
+- **Ctrl+P**: a picker over the task's files (`files.list` for each folder, folder name shown when the task has several), matched on the file name first, then the path; Enter opens it in this window's Files view. A focused terminal keeps Ctrl+P, as it keeps Ctrl+K.
+
+### Slice 6: exit run
+
+- Walk the exit criterion by hand, write `docs/testing/m6-testing.md`.
+
+### Not in M6
+
+- Language servers, go to definition, refactoring (vision, non-goals).
+- Creating, renaming or deleting files; staging, committing or reverting hunks (Perch's hunk staging is the reference when it's wanted).
+- Search across files; image preview; files outside a task's folders.
+- Reopening a window's open tabs after a restart (a window reopens on its task, as in M4).
+
+## M7 onwards (outline)
 
 Re-plan each milestone in detail when it starts. Notes worth keeping now:
 
-- **M6 to M8** stay as written in the roadmap; too far out to plan usefully.
+- **M7 and M8** stay as written in the roadmap; too far out to plan usefully.
 
 ## Housekeeping before starting
 

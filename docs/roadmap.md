@@ -76,9 +76,10 @@ Don't build anything that assumes a single window: per-window UI state (selected
 - An installed Ochre, as Perch ships: `publish.ps1` packs a Velopack installer and update feed; a `v*` tag publishes a GitHub release (`release.yml`); `install.ps1` installs it; the app updates itself when asked; CI runs on pull requests. Added between M5 and M6 at the user's request, so Ochre can be used day to day. See [ADR 0014](decisions/0014-velopack-distribution.md) and [testing/release-testing.md](testing/release-testing.md).
 - Later: code signing; a GitHub release for macOS when its head exists.
 
-## M6: editor
+## M6: editor (planned 2026-11-26)
 
 - Monaco: open/edit files from a task's repos, diff against HEAD, markdown preview.
+- Scope set 2026-11-26 with the user: files are edited and saved; the editor is reached from a file tree, a task-wide Changes list, the git graph's commits, file paths in agents' tool cards, and a Ctrl+P picker. Plan in [implementation-plan.md](implementation-plan.md), M6; placement and file-access rules in [ADR 0015](decisions/0015-editor-module-and-file-access.md).
 
 ## M7: widgets and plugins
 

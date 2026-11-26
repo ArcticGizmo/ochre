@@ -372,6 +372,7 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
   - **Activation**: while the host runs, a button press reaches it in-process from the pop-up and from the notification centre, with the arguments and the typed text. After the host has quit: what a click does with a COM activator (`LocalServer32` under HKCU) or a protocol (`ochre:`), and whether the endpoint protection on this machine objects to either. If both are trouble, a click on a stale notification simply starts Ochre.
   - **Lifecycle**: replace a session's notification in place (tag and group), remove it when it's answered elsewhere, clear a task's group, and what Windows keeps in the notification centre after a restart.
 - Out of scope for the spike: macOS, sounds beyond Windows' default.
+- Run 2026-11-26; see `docs/spike-notifications-results.md`. The WinRT path works unpackaged from an HKCU AppUserModelID alone: task headers, styled buttons, choice and text boxes, logos per status, progress updated in place, replace and remove by tag and group, and clicks with typed input arriving in-process. Still to check before slice 4: a click after the process has quit (protocol activation, which would avoid registering a COM activator), clicks from the notification centre, and `urgent` against Do Not Disturb.
 
 ### Slice 2: attention model (host)
 

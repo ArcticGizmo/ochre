@@ -2,7 +2,8 @@ namespace Ochre.Core.Platform;
 
 /// <summary>A shell the user can open a terminal with. The renderer picks one by <see cref="Id"/>; it never sends a command line.</summary>
 /// <param name="Executable">An absolute path, so starting it never searches the current directory.</param>
-public sealed record ShellProfile(string Id, string Name, string Executable, string Arguments);
+/// <param name="Environment">Variables set or replaced for this shell on top of Ochre's own environment.</param>
+public sealed record ShellProfile(string Id, string Name, string Executable, string Arguments, IReadOnlyDictionary<string, string>? Environment = null);
 
 /// <summary>A child process attached to a pseudoconsole.</summary>
 public interface IPseudoConsole : IDisposable

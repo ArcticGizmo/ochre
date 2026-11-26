@@ -15,6 +15,8 @@ What changed: Ochre saves its terminal tabs in `%LOCALAPPDATA%\Ochre\terminals\`
 | Tab menu **⋯** > untick "Keep scrollback when Ochre quits" on a tab that had it | | Its `.scrollback` file is deleted within a second |
 | Close a tab, quit, start | | It doesn't come back, and its `.scrollback` is gone |
 | In a full-screen program (e.g. `vim`) quit Ochre, start again | | The restored tab is readable: normal screen, cursor visible, divider, prompt |
+| In each shell (PowerShell, Windows PowerShell, cmd, Git Bash) `cd` somewhere else, then End task on Ochre in Task Manager, then start it | Tabs came back in the folder they opened in | Each comes back in the folder you cd'd to; no shells are left running from the killed Ochre |
+| Look at your prompt in each shell | | Unchanged (your profile's prompt, oh-my-posh and all); nothing extra printed |
 | Type `cls` in pwsh, scroll up | Earlier output was lost | It's in the scrollback |
 | Break `terminals.json` by hand (`{ x`), start Ochre | | No tabs restored; the log says it couldn't be read; the file is left as you broke it |
 

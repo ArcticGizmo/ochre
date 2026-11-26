@@ -11,16 +11,39 @@ namespace Ochre.Platform.Windows.Terminals;
 /// <summary>Terminals on Windows: ConPTY, with the shells found on this machine.</summary>
 public sealed class ConPtyPlatform : ITerminalPlatform
 {
+    // Each shell is told to report its folder at every prompt with Windows Terminal's OSC 9;9, which the host
+    // reads to reopen a restored tab where the user had cd'd to. The user's own prompt is kept and wrapped.
+
+    // PowerShell: run after the user's profile, so it wraps whatever prompt the profile set. Kept free of double
+    // quotes so it survives the command line as one argument; not a script file, which execution policy can block.
+    private const string PowerShellFolderHook =
+        @"$global:__OchrePrompt=$function:prompt;function global:prompt{$o=& $global:__OchrePrompt;if($PWD.Provider.Name -eq 'FileSystem'){-join([char]27,']9;9;',[char]34,$PWD.ProviderPath,[char]34,[char]27,'\',$o)}else{$o}}";
+
+    // cmd: $e is ESC and $P the current folder.
+    private const string CmdFolderPrompt = @"$e]9;9;$P$e\";
+
+    // Git Bash: cygpath turns /c/work into C:\work, the form the host checks.
+    private const string BashFolderCommand = @"printf '\033]9;9;%s\033\\' ""$(cygpath -w ""$PWD"")""";
+
     public IReadOnlyList<ShellProfile> DetectShells()
     {
+        var powerShellArgs = $"-NoLogo -NoExit -Command \"{PowerShellFolderHook}\"";
         var shells = new List<ShellProfile>();
-        if (ExecutableResolver.Find("pwsh") is { } pwsh) shells.Add(new ShellProfile("pwsh", "PowerShell", pwsh, "-NoLogo"));
+        if (ExecutableResolver.Find("pwsh") is { } pwsh) shells.Add(new ShellProfile("pwsh", "PowerShell", pwsh, powerShellArgs));
         var windowsPowerShell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
-        if (File.Exists(windowsPowerShell)) shells.Add(new ShellProfile("powershell", "Windows PowerShell", windowsPowerShell, "-NoLogo"));
+        if (File.Exists(windowsPowerShell)) shells.Add(new ShellProfile("powershell", "Windows PowerShell", windowsPowerShell, powerShellArgs));
         var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
-        if (File.Exists(cmd)) shells.Add(new ShellProfile("cmd", "Command Prompt", cmd, ""));
+        if (File.Exists(cmd))
+        {
+            var prompt = CmdFolderPrompt + (Environment.GetEnvironmentVariable("PROMPT") is { Length: > 0 } own ? own : "$P$G");
+            shells.Add(new ShellProfile("cmd", "Command Prompt", cmd, "", new Dictionary<string, string> { ["PROMPT"] = prompt }));
+        }
         var gitBash = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin", "bash.exe");
-        if (File.Exists(gitBash)) shells.Add(new ShellProfile("git-bash", "Git Bash", gitBash, "--login -i"));
+        if (File.Exists(gitBash))
+        {
+            var command = BashFolderCommand + (Environment.GetEnvironmentVariable("PROMPT_COMMAND") is { Length: > 0 } own ? "; " + own : "");
+            shells.Add(new ShellProfile("git-bash", "Git Bash", gitBash, "--login -i", new Dictionary<string, string> { ["PROMPT_COMMAND"] = command }));
+        }
         return shells;
     }
 
@@ -69,6 +92,7 @@ internal sealed class ConPtySession : IPseudoConsole
         var attrList = Marshal.AllocHGlobal(attrSize);
         var commandLine = shell.Arguments.Length == 0 ? Quote(shell.Executable) : $"{Quote(shell.Executable)} {shell.Arguments}";
         var cmd = Marshal.StringToHGlobalUni(commandLine);
+        var environment = shell.Environment is { Count: > 0 } extra ? Marshal.StringToHGlobalUni(EnvironmentBlock(extra)) : 0;
         var started = false;
         try
         {
@@ -81,7 +105,8 @@ internal sealed class ConPtySession : IPseudoConsole
             si.StartupInfo.Cb = Marshal.SizeOf<Native.StartupInfoEx>();
 
             // The executable is an absolute path (ShellProfile), so CreateProcess never searches a folder for it.
-            if (!Native.CreateProcess(null, cmd, 0, 0, false, Native.ExtendedStartupInfoPresent, 0, folder, ref si, out var pi))
+            var flags = Native.ExtendedStartupInfoPresent | (environment != 0 ? Native.CreateUnicodeEnvironment : 0);
+            if (!Native.CreateProcess(null, cmd, 0, 0, false, flags, environment, folder, ref si, out var pi))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), $"could not start {Path.GetFileName(shell.Executable)}");
             started = true;
             Native.CloseHandle(pi.Thread);
@@ -105,6 +130,7 @@ internal sealed class ConPtySession : IPseudoConsole
             Native.DeleteProcThreadAttributeList(attrList);
             Marshal.FreeHGlobal(attrList);
             Marshal.FreeHGlobal(cmd);
+            if (environment != 0) Marshal.FreeHGlobal(environment);
             if (!started)
             {
                 Native.ClosePseudoConsole(hpc);
@@ -114,6 +140,21 @@ internal sealed class ConPtySession : IPseudoConsole
                 outputRead.Dispose();
             }
         }
+    }
+
+    // Ochre's environment with the profile's variables on top, as CreateProcess wants it: "name=value" entries sorted
+    // by name, each ending in a NUL, then one more NUL (StringToHGlobalUni adds the last).
+    private static string EnvironmentBlock(IReadOnlyDictionary<string, string> extra)
+    {
+        var vars = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables())
+        {
+            if (e.Key is string k && e.Value is string v && k.Length > 0 && !k.Contains('=', StringComparison.Ordinal)) vars[k] = v;
+        }
+        foreach (var (k, v) in extra) vars[k] = v;
+        var sb = new StringBuilder();
+        foreach (var (k, v) in vars) sb.Append(k).Append('=').Append(v).Append('\0');
+        return sb.ToString();
     }
 
     private static string Quote(string path) => path.Contains(' ', StringComparison.Ordinal) ? $"\"{path}\"" : path;
@@ -208,6 +249,7 @@ internal sealed class ConPtySession : IPseudoConsole
 internal static partial class Native
 {
     internal const uint ExtendedStartupInfoPresent = 0x00080000;
+    internal const uint CreateUnicodeEnvironment = 0x00000400;
     internal const nint ProcThreadAttributePseudoConsole = 0x00020016;
 
     [StructLayout(LayoutKind.Sequential)]

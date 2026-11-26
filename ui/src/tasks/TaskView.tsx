@@ -240,7 +240,7 @@ export function TaskView({ id, openSession, onOpenSession, sections, folderStatu
 
       <section>
         <h3>Repos</h3>
-        <TaskFolders taskId={task.id} repos={task.repos} worktrees={task.worktrees} statuses={folderStatuses} onSaveRepos={(repos) => update({ repos })} />
+        <TaskFolders taskId={task.id} repos={task.repos} worktrees={task.worktrees} statuses={folderStatuses} ctx={ctx} onSaveRepos={(repos) => update({ repos })} />
       </section>
 
       <section>

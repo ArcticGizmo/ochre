@@ -9,20 +9,24 @@ using Ochre.Modules.Git.Bridge;
 namespace Ochre.Modules.Git;
 
 /// <summary>
-/// Git for tasks (M4 slice 2): each task folder's branch, changes and ahead/behind, and a <c>git-worktree</c>
-/// provider so an agent or terminal can start in a fresh checkout on its own branch. Status is read when a window
-/// asks (on focus) and after an agent's turn ends, never on a timer.
+/// Git for tasks (M4 slices 2 and 5): each task folder's branch, changes and ahead/behind, a <c>git-worktree</c>
+/// provider so an agent or terminal can start in a fresh checkout on its own branch, and a read-only commit graph of a
+/// task folder's repo. Status is read when a window asks (on focus) and after an agent's turn ends, never on a timer.
 /// </summary>
 internal sealed class GitModule : IModule
 {
     public string Id => "git";
     public string Name => "Git";
-    public string Description => "Shows each task folder's branch, changes and commits ahead or behind, and lets agents and terminals start in a new git worktree for the task.";
+    public string Description => "Shows each task folder's branch, changes and commits ahead or behind, a commit graph of its repo, and lets agents and terminals start in a new git worktree for the task.";
     public bool DefaultEnabled => true;
 
     public IReadOnlyList<RequestContract> Requests { get; } =
     [
         new("git.status", typeof(GitStatusRequest), typeof(IReadOnlyList<GitFolderStatus>)),
+        new("graph.load", typeof(GraphLoadRequest), typeof(GraphPageDto)),
+        new("graph.more", typeof(GraphTokenRequest), typeof(GraphMoreDto)),
+        new("graph.commit", typeof(GraphCommitRequest), typeof(GraphCommitDto)),
+        new("graph.changes", typeof(GraphChangesRequest), typeof(IReadOnlyList<GraphChangeDto>)),
     ];
 
     public IReadOnlyList<EventContract> Events { get; } =
@@ -34,7 +38,12 @@ internal sealed class GitModule : IModule
     {
         context.AddWorktreeProvider(new GitWorktreeProvider());
         var cache = new StatusCache();
-        context.AddBridge(bridge => Register(bridge, context.Tasks, cache));
+        var graphs = new GraphLoads();
+        context.AddBridge(bridge =>
+        {
+            Register(bridge, context.Tasks, cache);
+            GraphApi.Register(bridge, context.Tasks, graphs);
+        });
         var watcher = new TurnWatcher(context.Sessions, taskId =>
         {
             cache.Clear();

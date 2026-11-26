@@ -308,7 +308,13 @@ Slices are ordered so the exit criterion's three parts come first; the git graph
 
 - Port the graph model (`GraphModels`, `LaneAllocator`, `GraphSnapshot`, `GraphLogReader`, `GraphLoader` and the status calls they need) with `GitGraphTests`. Render it in the web UI (rows, lanes and edges as SVG, refs, worktrees and stashes), paged 2,000 commits at a time. Read-only first; write operations (`GitOps`) and avatars wait.
 - Larger visual change: starts from a design artefact.
-- Model ported 2026-11-26 from Perch `9275e0b` into `src/Ochre.Core/Git/Graph/`, with the matching `GitGraphTests` and the base-ref ranking (`GitBaseRefs`, from `GitRepoService`) for the Branch scope. Left behind with their tests: checkout and drop planning, `GitOps`, branch visibility (hidden branches), tag trees, commit info and avatars. The UI waits on the design artefact.
+- Done 2026-11-26; see `docs/testing/m4-graph-testing.md` and the agreed design in `docs/design/m4-graph/`. Model ported from Perch `9275e0b` into `src/Ochre.Core/Git/Graph/`, with the matching `GitGraphTests` and the base-ref ranking (`GitBaseRefs`, from `GitRepoService`) for the Branch scope. Left behind with their tests: checkout and drop planning, `GitOps`, branch visibility (hidden branches), tag trees, commit info and avatars. Decisions made while building:
+  - **Where it lives**: a **Git** title-bar view from the git module, its parameter (task, folder, scope, base) kept per window, and a **Graph** link the module adds beside each git folder on a task's page (not on Today). A repo opens All; a worktree opens This branch.
+  - **Untrusted renderer**: `graph.load` names a task and one of its own folders. It returns a token; `graph.more`, `graph.commit` and `graph.changes` name that token, so git runs only in that checkout, for a full hash the graph showed or a worktree it listed. A base branch must be one `for-each-ref` listed, so nothing the page sends reaches git as an option. The host keeps the 16 most recent loads; an expired one makes the page reload.
+  - **Details**: the whole message (`git show -s`, one call per click) with hard-wrapped prose rejoined, and a worktree's changed files (`git status`). Changed files of a commit and diffs wait for the editor (M6).
+  - **Rows**: virtualised at a fixed 28 px; each row draws the band above it, so any window of rows paints on its own. Lane colours are Perch's dark set, by lane. This branch shows ahead/behind its base (`rev-list --left-right --count`).
+  - **Refresh**: on window focus (at most every 5 s), after an agent's turn on the task (`git.changed`), and from a button; the selection is kept when its commit is still there.
+  - A window on the Git view reopens on Today after a restart (slice 4 saves a window's task only).
 
 ### Slice 6: Jira module
 

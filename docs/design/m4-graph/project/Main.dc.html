@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Git view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace}
+.muted{color:#a39d96}
+.btn{font:inherit;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:4px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.seg{display:inline-flex;border:1px solid #3a3836;border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;color:#a39d96;background:transparent;border:0;padding:4px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid #3a3836}
+.seg button[aria-pressed="true"]{color:#e8e4df;background:#2e2c2a}
+.find{font:inherit;font-size:13px;color:#e8e4df;background:#141312;border:1px solid #3a3836;border-radius:6px;padding:4px 10px;width:260px}
+.rail{width:220px;flex:none;border-right:1px solid #3a3836;padding:10px 0;overflow:auto;font-size:13px}
+.rh{display:flex;justify-content:space-between;padding:8px 14px 2px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a39d96}
+.ri{display:flex;align-items:center;gap:8px;width:100%;font:inherit;font-size:13px;color:#e8e4df;background:transparent;border:0;padding:3px 14px;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri:hover{background:#242322}
+.sw{width:8px;height:8px;border-radius:2px;flex:none}
+.rows{position:relative}
+.row{display:grid;grid-template-columns:88px minmax(0,1fr) 110px 92px 64px;column-gap:12px;align-items:center;height:28px;padding-right:12px;font-size:13px;white-space:nowrap}
+.row:hover{background:#242322}
+.row.sel{background:#2e2c2a}
+.subj{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden}
+.subj .t{overflow:hidden;text-overflow:ellipsis}
+.ref{font-size:11px;line-height:16px;padding:0 6px;border-radius:4px;border:1px solid #3a3836;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;flex:none}
+.rl{color:#e8e4df}
+.rr{color:#a39d96;border-style:dashed}
+.rt{color:#e3b44e;background:#2a2620;border-color:#4a3f2a}
+.rw{color:#e8974a;background:#2e2620;border-color:#5a3f26}
+.rs{color:#de7daf;border-color:#5a3446}
+.detail{width:340px;flex:none;border-left:1px solid #3a3836;padding:16px 18px;overflow:auto;font-size:13px}
+.kv{display:grid;grid-template-columns:72px minmax(0,1fr);gap:6px 10px;margin:14px 0}
+.kv dt{color:#a39d96}
+.kv dd{margin:0}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#" class="nav">Today</a>
+      <a href="#" class="nav">Tasks</a>
+      <a href="#" class="nav">Board</a>
+      <a href="#" class="nav">Terminals</a>
+      <a href="#" class="nav on" aria-current="page">Git</a>
+    </nav>
+    <span style="flex: 1"></span>
+    <span class="muted" style="font-size: 12px">v0.1.0</span>
+  </header>
+
+  <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 8px 16px; border-bottom: 1px solid #3a3836">
+    <button class="btn" aria-haspopup="menu" title="C:\git\example-app.worktrees\t-0012-usage">
+      <span style="font-weight: 600">example-app</span>
+      <span class="mono muted" style="font-size: 12px">…\t-0012-usage</span>
+      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>
+    </button>
+    <div class="seg" role="group" aria-label="Show">
+      <button aria-pressed="true">All</button>
+      <button aria-pressed="false">Worktrees</button>
+      <button aria-pressed="false">This branch</button>
+    </div>
+    <span style="flex: 1"></span>
+    <label style="display: inline-flex; align-items: center; gap: 8px">
+      <span class="muted" style="font-size: 13px">Find</span>
+      <input class="find" type="search" placeholder="Message, author, branch or hash" value="feed">
+    </label>
+    <span class="muted" style="font-size: 12px">1 of 2</span>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <aside class="rail" aria-label="Refs">
+      <div class="rh"><span>Worktrees</span><span>2</span></div>
+      <button class="ri"><span class="sw" style="background: #e8974a"></span>t-0012-usage <span class="muted" style="font-size: 12px">here · 3 changed</span></button>
+      <button class="ri"><span class="sw" style="background: #e8974a; opacity: .5"></span>example-app <span class="muted" style="font-size: 12px">main</span></button>
+      <div class="rh"><span>Branches</span><span>2</span></div>
+      <button class="ri"><span class="sw" style="background: #6aa0e8"></span>t-0012-usage <span class="muted" style="font-size: 12px">↑2 ↓3</span></button>
+      <button class="ri"><span class="sw" style="background: #a391e6"></span>main</button>
+      <div class="rh"><span>Remote</span><span>3</span></div>
+      <button class="ri"><span class="sw" style="background: #a391e6"></span>origin/main</button>
+      <button class="ri"><span class="sw" style="background: #45c2b1"></span>origin/feeds</button>
+      <button class="ri"><span class="sw" style="background: #a391e6"></span>origin/spike-cache</button>
+      <div class="rh"><span>Tags</span><span>1</span></div>
+      <button class="ri"><span class="sw" style="background: #e3b44e"></span>v0.4.1</button>
+      <div class="rh"><span>Stashes</span><span>1</span></div>
+      <button class="ri"><span class="sw" style="background: #de7daf"></span>spike on retry <span class="muted" style="font-size: 12px">stash@{0}</span></button>
+    </aside>
+
+    <main style="flex: 1; min-width: 0; overflow: auto; display: flex; flex-direction: column">
+      <div class="row muted" style="height: 26px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid #242322">
+        <span style="padding-left: 12px">Graph</span><span>Message</span><span>Author</span><span>Date</span><span>Commit</span>
+      </div>
+      <div class="rows">
+        <svg width="88" height="344" viewBox="0 0 88 344" style="position: absolute; left: 4px; top: 0; pointer-events: none" aria-hidden="true">
+          <g fill="none" stroke-width="2" stroke-linecap="round">
+            <path d="M14 14 L14 42" stroke="#6aa0e8" stroke-dasharray="3 3"></path>
+            <path d="M14 42 L14 344" stroke="#6aa0e8"></path>
+            <path d="M30 98 L30 182" stroke="#a391e6"></path>
+            <path d="M30 182 C30 196 14 196 14 210" stroke="#a391e6"></path>
+            <path d="M30 98 C30 112 46 112 46 126" stroke="#45c2b1"></path>
+            <path d="M46 126 L46 182" stroke="#45c2b1"></path>
+            <path d="M46 182 C46 196 14 196 14 210" stroke="#45c2b1"></path>
+            <path d="M62 154 C62 168 30 168 30 182" stroke="#de7daf" stroke-dasharray="3 3"></path>
+            <path d="M30 294 C30 308 14 308 14 322" stroke="#a391e6"></path>
+          </g>
+          <circle cx="14" cy="14" r="4.5" fill="#1b1a19" stroke="#6aa0e8" stroke-width="1.6" stroke-dasharray="2 2"></circle>
+          <circle cx="14" cy="42" r="7.5" fill="none" stroke="#6aa0e8" stroke-width="1.4"></circle>
+          <circle cx="14" cy="42" r="4.5" fill="#6aa0e8"></circle>
+          <circle cx="14" cy="70" r="4.5" fill="#6aa0e8"></circle>
+          <circle cx="30" cy="98" r="5.5" fill="#a391e6" stroke="#2e2c2a" stroke-width="2"></circle>
+          <circle cx="46" cy="126" r="4.5" fill="#45c2b1"></circle>
+          <rect x="58" y="150" width="8" height="8" rx="1.5" fill="#1b1a19" stroke="#de7daf" stroke-width="1.6"></rect>
+          <circle cx="30" cy="182" r="4.5" fill="#a391e6"></circle>
+          <circle cx="14" cy="210" r="4.5" fill="#6aa0e8"></circle>
+          <circle cx="14" cy="238" r="4.5" fill="#6aa0e8"></circle>
+          <circle cx="14" cy="266" r="4.5" fill="#6aa0e8"></circle>
+          <circle cx="30" cy="294" r="4.5" fill="#a391e6"></circle>
+          <circle cx="14" cy="322" r="4.5" fill="#6aa0e8"></circle>
+        </svg>
+
+        <div class="row"><span></span><span class="subj"><span class="t muted" style="font-style: italic">3 uncommitted changes</span><span class="ref rw">t-0012-usage</span></span><span></span><span class="muted">now</span><span></span></div>
+        <div class="row"><span></span><span class="subj"><span class="ref rl" style="border-color: #6aa0e8">t-0012-usage</span><span class="ref rw"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3h3l1 1h4v4.5H1z" fill="none" stroke="currentColor" stroke-width="1.1"></path></svg>here</span><span class="t">Show usage per org in the account bar</span></span><span class="muted">Sam</span><span class="muted">12 min ago</span><span class="mono muted">9f3c2a1</span></div>
+        <div class="row"><span></span><span class="subj"><span class="t">Fetch org usage from the billing API</span></span><span class="muted">Sam</span><span class="muted">2 h ago</span><span class="mono muted">51be7d0</span></div>
+        <div class="row sel" aria-selected="true"><span></span><span class="subj"><span class="ref rl" style="border-color: #a391e6">main</span><span class="ref rr">origin/main</span><span class="ref rw"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3h3l1 1h4v4.5H1z" fill="none" stroke="currentColor" stroke-width="1.1"></path></svg>example-app</span><span class="t">Merge pull request #218 from feeds</span></span><span class="muted">Alex</span><span class="muted">yesterday</span><span class="mono muted">e04a9b3</span></div>
+        <div class="row" style="background: rgba(232,151,74,.08)"><span></span><span class="subj"><span class="ref rr">origin/feeds</span><span class="t">Feed images load lazily</span></span><span class="muted">Priya</span><span class="muted">yesterday</span><span class="mono muted">7a2d4c8</span></div>
+        <div class="row"><span></span><span class="subj"><span class="ref rs">stash@{0}</span><span class="t muted" style="font-style: italic">spike on retry</span></span><span></span><span class="muted">2 days ago</span><span></span></div>
+        <div class="row"><span></span><span class="subj"><span class="t">Retry failed uploads twice</span></span><span class="muted">Alex</span><span class="muted">2 days ago</span><span class="mono muted">3d81f60</span></div>
+        <div class="row"><span></span><span class="subj"><span class="t">Bump vite to 8.3.8</span></span><span class="muted">Sam</span><span class="muted">3 days ago</span><span class="mono muted">4c1e9a2</span></div>
+        <div class="row"><span></span><span class="subj"><span class="ref rt"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 1h4l4 4-4 4-4-4z" fill="none" stroke="currentColor" stroke-width="1.1"></path></svg>v0.4.1</span><span class="t">Release v0.4.1</span></span><span class="muted">Alex</span><span class="muted">5 days ago</span><span class="mono muted">b7e2105</span></div>
+        <div class="row"><span></span><span class="subj"><span class="t">Add usage endpoint stub</span></span><span class="muted">Priya</span><span class="muted">6 days ago</span><span class="mono muted">2f9a6e3</span></div>
+        <div class="row"><span></span><span class="subj"><span class="ref rr">origin/spike-cache</span><span class="t">Cache org lookups (spike)</span></span><span class="muted">Sam</span><span class="muted">1 week ago</span><span class="mono muted">c55e0b8</span></div>
+        <div class="row"><span></span><span class="subj"><span class="t">Initial account bar</span></span><span class="muted">Alex</span><span class="muted">2 weeks ago</span><span class="mono muted">81d4a7f</span></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px 14px 104px; font-size: 13px">
+        <span class="muted">2,000 commits loaded</span>
+        <button class="btn" style="font-size: 13px; padding: 3px 10px">Load 2,000 more</button>
+      </div>
+    </main>
+
+    <aside class="detail" aria-label="Commit">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 600; line-height: 1.35">Merge pull request #218 from feeds</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px">
+        <span class="ref rl" style="border-color: #a391e6">main</span>
+        <span class="ref rr">origin/main</span>
+        <span class="ref rw">checked out in example-app</span>
+      </div>
+      <dl class="kv">
+        <dt>Commit</dt>
+        <dd><span class="mono" style="font-size: 12px; word-break: break-all">e04a9b3c71f0d2a84e5b19c6d7f203a1b8e46c55</span> <button class="btn" style="font-size: 12px; padding: 0 8px; margin-top: 4px">Copy</button></dd>
+        <dt>Author</dt>
+        <dd>Alex <span class="muted">alex@example.com</span></dd>
+        <dt>Date</dt>
+        <dd>25 Nov 2026, 4:42 pm</dd>
+        <dt>Parents</dt>
+        <dd style="display: flex; flex-direction: column; gap: 2px">
+          <a href="#" class="mono" style="font-size: 12px">3d81f60</a><span class="muted" style="font-size: 12px; margin-top: -2px">Retry failed uploads twice</span>
+          <a href="#" class="mono" style="font-size: 12px; margin-top: 4px">7a2d4c8</a><span class="muted" style="font-size: 12px; margin-top: -2px">Feed images load lazily</span>
+        </dd>
+      </dl>
+      <div style="border-top: 1px solid #3a3836; padding-top: 12px; white-space: pre-line; color: #d6d1cb">Lazy-load feed images
+
+Images below the fold now load as they scroll into view, which cuts the first paint of a long feed by about a third.</div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

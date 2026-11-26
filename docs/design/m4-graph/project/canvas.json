@@ -1,0 +1,17 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-26T06:10:00Z" },
+  "title": "Ochre git graph",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 800, "title": "Git view: all branches, a merge selected", "expand": "fill" },
+    "Branch.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 800, "title": "This branch: a task's worktree against its base", "expand": "fill" },
+    "Task.dc.html": { "x": 0, "y": 920, "w": 1280, "h": 800, "title": "Task detail: Graph beside each folder", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "Branch.dc.html", "Task.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "Ochre: git graph (M4 slice 5)", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

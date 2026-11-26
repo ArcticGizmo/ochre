@@ -33,6 +33,10 @@ export interface TaskSectionProps {
 export interface FolderStatusProps {
   taskId: string;
   path: string;
+  /** A worktree made for the task, rather than one of its repos. */
+  worktree?: boolean;
+  /** Given where the folder may offer actions that navigate (the task's own page); absent on Today. */
+  ctx?: AppContext;
 }
 
 /** The running modules' folder statuses, in module order, as the app hands them to its views. */

@@ -10,6 +10,14 @@ namespace Ochre.Modules.Git.Bridge;
 [JsonSerializable(typeof(GitStatusRequest))]
 [JsonSerializable(typeof(IReadOnlyList<GitFolderStatus>))]
 [JsonSerializable(typeof(GitChangedEvent))]
+[JsonSerializable(typeof(GraphLoadRequest))]
+[JsonSerializable(typeof(GraphPageDto))]
+[JsonSerializable(typeof(GraphTokenRequest))]
+[JsonSerializable(typeof(GraphMoreDto))]
+[JsonSerializable(typeof(GraphCommitRequest))]
+[JsonSerializable(typeof(GraphCommitDto))]
+[JsonSerializable(typeof(GraphChangesRequest))]
+[JsonSerializable(typeof(IReadOnlyList<GraphChangeDto>))]
 internal sealed partial class GitJson : JsonSerializerContext;
 
 // Bridge shapes for the git module: the state of each folder a task works in (its repos and its worktrees).

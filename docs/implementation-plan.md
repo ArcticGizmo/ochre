@@ -345,11 +345,101 @@ Slices are ordered so the exit criterion's three parts come first; the git graph
 - The Jira module (slice 6), moved to the roadmap's Later list. The contracts are shaped so they can be served out of process later, but nothing loads code that isn't built into Ochre.
 - Live module toggling without a restart; git write operations from the graph; graph avatars.
 
-## M5 onwards (outline)
+## M5: attention inbox and Roost grid
+
+Exit: start three agents on a task and open its grid: all three stream side by side, and a permission prompt is answered in its pane. From another task's window, the inbox shows a question from one agent and a finished turn from another, grouped by task; answering the question there and opening the finished agent's thread clears both from every window. An outside `claude` in the task's repo, linked to the task, appears in the grid read-only, and the inbox lists it while it waits. With Ochre's windows in the background, a permission prompt pops a notification under its task's name; Allow on the notification lets the agent carry on, and a prompt answered inside Ochre takes its notification away. With the `roost` and `notifications` modules off, the inbox still works.
+
+Planned 2026-11-26 from a survey of Perch main (still `9275e0b`) and Ochre's session model. Scope agreed with the user: the grid shows one task's agents (a grid across tasks waits for dogfooding to ask), failed CI waits for a GitHub module (roadmap, Later), and rich desktop notifications are in, starting with a spike. Where each piece lives is [ADR 0013](decisions/0013-attention-inbox-and-roost.md): the inbox is kernel; the grid and notifications are modules.
+
+Findings that shape it:
+
+- **Ochre already has every input the inbox needs.** A controlled session's `SessionConversation` holds the pending permission (`IsQuestion`, `IsPlan` tell a question or plan approval apart), `WaitingElsewhere`, `TurnActive` and `LastTurn`; an observed session has `ObservedStatus` (busy, idle, waiting, closed) from `sessions/{pid}.json`; `sessions.update` already reaches every window. What's missing is "seen": nothing records that the user has looked at a finished turn.
+- **Perch has no unified inbox.** Its Roost rail is the nearest thing (urgency groups: needs you, longest waiting first; then done, to review; then working; then quiet), with `NextNeedingYou` and `AttentionSeen` (a turn counts as seen only when its window is active and its pane is on screen). Those rules carry over; the rail itself doesn't, since the inbox replaces it.
+- **Perch's Roost model is UI-free**, about 1.7k lines with about 150 tests in `src/Perch.Core/Data/Roost/`. `RoostGridLayout` (347 lines: regions on a 12×12 grid, at least 2 units each way, at most 8; split, merge, dividers, reading order) and `RoostTemplates` (95: nine presets and `ForCount`) port as they are. `RoostTabSet` (607) is tabs plus placement; only its placement rules are wanted (assign with swap, unassign, zoom, sync when a session goes). `RoostRoster` (439) mostly exists to give pid-keyed sessions stable keys across resume, take-over and `/clear`; Ochre's session ids already survive all three, so it isn't ported. `RoostToken`, `RoostKeys`, `RoostLayoutLibrary` and tabs aren't needed in M5. The Avalonia window, `SessionPane` and `RoostFeed` are the behavioural spec: a pane is a compact live thread, not a terminal; Perch's own sessions are interactive, outside ones read-only; nothing is placed or moved without the user.
+- **Panes can share the existing feed.** `sessions.update` goes to every window for every session, and an observed session's transcript is followed once anything has opened its thread, so N panes are N filters on one stream rather than N subscriptions.
+
+- **Perch's notifications are plain** (`NotificationService`: toast, chime, ntfy for done, waiting and failed), so there's nothing to port for rich ones. Ochre's platform project targets `net10.0-windows` without the WinRT projections toasts need, Ochre has no installer or Start menu shortcut to carry an AppUserModelID, and a notification clicked after the host has quit needs a registered activator. Those are the unknowns the spike settles.
+
+Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are the inbox and notifications, 5 and 6 the grid. The inbox and the grid don't depend on each other.
+
+### Slice 1: notifications spike
+
+- Throwaway code in `spikes/notifications/` (never referenced by `src/`), findings in `docs/spike-notifications-results.md`, an ADR if the answer changes the platform project. Shows real notifications, so it runs with the user at the screen; the user clicks the buttons.
+- Questions it answers:
+  - **API**: WinRT `ToastNotificationManager` (needs `net10.0-windows10.0.19041.0` and CsWinRT) against Windows App SDK `AppNotificationManager` (unpackaged, self-contained). Cost of each in output size, startup and build, and which works without an installer.
+  - **Identity**: an AppUserModelID registered under `HKCU\Software\Classes\AppUserModelId` (name and icon) without a Start menu shortcut; a separate id for the dev profile so its notifications never look like the installed Ochre's.
+  - **Content**: a header per task (Windows groups notifications under it), buttons (Allow, Deny, Open), a text box with a Send button (reply to a finished agent, feedback on a plan), a choice box (a question's options), an app logo per status, and the `urgent` or `reminder` scenario for a waiting permission (does it stay on screen; does it get through Do Not Disturb).
+  - **Activation**: while the host runs, a button press reaches it in-process from the pop-up and from the notification centre, with the arguments and the typed text. After the host has quit: what a click does with a COM activator (`LocalServer32` under HKCU) or a protocol (`ochre:`), and whether the endpoint protection on this machine objects to either. If both are trouble, a click on a stale notification simply starts Ochre.
+  - **Lifecycle**: replace a session's notification in place (tag and group), remove it when it's answered elsewhere, clear a task's group, and what Windows keeps in the notification centre after a restart.
+- Out of scope for the spike: macOS, sounds beyond Windows' default.
+
+### Slice 2: attention model (host)
+
+- `src/Ochre.Core/Attention/`: an `AttentionBoard` derives the items from `SessionManager` whenever sessions change; it stores only "seen" and "dismissed" marks, in memory. Kinds:
+  - **needs you** (controlled): a permission prompt, a question, a plan approval, or `WaitingElsewhere` (Claude wants something Ochre can't show, so the item opens the thread).
+  - **waiting** (observed): `ObservedStatus` is waiting. Read-only; the item opens its thread and says where it runs.
+  - **finished** (controlled): a turn ended (busy to idle) and hasn't been seen since; carries the last lines of the reply. A failed turn (an error result, or the process exiting with a non-zero code) is the same kind, flagged as failed.
+- Each item has its session, task (empty for an unlinked observed session), kind, a one-line summary and `since`. Order: grouped by task, groups by their oldest needs-you item, then by their oldest finished one; within a group, needs you before finished, longest waiting first.
+- **Seen**: port `AttentionSeen` with its tests (Perch `src/Perch.Core/Data/Roost/AttentionSeen.cs`). A window reports `attention.seen {sessionId}` when a session's thread or grid pane is on screen while the window is active; that clears its finished item. Answering a permission clears its item through the existing `sessions.respond`. `attention.dismiss {itemId}` drops a finished or waiting item until the session's next change of state. The host checks every id against its current items.
+- Bridge: `attention.list` and an `attention.changed` event, coalesced like `sessions.update` and broadcast to every window. Run BridgeGen.
+- **Tests** (controlled-session lifecycle, with `FakeClaude`): a permission raises a needs-you item and answering clears it; a turn's end raises finished, seen clears it, the next turn raises it again; an exit with an error raises failed; an observed session's waiting status raises and clears its item; dismiss and seen with an id the host never listed are refused.
+
+### Slice 3: inbox view
+
+- Larger visual change: starts from a design artefact the user agrees first (`docs/design/m5-inbox/`).
+- A kernel title-bar view, **Inbox**, with a badge counting needs-you items (finished ones show in the view, not the badge). Groups by task, each with the task's title and a link to it; an unlinked observed session sits under "Not on a task".
+- A permission is allowed or denied in place; a question or plan approval is answered in place with the thread's own cards; anything else opens the thread in this window. A finished item shows the reply's last lines with Open and Dismiss.
+- Ctrl+. in any window goes to the next item needing you (the inbox's order, wrapping), opening its thread. The tray tooltip says how many need you.
+- The task list and Today keep their "needs you" status; they draw it from the same items so the counts agree.
+
+### Slice 4: notifications
+
+- Built on the spike's answers. The `notifications` module (on by default) watches the attention board and shows a Windows notification per session through a Core `IDesktopNotifier` with its implementation in `Ochre.Platform.Windows`. One notification per session, replaced as its state changes and removed when its item clears, all under a header naming the task.
+- By kind:
+  - **Permission**: what it wants to run, shortened; Allow, Deny and Open.
+  - **Question**: a single-choice question with up to five options gets a choice box and Answer; anything else gets Open.
+  - **Plan approval**: Approve, and a feedback box with Reject; Open.
+  - **Finished**: the reply's last line; a text box with Send (sends the next prompt) and Open. A failed turn says so, with Open.
+  - **Waiting** (observed): where it runs and Open; nothing else, since it's read-only.
+- Nothing shows for a session whose thread or grid pane is on screen in the active window (the `AttentionSeen` rule). Settings: which kinds notify (all on except observed waiting), and on or off per kind.
+- **The renderer and Windows are both untrusted callers here.** A notification's arguments carry only the item id and the action; the host acts only if that item is still current and the action fits its kind, so a stale Allow does nothing. Typed text goes through the same path as the composer.
+- **Privacy**: Windows keeps notifications in its own store, so the body is a short summary (the tool and a shortened command), never a whole command or reply.
+- **Dev profile**: a headless dev host never shows notifications on the user's screen; it logs them and `ochre-cli dev notifications` lists what it would have shown and can press a button, so the module is driven without the screen. `OCHRE_DEV_NOTIFY=1` shows them for real.
+- **Tests**: the host's handling of an action (current item, stale item, wrong action for the kind, unknown id) with `FakeClaude`.
+
+### Slice 5: Roost model
+
+- New module project `modules/Ochre.Modules.Roost/` (`roost`, on by default; ADR 0013). Port `RoostGridLayout` and `RoostTemplates` with `RoostGridLayoutTests` and `RoostTemplatesTests`. Commit names Perch, the paths and `9275e0b`.
+- `RoostGrid`: one layout plus region-to-session cells and a zoomed region, taken from `RoostTabSet`'s placement rules (assign swaps, unassign, toggle zoom, sync empties a region whose session is gone) with the matching tests from `RoostTabSetTests`; tabs, `Show`, `DropOnTab`, duplication and the layout library stay behind.
+- Saved per task in the module's data folder (`roost.json`: layout regions, cells, zoom), written atomically. A task with no saved grid gets `ForCount` for its sessions, filled in start order. A session that joins later goes into an empty region if there is one, else to the "not in the grid" strip; nothing already placed moves.
+- Bridge `roost.get {taskId}`, `roost.applyPreset`, `roost.assign`, `roost.unassign`, `roost.zoom`, and a `roost.changed` event so two windows on one task agree. The host builds every layout from a preset name or its own last layout, never from regions the page sends, and checks that every placed session belongs to the task.
+
+### Slice 6: grid view
+
+- Larger visual change: starts from a design artefact the user agrees first (`docs/design/m5-roost/`).
+- A **Grid** title-bar view from the module, its parameter (the task) kept per window, and a **Grid** link beside a task's agents.
+- Regions are a CSS grid from the layout's unit spans. Each pane: a header (status dot and word, role, model, context, a menu with Remove from grid and Open thread), then the thread in a compact form of `SessionView`. Controlled panes have the composer and the permission, question and plan cards; dormant ones resume on send; observed ones say "Read-only: started outside Ochre" and have no composer.
+- Placement is the user's: drag a pane's header onto another region to swap, click an empty region to choose from the unplaced sessions, choose a preset from a menu (the nine templates). Zoom a pane (button, Ctrl+Shift+Z; Esc restores); Alt+1 to Alt+8 focus regions in reading order; Ctrl+. picks the next pane needing you when one is in the grid.
+- A pane on screen in the active window reports `attention.seen`, so a turn finished in view never reaches the inbox's unseen list.
+- Check eight streaming panes stay responsive (one agent running a long reply, seven idle; then several streaming at once); if not, panes off-screen or zoomed away drop their thread and show the last lines until shown again.
+
+### Slice 7: exit run
+
+- Walk the exit criterion by hand, write `docs/testing/m5-testing.md`.
+
+### Not in M5
+
+- A grid across tasks; failed CI and PR reviews in the inbox (a GitHub module, roadmap Later).
+- Seen and dismissed marks surviving a restart (revisit when dormant sessions need it).
+- Notifications on macOS; chimes and phone push (Perch's ntfy).
+- Grid tabs, saved layouts, and editing a layout by splitting, merging or dragging dividers (the model supports them; the UI waits).
+- Taking over an observed session in Ochre.
+
+## M6 onwards (outline)
 
 Re-plan each milestone in detail when it starts. Notes worth keeping now:
 
-- **M5 to M8** stay as written in the roadmap; too far out to plan usefully.
+- **M6 to M8** stay as written in the roadmap; too far out to plan usefully.
 
 ## Housekeeping before starting
 

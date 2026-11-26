@@ -2,7 +2,7 @@
 
 A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray host plus a web UI in WebView2, hosted in a minimal WinForms shell on Windows (`docs/decisions/0002-stack-dotnet-host-web-ui.md`). The durable unit of work is the **task**; sessions, worktrees, terminals and links attach to it.
 
-**Status: M0 (stack spike), M1 (tasks and controlled sessions), M2 (park, resume and Today), M3 (terminal tabs) and M4 (modules: module host, git and worktrees, sprig, multiple windows, git graph, jump to task) done; the Jira module moved to the roadmap's Later list. M5 (attention inbox and Roost grid) is next and needs planning.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md`, `docs/roadmap.md` and `docs/implementation-plan.md` before writing code. Spike findings that M1 must carry over are in `docs/spike-stack-results.md`; the spike code is at the git tag `spike-stack`.
+**Status: M0 (stack spike), M1 (tasks and controlled sessions), M2 (park, resume and Today), M3 (terminal tabs) and M4 (modules: module host, git and worktrees, sprig, multiple windows, git graph, jump to task) done; the Jira module moved to the roadmap's Later list. M5 (attention inbox and Roost grid) is planned (`docs/implementation-plan.md`, M5; ADR 0013) and next.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md`, `docs/roadmap.md` and `docs/implementation-plan.md` before writing code. Spike findings that M1 must carry over are in `docs/spike-stack-results.md`; the spike code is at the git tag `spike-stack`.
 
 ## Layout
 

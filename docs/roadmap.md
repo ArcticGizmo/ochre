@@ -64,8 +64,12 @@ Don't build anything that assumes a single window: per-window UI state (selected
 
 ## M5: attention inbox and Roost grid
 
-- Inbox of everything needing you, grouped by task.
+- Inbox of everything needing you, grouped by task: permission prompts, questions, plan approvals, finished turns, observed sessions waiting.
 - Roost-style grid of a task's sessions (interactive if controlled, read-only if observed).
+- Rich desktop notifications for inbox items (grouped by task, with buttons and replies), starting with a spike.
+- Scope set 2026-11-26 with the user: the grid shows one task's agents; a grid across tasks and failed CI in the inbox wait (Later); notifications are in. Plan in [implementation-plan.md](implementation-plan.md), M5; placement in [ADR 0013](decisions/0013-attention-inbox-and-roost.md).
+
+**Exit:** three agents on a task stream side by side in its grid and a permission is answered in a pane; another window's inbox shows a question and a finished turn grouped by task, and answering or opening them clears them everywhere; an outside `claude` linked to the task shows read-only in the grid and in the inbox while it waits; a permission prompt pops a notification that can allow it, and answering inside Ochre takes the notification away; with the `roost` and `notifications` modules off, the inbox still works.
 
 ## M6: editor
 
@@ -84,6 +88,8 @@ Don't build anything that assumes a single window: per-window UI state (selected
 ## Later
 
 - Jira module: import + link, `LinkResolver`, `task fetch` (moved out of M4 on 2026-11-26; its plan stays in `docs/implementation-plan.md`, M4 slice 6, and needs a Jira site to test against).
+- GitHub module: failed CI, review requests and conflicts on a task's branch, as inbox items (moved out of M5 on 2026-11-26; Perch's `GitHubAlerts` is the reference).
+- A Roost grid across tasks (the vision's "or across tasks"; M5 builds one task's grid).
 - Per-task usage/cost/time.
 - Plan usage (5-hour and weekly limits) in place of the API-equivalent cost, which means little on a Pro or Max plan. Perch reads it from Claude's OAuth usage endpoint (`UsageMonitor`), which needs the user's OAuth token, so it would be opt-in.
 - MCP server mirroring the agent CLI, if a client that can't run a shell needs task access.

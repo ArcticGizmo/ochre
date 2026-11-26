@@ -40,6 +40,7 @@ internal sealed class WindowHost : IWindowHost
         WindowApi.Register(dispatcher, _host, window);
         TaskApi.Register(dispatcher, _host.Tasks, _host.Parking);
         SessionApi.Register(dispatcher, _host.Sessions);
+        AttentionApi.Register(dispatcher, _host.Attention, _host.Sessions);
         WorktreeApi.Register(dispatcher, _host.Tasks, _host.Modules, _host.Sessions);
         _host.Modules.RegisterBridge(dispatcher);
         CheckAgainstContract(dispatcher);

@@ -70,6 +70,9 @@ internal sealed class LiveSession
     /// <summary>No process: it ended, or the host started after it ran. Sending resumes it.</summary>
     public bool Dormant { get; set; }
 
+    /// <summary>How its process last ended in this host run; null while it has never exited here.</summary>
+    public SessionExit? LastExit { get; set; }
+
     /// <summary>The thread holds what the transcript had (or the session ran in this host, so it never needed it).</summary>
     public bool HistoryLoaded { get; set; }
 
@@ -79,6 +82,13 @@ internal sealed class LiveSession
     public bool HeaderDirty { get; set; }
 
     public bool HasChanges => Dirty.Count > 0 || ResetPending || HeaderDirty;
+}
+
+/// <summary>A process exit. A class, so each exit is a distinct instance a watcher can tell from the one before.</summary>
+internal sealed class SessionExit(int code, string tail)
+{
+    public int Code { get; } = code;
+    public string Tail { get; } = tail;
 }
 
 /// <summary>Why <see cref="SessionManager.StartAsync"/> didn't launch.</summary>
@@ -616,6 +626,7 @@ internal sealed class SessionManager : IDisposable
         lock (session.Gate)
         {
             session.Dormant = true;
+            session.LastExit = new SessionExit(code, tail);
             session.Conversation.SessionEnded(code, tail);
             session.HeaderDirty = true;
         }

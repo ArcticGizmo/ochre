@@ -38,6 +38,9 @@ public static class BridgeContract
         new("sessions.setEffort", typeof(SetEffortRequest), typeof(Ack)),
         new("sessions.bind", typeof(BindSessionRequest), typeof(Ack)),
         new("sessions.unbind", typeof(SessionIdRequest), typeof(Ack)),
+        new("attention.list", typeof(Empty), typeof(AttentionSnapshot)),
+        new("attention.seen", typeof(AttentionSeenRequest), typeof(Ack)),
+        new("attention.dismiss", typeof(AttentionItemRequest), typeof(Ack)),
         new("worktrees.providers", typeof(Empty), typeof(IReadOnlyList<WorktreeProviderDto>)),
         new("worktrees.plan", typeof(WorktreeRequest), typeof(WorktreePlanDto)),
         new("worktrees.create", typeof(WorktreeRequest), typeof(WorktreeDto)),
@@ -57,5 +60,7 @@ public static class BridgeContract
         new("sessions.update", typeof(SessionUpdateEvent)),
         // A session appeared or went, or an observed one's suggestions may have changed: fetch sessions.list again.
         new("sessions.changed", typeof(Empty)),
+        // What needs the user changed; carries the whole list, which is short.
+        new("attention.changed", typeof(AttentionSnapshot)),
     ];
 }

@@ -1,4 +1,5 @@
 using Ochre.Core;
+using Ochre.Core.Attention;
 using Ochre.Core.Bridge;
 using Ochre.Core.Hosting;
 using Ochre.Core.Modules;
@@ -34,6 +35,9 @@ internal sealed class OchreHost : IDisposable
         Sessions.Changed += (session, changes) =>
             Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.update", SessionApi.Update(session, changes), AppJson.Default.SessionUpdateEvent));
         Sessions.ListChanged += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.changed", new Empty(), AppJson.Default.Empty));
+        Attention = new AttentionBoard(Sessions);
+        Attention.Changed += () =>
+            Windows.Broadcast(BridgeDispatcher.SerializeEvent("attention.changed", AttentionApi.Snapshot(Attention), AppJson.Default.AttentionSnapshot));
         Sessions.StartObserving();
         Parking = new ParkCoordinator(Tasks, Sessions, ParkRequests, log);
         Parking.Changed += id => Windows.Broadcast(BridgeDispatcher.SerializeEvent("tasks.changed", new TaskChangedEvent(id), AppJson.Default.TaskChangedEvent));
@@ -62,6 +66,7 @@ internal sealed class OchreHost : IDisposable
     public WindowHost Windows { get; }
     public TaskStore Tasks { get; }
     public SessionManager Sessions { get; }
+    public AttentionBoard Attention { get; }
     public IShell? Shell { get; private set; }
 
     /// <summary>Set when the user asked to restart (to apply module changes); Program starts a new host after this one exits.</summary>
@@ -109,6 +114,7 @@ internal sealed class OchreHost : IDisposable
     public void Dispose()
     {
         Modules.Dispose();
+        Attention.Dispose();
         Sessions.Dispose();
         Tasks.Dispose();
     }

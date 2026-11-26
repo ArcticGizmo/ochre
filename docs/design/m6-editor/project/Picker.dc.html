@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Go to file</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;position:relative;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.ghost{background:#242322;border-radius:4px}
+.kbd{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:11px;padding:0 5px;border:1px solid #3a3836;border-bottom-width:2px;border-radius:4px;color:#a39d96}
+.scrim{position:absolute;inset:0;background:rgba(10,9,9,.45);display:flex;justify-content:center;align-items:flex-start;padding:90px 16px 16px}
+.picker{width:640px;max-width:100%;background:#242322;border:1px solid #3a3836;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);overflow:hidden}
+.q{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #33312f}
+.qin{flex:1;font:inherit;font-size:15px;color:#e8e4df;background:none;border:0;outline:none}
+.res{list-style:none;margin:0;padding:6px}
+.res li{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;font-size:13px}
+.res li.sel{background:#3a2c1d;box-shadow:inset 2px 0 0 #cc7722}
+.nm b{color:#e8974a;font-weight:600}
+.dir{color:#a39d96;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fold{margin-left:auto;font-size:11px;padding:0 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96;white-space:nowrap}
+.letter{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;font-weight:700;color:#d9b44a;width:10px}
+.foot{display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 14px;border-top:1px solid #33312f;font-size:12px;color:#a39d96}
+.ann{font-size:12px;color:#1b1a19;background:#d9b44a;border-radius:6px;padding:4px 8px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav">Tasks</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Files</a>
+    </nav>
+  </header>
+  <div style="flex: 1; display: flex; gap: 16px; padding: 16px" aria-hidden="true">
+    <div class="ghost" style="width: 260px"></div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 10px">
+      <div class="ghost" style="height: 30px"></div>
+      <div class="ghost" style="flex: 1"></div>
+    </div>
+  </div>
+
+  <div class="scrim">
+    <div class="picker" role="dialog" aria-modal="true" aria-label="Go to a file in T-0042">
+      <div class="q">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="#a39d96" stroke-width="1.5"></circle><path d="M10.5 10.5L14 14" stroke="#a39d96" stroke-width="1.5" stroke-linecap="round"></path></svg>
+        <label for="q" class="muted" style="position: absolute; left: -9999px">File name or path</label>
+        <input id="q" class="qin" type="text" value="retur" autocomplete="off">
+        <span class="muted" style="font-size: 12px">412 files in 3 folders</span>
+      </div>
+      <ul class="res" role="listbox" aria-label="Files">
+        <li class="sel" role="option" aria-selected="true"><span class="letter" aria-label="Untracked">?</span><span class="nm"><b>Retur</b>nUrl.cs</span><span class="dir">src/Auth</span><span class="fold">auth-service</span></li>
+        <li role="option" aria-selected="false"><span class="letter"></span><span class="nm"><b>Retur</b>nUrl.cs</span><span class="dir">src/Auth</span><span class="fold">fix-login-redirect</span></li>
+        <li role="option" aria-selected="false"><span class="letter"></span><span class="nm"><b>Retur</b>nUrlTests.cs</span><span class="dir">tests/Auth.Tests</span><span class="fold">auth-service</span></li>
+        <li role="option" aria-selected="false"><span class="letter"></span><span class="nm"><b>retur</b>n-to.ts</span><span class="dir">src/routing</span><span class="fold">web-portal</span></li>
+        <li role="option" aria-selected="false"><span class="letter"></span><span class="nm">index.ts</span><span class="dir">src/<b style="color: #e8974a; font-weight: 600">retur</b>n-urls</span><span class="fold">web-portal</span></li>
+      </ul>
+      <div class="foot">
+        <span><span class="kbd">↑</span> <span class="kbd">↓</span> choose</span>
+        <span><span class="kbd">Enter</span> open here</span>
+        <span><span class="kbd">Esc</span> close</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+    <span class="ann">Ctrl+P in any view of a window showing a task (Files, the task, its thread). A focused terminal keeps Ctrl+P, as it keeps Ctrl+K.</span>
+    <span class="ann">Matches the file name first, then the path. Changed files carry their letter. Opens in this window's Files view.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

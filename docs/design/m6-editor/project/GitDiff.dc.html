@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Commit diff in the Git view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace}
+.muted{color:#a39d96}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:3px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:28px;box-sizing:border-box;text-decoration:none}
+.icon{width:28px;padding:0;justify-content:center}
+.seg{display:inline-flex;border:1px solid #3a3836;border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;color:#a39d96;background:transparent;border:0;padding:3px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid #3a3836}
+.seg button[aria-pressed="true"]{color:#e8e4df;background:#2e2c2a}
+.row{display:grid;grid-template-columns:72px minmax(0,1fr) 110px 92px;column-gap:12px;align-items:center;height:28px;padding-right:12px;font-size:13px;white-space:nowrap}
+.row.sel{background:#2e2c2a}
+.ref{font-size:11px;line-height:16px;padding:0 6px;border-radius:4px;border:1px solid #3a3836;white-space:nowrap;margin-right:6px}
+.detail{width:360px;flex:none;border-left:1px solid #3a3836;padding:14px 16px;overflow:hidden;font-size:13px;display:flex;flex-direction:column;gap:10px}
+.h3{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#a39d96;font-weight:600;margin:0}
+.fi{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;column-gap:8px;width:100%;font:inherit;font-size:13px;color:#e8e4df;background:none;border:0;padding:4px 8px;border-radius:6px;text-align:left;cursor:pointer;box-sizing:border-box}
+.fi:hover{background:#242322}
+.fi.sel{background:#2e2c2a}
+.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dir{color:#a39d96;font-size:12px;margin-left:6px}
+.letter{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;font-weight:700;text-align:center}
+.l-m{color:#d9b44a}
+.l-a{color:#86b572}
+.counts{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;white-space:nowrap}
+.plus{color:#86b572}
+.minus{color:#e8877d}
+.dhead{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #33312f;font-size:12px;color:#a39d96}
+.dhead div{padding:4px 16px}
+.dhead div+div{border-left:1px solid #33312f}
+.diff{flex:1;min-height:0;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:13px;line-height:20px}
+.pane{overflow:hidden;padding-top:4px}
+.pane+.pane{border-left:1px solid #33312f}
+.ln{display:grid;grid-template-columns:44px 18px minmax(0,1fr);white-space:pre}
+.ln .g{text-align:right;color:#5f5a55;padding-right:6px}
+.ln .m{text-align:center}
+.del{background:rgba(232,135,125,.13)}
+.del .m{color:#e8877d}
+.add{background:rgba(134,181,114,.14)}
+.add .m{color:#86b572}
+.gap{background:repeating-linear-gradient(135deg,transparent 0 6px,#232221 6px 12px)}
+.k{color:#e8974a}
+.t{color:#8fbcd4}
+.s{color:#a8c97f}
+.ann{font-size:12px;color:#1b1a19;background:#d9b44a;border-radius:6px;padding:4px 8px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav">Tasks</a>
+      <a href="#inbox" class="nav">Inbox</a>
+      <a href="GitDiff.dc.html" class="nav on" aria-current="page">Git</a>
+      <a href="Main.dc.html" class="nav">Files</a>
+      <a href="#terminals" class="nav">Terminals</a>
+    </nav>
+  </header>
+
+  <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 8px 16px; border-bottom: 1px solid #3a3836">
+    <button class="btn" type="button" aria-haspopup="menu" title="C:\git\auth-service"><span style="font-weight: 600">auth-service</span></button>
+    <div class="seg" role="group" aria-label="Show">
+      <button type="button" aria-pressed="true">All</button>
+      <button type="button" aria-pressed="false">Worktrees</button>
+      <button type="button" aria-pressed="false">This branch</button>
+    </div>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+      <div style="flex: none; padding: 4px 0; border-bottom: 1px solid #3a3836" aria-label="Commits">
+        <div class="row"><svg width="72" height="28" aria-hidden="true"><path d="M20 0V28M44 14V28" stroke="#e8974a" stroke-width="2"></path><circle cx="44" cy="14" r="4" fill="#1b1a19" stroke="#e8974a" stroke-width="2"></circle></svg><span><span class="ref" style="color: #e8974a">fix-login</span>Keep ReturnUrl only when it's local</span><span class="muted">builder</span><span class="muted">12 min ago</span></div>
+        <div class="row sel"><svg width="72" height="28" aria-hidden="true"><path d="M20 0V28M44 0V14C44 22 20 20 20 28" stroke="#e8974a" stroke-width="2" fill="none"></path><circle cx="44" cy="12" r="4" fill="#e8974a"></circle></svg><span>Add regression tests for the open redirect</span><span class="muted">tester</span><span class="muted">25 min ago</span></div>
+        <div class="row"><svg width="72" height="28" aria-hidden="true"><path d="M20 0V28" stroke="#a391e6" stroke-width="2"></path><circle cx="20" cy="14" r="4" fill="#a391e6"></circle></svg><span><span class="ref">main</span><span class="ref muted" style="border-style: dashed">origin/main</span>Rotate signing keys on deploy</span><span class="muted">Alex</span><span class="muted">2 days ago</span></div>
+        <div class="row"><svg width="72" height="28" aria-hidden="true"><path d="M20 0V28" stroke="#a391e6" stroke-width="2"></path><circle cx="20" cy="14" r="4" fill="#a391e6"></circle></svg><span>Token refresh retries once on 401</span><span class="muted">Sam</span><span class="muted">3 days ago</span></div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 16px; border-bottom: 1px solid #33312f">
+        <span style="font-weight: 600">LoginRedirectTests.cs</span>
+        <span class="muted" style="font-size: 12px">tests/Auth.Tests · in 9c41e07, against its parent 3d81f60</span>
+        <span style="flex: 1"></span>
+        <div class="seg" role="group" aria-label="Diff layout">
+          <button type="button" aria-pressed="true">Side by side</button>
+          <button type="button" aria-pressed="false">Inline</button>
+        </div>
+        <button class="btn icon" type="button" aria-label="Close the diff"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+      </div>
+      <div class="dhead"><div>3d81f60 · before</div><div>9c41e07 · after · read-only</div></div>
+      <div class="diff">
+        <div class="pane">
+          <div class="ln"><span class="g">1</span><span class="m"> </span><span><span class="k">using</span> Auth;</span></div>
+          <div class="ln"><span class="g">2</span><span class="m"> </span><span><span class="k">using</span> Xunit;</span></div>
+          <div class="ln"><span class="g">3</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">4</span><span class="m"> </span><span><span class="k">public class</span> <span class="t">LoginRedirectTests</span></span></div>
+          <div class="ln"><span class="g">5</span><span class="m"> </span><span>{</span></div>
+          <div class="ln"><span class="g">6</span><span class="m"> </span><span>    [<span class="t">Fact</span>]</span></div>
+          <div class="ln"><span class="g">7</span><span class="m"> </span><span>    <span class="k">public void</span> A_local_return_url_is_kept() =&gt;</span></div>
+          <div class="ln"><span class="g">8</span><span class="m"> </span><span>        Assert.True(ReturnUrl.IsLocal(<span class="s">"/orders/42"</span>));</span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln"><span class="g">9</span><span class="m"> </span><span>}</span></div>
+        </div>
+        <div class="pane">
+          <div class="ln"><span class="g">1</span><span class="m"> </span><span><span class="k">using</span> Auth;</span></div>
+          <div class="ln"><span class="g">2</span><span class="m"> </span><span><span class="k">using</span> Xunit;</span></div>
+          <div class="ln"><span class="g">3</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">4</span><span class="m"> </span><span><span class="k">public class</span> <span class="t">LoginRedirectTests</span></span></div>
+          <div class="ln"><span class="g">5</span><span class="m"> </span><span>{</span></div>
+          <div class="ln"><span class="g">6</span><span class="m"> </span><span>    [<span class="t">Fact</span>]</span></div>
+          <div class="ln"><span class="g">7</span><span class="m"> </span><span>    <span class="k">public void</span> A_local_return_url_is_kept() =&gt;</span></div>
+          <div class="ln"><span class="g">8</span><span class="m"> </span><span>        Assert.True(ReturnUrl.IsLocal(<span class="s">"/orders/42"</span>));</span></div>
+          <div class="ln add"><span class="g">9</span><span class="m">+</span><span></span></div>
+          <div class="ln add"><span class="g">10</span><span class="m">+</span><span>    [<span class="t">Theory</span>]</span></div>
+          <div class="ln add"><span class="g">11</span><span class="m">+</span><span>    [<span class="t">InlineData</span>(<span class="s">"https://evil.example"</span>)]</span></div>
+          <div class="ln add"><span class="g">12</span><span class="m">+</span><span>    [<span class="t">InlineData</span>(<span class="s">"//evil.example"</span>)]</span></div>
+          <div class="ln add"><span class="g">13</span><span class="m">+</span><span>    <span class="k">public void</span> Anything_else_is_dropped(<span class="k">string</span> url) =&gt;</span></div>
+          <div class="ln add"><span class="g">14</span><span class="m">+</span><span>        Assert.False(ReturnUrl.IsLocal(url));</span></div>
+          <div class="ln"><span class="g">15</span><span class="m"> </span><span>}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="detail" aria-label="Commit">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 600; line-height: 1.35">Add regression tests for the open redirect</h2>
+      <div class="muted">tester · 25 min ago · <span class="mono" style="font-size: 12px">9c41e07</span></div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px"><h3 class="h3">Files (3)</h3><span class="counts"><span class="plus">+51</span> <span class="minus">−2</span></span></div>
+      <div style="display: flex; flex-direction: column; gap: 1px">
+        <button class="fi sel" type="button" title="tests/Auth.Tests/LoginRedirectTests.cs"><span class="letter l-m">M</span><span class="nm">LoginRedirectTests.cs<span class="dir">tests/Auth.Tests</span></span><span class="counts"><span class="plus">+6</span></span></button>
+        <button class="fi" type="button" title="tests/Auth.Tests/Fakes/FakeSignIn.cs"><span class="letter l-a">A</span><span class="nm">FakeSignIn.cs<span class="dir">tests/Auth.Tests/Fakes</span></span><span class="counts"><span class="plus">+43</span></span></button>
+        <button class="fi" type="button" title="tests/Auth.Tests/Auth.Tests.csproj"><span class="letter l-m">M</span><span class="nm">Auth.Tests.csproj<span class="dir">tests/Auth.Tests</span></span><span class="counts"><span class="plus">+2</span> <span class="minus">−2</span></span></button>
+      </div>
+      <div style="border-top: 1px solid #3a3836; padding-top: 10px; color: #d6d1cb; white-space: pre-line">Add regression tests for the open redirect
+
+Covers an absolute and a protocol-relative ReturnUrl.</div>
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+        <span class="ann">Choosing a file opens its diff under the graph, which shrinks to a few rows; Esc or × gives the graph back.</span>
+        <span class="ann">A worktree's uncommitted row lists its changed files the same way; those diffs are against HEAD and open in Files to edit.</span>
+        <span class="ann">Works with the Editor module off: the diff is shared UI, only the Files view is the module's.</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

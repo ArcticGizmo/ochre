@@ -18,6 +18,17 @@ internal static class WindowApi
             window.ReportTask(r.Task);
             return new Ack();
         });
+        bridge.Handle("window.setUnsaved", j.WindowUnsavedRequest, j.Ack, r =>
+        {
+            window.SetUnsaved(Math.Clamp(r.Count, 0, 10_000));
+            return new Ack();
+        });
+        // The page asked the user after the window refused to close; only this page's own window is closed.
+        bridge.Handle("window.close", j.WindowCloseRequest, j.Ack, r =>
+        {
+            window.ConfirmClose(r.Quit);
+            return new Ack();
+        });
         bridge.Handle("windows.openTask", j.OpenTaskRequest, j.OpenTaskResult, async ValueTask<OpenTaskResult> (r) =>
         {
             if (r.Id.Length > 64 || host.Tasks.Get(r.Id) is null) throw new BridgeRejectException("no such task");

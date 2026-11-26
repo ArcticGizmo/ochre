@@ -52,6 +52,8 @@ public static class BridgeContract
         new("worktrees.remove", typeof(RemoveWorktreeRequest), typeof(Ack)),
         new("window.get", typeof(Empty), typeof(WindowInfo)),
         new("window.setTask", typeof(WindowTaskRequest), typeof(Ack)),
+        new("window.setUnsaved", typeof(WindowUnsavedRequest), typeof(Ack)),
+        new("window.close", typeof(WindowCloseRequest), typeof(Ack)),
         new("windows.openTask", typeof(OpenTaskRequest), typeof(OpenTaskResult)),
     ];
 
@@ -60,6 +62,8 @@ public static class BridgeContract
         new("window.shown", typeof(Empty)),
         // Sent to one window: the jump hotkey brought it forward, so show the "jump to task" picker.
         new("window.jump", typeof(Empty)),
+        // Sent to one window: closing it (or quitting) waits for the user to save or discard its unsaved files.
+        new("window.closeRequested", typeof(WindowCloseRequestedEvent)),
         new("tasks.changed", typeof(TaskChangedEvent)),
         new("sessions.update", typeof(SessionUpdateEvent)),
         // A session appeared or went, or an observed one's suggestions may have changed: fetch sessions.list again.

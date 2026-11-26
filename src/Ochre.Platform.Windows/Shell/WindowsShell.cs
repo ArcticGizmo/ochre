@@ -166,7 +166,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
             var menu = new ContextMenuStrip();
             menu.Items.Add("Open Ochre", null, (_, _) => OpenWindow());
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Quit", null, (_, _) => Quit());
+            menu.Items.Add("Quit", null, (_, _) => QuitAsking());
             _tray = new NotifyIcon { Icon = _trayIcon, Text = options.Title, ContextMenuStrip = menu, Visible = true };
             _tray.MouseClick += (_, e) =>
             {
@@ -342,6 +342,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
             window.ResizeEnd += (_, _) => ScheduleSave();
             window.SizeChanged += (_, _) => ScheduleSave();
             window.TaskChanged += () => Post(c => c.ScheduleSave());
+            window.QuitConfirmed += QuitAsking;
             _windows.Add(window);
             window.Show();
             ScheduleSave();
@@ -355,14 +356,29 @@ public sealed class WindowsShell : IShell, IShellDevTools
 
         public void CloseWindow()
         {
-            foreach (var window in Open.ToList()) window.Close();
+            foreach (var window in Open.ToList()) window.ForceClose();
+        }
+
+        /// <summary>
+        /// The tray's Quit: each window holding unsaved files is brought forward and asked in turn, and Ochre quits once
+        /// every one has answered. Cancelling in any window stops the quit.
+        /// </summary>
+        private void QuitAsking()
+        {
+            if (Open.FirstOrDefault(w => w.HoldsUnsaved) is { } window)
+            {
+                BringForward(window, notify: false);
+                window.AskToClose(quit: true);
+                return;
+            }
+            Quit();
         }
 
         public void Quit()
         {
             Freeze();
             _tray.Visible = false;
-            foreach (var window in Open.ToList()) window.Close();
+            foreach (var window in Open.ToList()) window.ForceClose();
             ExitThread();
         }
 

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Changed on disk</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid rgba(232,151,74,.4);background:rgba(232,151,74,.12);color:#e8974a}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:3px 10px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:28px;box-sizing:border-box}
+.btn:hover{background:#2e2c2a}
+.btn.on{background:#2e2c2a;border-color:#5c5854}
+.btn.danger{color:#f0a8a0;border-color:#6b3a35}
+.kbd{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:11px;padding:0 5px;border:1px solid #3a3836;border-bottom-width:2px;border-radius:4px;color:#a39d96}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:8px 16px;border-bottom:1px solid #33312f}
+.side{width:280px;flex:none;border-right:1px solid #3a3836;padding:8px 0;font-size:13px}
+.ti{display:flex;align-items:center;gap:6px;padding:2px 10px;white-space:nowrap}
+.ti.sel{background:#2e2c2a}
+.etabs{display:flex;align-items:flex-end;border-bottom:1px solid #33312f;padding:0 8px;background:#1f1e1d}
+.etab{display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:13px;color:#a39d96;border-right:1px solid #2a2928}
+.etab.on{color:#e8e4df;background:#1b1a19;box-shadow:inset 0 2px 0 #cc7722}
+.unsaved{width:8px;height:8px;border-radius:50%;background:#e8e4df}
+.notice{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:8px 16px;background:#2a2620;border-bottom:1px solid #5a4a26}
+.warn{width:18px;height:18px;flex:none;color:#d9b44a}
+.dhead{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #33312f;font-size:12px;color:#a39d96}
+.dhead div{padding:5px 16px}
+.dhead div+div{border-left:1px solid #33312f}
+.diff{flex:1;min-height:0;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:13px;line-height:20px}
+.pane{overflow:hidden;padding-top:4px}
+.pane+.pane{border-left:1px solid #33312f}
+.ln{display:grid;grid-template-columns:44px 18px minmax(0,1fr);white-space:pre}
+.ln .g{text-align:right;color:#5f5a55;padding-right:6px}
+.ln .m{text-align:center}
+.del{background:rgba(232,135,125,.13)}
+.del .m{color:#e8877d}
+.add{background:rgba(134,181,114,.14)}
+.add .m{color:#86b572}
+.k{color:#e8974a}
+.t{color:#8fbcd4}
+.s{color:#a8c97f}
+.c{color:#7f7a74;font-style:italic}
+.ann{font-size:12px;color:#1b1a19;background:#d9b44a;border-radius:6px;padding:4px 8px}
+.status{display:flex;align-items:center;gap:16px;padding:4px 16px;font-size:12px;color:#a39d96;border-top:1px solid #33312f;background:#1f1e1d}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px; flex-wrap: wrap" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav">Tasks</a>
+      <a href="#inbox" class="nav">Inbox</a>
+      <a href="GitDiff.dc.html" class="nav">Git</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Files</a>
+      <a href="#terminals" class="nav">Terminals</a>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <a href="Task.dc.html" style="font-weight: 600; color: #e8e4df; text-decoration: none">Fix the login redirect</a>
+    <span class="mono muted">T-0042</span>
+    <span class="pill"><span class="dot"></span>Active</span>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <aside class="side" aria-label="Files of T-0042">
+      <div class="ti" style="font-weight: 600">▾ auth-service</div>
+      <div class="ti" style="padding-left: 26px">▾ src</div>
+      <div class="ti" style="padding-left: 42px">▾ Auth</div>
+      <div class="ti sel" style="padding-left: 58px">LoginController.cs</div>
+      <div class="ti" style="padding-left: 58px">ReturnUrl.cs</div>
+      <div class="ti" style="padding-left: 26px">▸ tests</div>
+    </aside>
+
+    <main style="flex: 1; min-width: 0; display: flex; flex-direction: column" aria-label="Editor">
+      <div class="etabs" role="tablist">
+        <div class="etab on" role="tab" aria-selected="true">LoginController.cs <span class="unsaved" aria-label="Unsaved changes"></span></div>
+        <div class="etab" role="tab" aria-selected="false">ReturnUrl.cs</div>
+      </div>
+
+      <div class="notice" role="alert">
+        <svg class="warn" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2l7.5 13h-15z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path><path d="M9 7v4M9 13v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+        <span><b>LoginController.cs changed on disk</b> while you had unsaved edits, probably by <b>builder</b> (its last Edit, 20 s ago).</span>
+        <span style="flex: 1"></span>
+        <button class="btn on" type="button" aria-pressed="true">Compare</button>
+        <button class="btn danger" type="button">Reload, discard mine</button>
+        <button class="btn" type="button">Keep mine…</button>
+      </div>
+
+      <div class="dhead"><div>On disk now · read-only</div><div>Yours, unsaved · keep editing here</div></div>
+      <div class="diff">
+        <div class="pane" aria-label="On disk">
+          <div class="ln"><span class="g">40</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">41</span><span class="m"> </span><span>        <span class="k">await</span> _signIn.SignInAsync(user);</span></div>
+          <div class="ln"><span class="g">42</span><span class="m"> </span><span>        <span class="k">if</span> (!ReturnUrl.IsLocal(returnUrl))</span></div>
+          <div class="ln"><span class="g">43</span><span class="m"> </span><span>            returnUrl = <span class="s">"/"</span>;</span></div>
+          <div class="ln del"><span class="g">44</span><span class="m">−</span><span>        _audit.LoggedIn(user.Id, returnUrl);</span></div>
+          <div class="ln"><span class="g">45</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">46</span><span class="m"> </span><span>        <span class="k">return</span> LocalRedirect(returnUrl);</span></div>
+          <div class="ln"><span class="g">47</span><span class="m"> </span><span>    }</span></div>
+        </div>
+        <div class="pane" aria-label="Yours">
+          <div class="ln"><span class="g">40</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">41</span><span class="m"> </span><span>        <span class="k">await</span> _signIn.SignInAsync(user);</span></div>
+          <div class="ln add"><span class="g">42</span><span class="m">+</span><span>        <span class="c">// Only a local path: an absolute or protocol-relative URL is an open redirect.</span></span></div>
+          <div class="ln"><span class="g">43</span><span class="m"> </span><span>        <span class="k">if</span> (!ReturnUrl.IsLocal(returnUrl))</span></div>
+          <div class="ln"><span class="g">44</span><span class="m"> </span><span>            returnUrl = <span class="s">"/"</span>;</span></div>
+          <div class="ln"><span class="g">45</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">46</span><span class="m"> </span><span>        <span class="k">return</span> LocalRedirect(returnUrl);</span></div>
+          <div class="ln"><span class="g">47</span><span class="m"> </span><span>    }</span></div>
+        </div>
+      </div>
+      <div style="padding: 10px 16px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+        <span class="ann">A clean tab just reloads, keeping its cursor and scroll. Only a tab with unsaved edits shows this bar.</span>
+        <span class="ann">Keep mine asks first: "Save over builder's change? Its edit to line 44 will be lost." A save that finds the file moved on shows the same bar.</span>
+      </div>
+      <div class="status">
+        <span style="color: #e8e4df">Unsaved</span>
+        <span>Saving is paused until you choose</span>
+        <span style="flex: 1"></span>
+        <span>Ln 42, Col 17</span>
+        <span>UTF-8 with BOM</span>
+        <span>CRLF</span>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

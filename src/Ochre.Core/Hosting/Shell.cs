@@ -77,6 +77,13 @@ public interface IShellWindow
 
     /// <summary>True once if the window was opened by the jump hotkey, so its page shows the picker when it loads.</summary>
     bool TakeJumpRequest();
+
+    /// <summary>How many unsaved files the page holds. While it isn't 0, the user closing the window (or quitting from
+    /// the tray) asks the page first instead. Safe from any thread.</summary>
+    void SetUnsaved(int count);
+
+    /// <summary>The page has saved or discarded its unsaved files: close the window, or carry on quitting. Safe from any thread.</summary>
+    void ConfirmClose(bool quit);
 }
 
 /// <summary>

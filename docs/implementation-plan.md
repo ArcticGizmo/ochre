@@ -512,6 +512,13 @@ Slice 1 is host-only and needs nothing else. Slices 2 to 5 are UI and share one 
 - **Markdown**: a `.md` file has Source, Preview and Side by side; the preview uses `markdown.ts`, links open through `app.openUrl` (middle click: a new browser window), and relative links to other files in the folder open them in the editor. Images wait.
 - **Unsaved edits on close**: closing a tab with unsaved edits asks; closing a window with any asks (the shell asks the page before it closes); quitting Ochre asks each window that has some.
 - A **Files** link beside each task folder (a `FolderStatus` contribution) opens the view on that folder.
+- Done 2026-11-26; see `docs/testing/m6-files-testing.md` and the agreed design in `docs/design/m6-editor/` (published at https://claude.ai/artifact/12xqUham9C81jtW18Cs81U). Decisions made while building:
+  - **Monaco 0.57.0**, pinned (0.58.0 was three days old). A slim entry (`ui/src/editor/monaco.ts`): the editor API, the built-in tokenisers and the editing features; Monaco's full entry also pulls in the TypeScript, JSON, CSS and HTML services and an LSP client, which stay out. One generic worker; a 3.3 MB chunk loaded on first use, with its own stylesheet. The codicon font's stylesheet is aliased in `vite.config.ts`, since Monaco's package exports map every subpath to `.js`.
+  - **Tabs live outside React** (`ui/src/modules/editor/store.ts`): each open file's Monaco model holds its edits, so switching views or tasks loses nothing. A tab is dirty while the model's alternative version differs from the one last read or saved, so undoing back to it counts as clean.
+  - **Changed on disk**: the store matches `editor.changed` by task, folder and path and ignores its own save's version. A clean tab reloads as an undoable edit; a dirty one shows the bar. A deleted file offers only Close (M6 creates no files). "Probably by" names the agent only when exactly one on the task was working when the change arrived.
+  - **Unsaved files on close**: a kernel registry (`ui/src/windows/unsaved.ts`) any module can add to; the page reports its count with `window.setUnsaved`. A user close of a window holding some is refused by the shell, which sends `window.closeRequested`; the page asks and answers with `window.close`. The tray's Quit asks each such window in turn; the CLI's quit, an update and Windows ending the session never wait.
+  - **An error boundary** around the view, so a failure in Monaco can't blank the window (one did while building: a diff editor disposed before its model was detached).
+  - Not built here: the Changes tab (slice 3), Ctrl+P (slice 5).
 
 ### Slice 3: Changes and diffs
 

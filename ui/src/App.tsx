@@ -14,6 +14,7 @@ import { TaskList } from './tasks/TaskList';
 import { TaskView } from './tasks/TaskView';
 import { Today } from './tasks/Today';
 import { UpdateBadge } from './updates/Updates';
+import { CloseGuard } from './windows/CloseGuard';
 import { useOpenInWindow } from './windows/useOpenInWindow';
 
 // The kernel's views; modules add theirs after these (ADR 0012).
@@ -315,6 +316,7 @@ export function App() {
       <div className="body">{body}</div>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {openInWindowDialog}
+      <CloseGuard />
       <JumpDialog open={jumping} tasks={tasks} onClose={() => setJumping(false)} onOpen={openTask} onOpenInWindow={openInWindow} />
       <NewTaskDialog
         open={creating}

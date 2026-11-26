@@ -1,0 +1,23 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-26T20:00:00Z" },
+  "title": "Ochre M6 editor",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Files: the task's folders, tabs, an unsaved file", "expand": "fill" },
+    "Changes.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 900, "title": "Changes: what the agents changed, as a diff against HEAD", "expand": "fill" },
+    "OnDisk.dc.html": { "x": 0, "y": 1020, "w": 1440, "h": 900, "title": "Changed on disk while you were editing", "expand": "fill" },
+    "Close.dc.html": { "x": 1520, "y": 1020, "w": 1440, "h": 900, "title": "Closing a window with unsaved files", "expand": "fill" },
+    "Markdown.dc.html": { "x": 0, "y": 2040, "w": 1440, "h": 900, "title": "Markdown side by side", "expand": "fill" },
+    "GitDiff.dc.html": { "x": 1520, "y": 2040, "w": 1440, "h": 900, "title": "Git view: a commit's files and a diff", "expand": "fill" },
+    "Thread.dc.html": { "x": 0, "y": 3060, "w": 1440, "h": 900, "title": "Paths in an agent's tool cards", "expand": "fill" },
+    "Picker.dc.html": { "x": 1520, "y": 3060, "w": 1440, "h": 900, "title": "Ctrl+P: go to a file", "expand": "fill" },
+    "Task.dc.html": { "x": 0, "y": 4080, "w": 1440, "h": 900, "title": "Task page: Files and Changes beside each folder", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "Changes.dc.html", "OnDisk.dc.html", "Close.dc.html", "Markdown.dc.html", "GitDiff.dc.html", "Thread.dc.html", "Picker.dc.html", "Task.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "Ochre: editor (M6 slices 2 to 5)", "kind": "title1", "maxW": 2960 }
+  },
+  "designSystems": []
+}

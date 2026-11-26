@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Markdown preview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid rgba(232,151,74,.4);background:rgba(232,151,74,.12);color:#e8974a}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:8px 16px;border-bottom:1px solid #33312f}
+.side{width:280px;flex:none;border-right:1px solid #3a3836;padding:8px 0;font-size:13px}
+.ti{display:flex;align-items:center;gap:6px;padding:2px 10px;white-space:nowrap}
+.ti.sel{background:#2e2c2a}
+.etabs{display:flex;align-items:flex-end;border-bottom:1px solid #33312f;padding:0 8px;background:#1f1e1d}
+.etab{display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:13px;color:#a39d96;border-right:1px solid #2a2928}
+.etab.on{color:#e8e4df;background:#1b1a19;box-shadow:inset 0 2px 0 #cc7722}
+.seg{display:inline-flex;border:1px solid #3a3836;border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;color:#a39d96;background:transparent;border:0;padding:3px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid #3a3836}
+.seg button[aria-pressed="true"]{color:#e8e4df;background:#2e2c2a}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr}
+.code{overflow:hidden;padding:6px 0 0;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:13px;line-height:20px;display:flex;border-right:1px solid #33312f}
+.gut{flex:none;width:44px;text-align:right;padding-right:12px;color:#5f5a55}
+.src{white-space:pre-wrap;color:#d6d1cb;flex:1;min-width:0;padding-right:16px}
+.h{color:#e8974a;font-weight:600}
+.lk{color:#8fbcd4}
+.cd{color:#a8c97f}
+.preview{overflow:hidden;padding:20px 32px}
+.preview h1{font-size:24px;margin:0 0 8px;font-weight:600}
+.preview h2{font-size:17px;margin:20px 0 6px;font-weight:600}
+.preview p{margin:0 0 10px;color:#d6d1cb}
+.preview code{font-family:'Cascadia Mono',Consolas,monospace;font-size:12.5px;background:#242322;border:1px solid #33312f;border-radius:4px;padding:0 4px}
+.preview pre{font-family:'Cascadia Mono',Consolas,monospace;font-size:12.5px;background:#1f1e1d;border:1px solid #33312f;border-radius:6px;padding:10px 12px;margin:0 0 10px}
+.preview ul{margin:0 0 10px;padding-left:20px;color:#d6d1cb}
+.ann{font-size:12px;color:#1b1a19;background:#d9b44a;border-radius:6px;padding:4px 8px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px; flex-wrap: wrap" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav">Tasks</a>
+      <a href="#inbox" class="nav">Inbox</a>
+      <a href="GitDiff.dc.html" class="nav">Git</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Files</a>
+      <a href="#terminals" class="nav">Terminals</a>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <a href="Task.dc.html" style="font-weight: 600; color: #e8e4df; text-decoration: none">Fix the login redirect</a>
+    <span class="mono muted">T-0042</span>
+    <span class="pill"><span class="dot"></span>Active</span>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <aside class="side" aria-label="Files of T-0042">
+      <div class="ti" style="font-weight: 600">▾ auth-service</div>
+      <div class="ti" style="padding-left: 26px">▸ docs</div>
+      <div class="ti" style="padding-left: 26px">▸ src</div>
+      <div class="ti" style="padding-left: 26px">▸ tests</div>
+      <div class="ti sel" style="padding-left: 26px">README.md</div>
+    </aside>
+
+    <main style="flex: 1; min-width: 0; display: flex; flex-direction: column" aria-label="README.md">
+      <div class="etabs" role="tablist">
+        <div class="etab" role="tab" aria-selected="false">LoginController.cs</div>
+        <div class="etab on" role="tab" aria-selected="true">README.md</div>
+      </div>
+      <div class="toolbar" style="padding: 6px 16px">
+        <span class="muted" style="font-size: 12px">auth-service › README.md</span>
+        <span style="flex: 1"></span>
+        <div class="seg" role="group" aria-label="Markdown view">
+          <button type="button" aria-pressed="false">Source</button>
+          <button type="button" aria-pressed="false">Preview</button>
+          <button type="button" aria-pressed="true">Side by side</button>
+        </div>
+      </div>
+      <div class="split">
+        <div class="code" aria-label="Source">
+          <div class="gut">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15<br>16<br>17</div>
+          <div class="src"><span class="h"># auth-service</span>
+
+Sign-in, tokens and sessions for the portal.
+
+<span class="h">## Running it</span>
+
+<span class="cd">```</span>
+<span class="cd">dotnet run --project src/Web</span>
+<span class="cd">```</span>
+
+<span class="h">## Redirects after login</span>
+
+Only a local <span class="cd">`returnUrl`</span> is followed; anything else
+goes to <span class="cd">`/`</span>. See <span class="lk">[ReturnUrl.cs](src/Auth/ReturnUrl.cs)</span> and the
+<span class="lk">[threat model](https://example.com/auth-threats)</span>.
+
+- Tests: <span class="cd">`dotnet test tests/Auth.Tests`</span></div>
+        </div>
+        <div class="preview" aria-label="Preview">
+          <h1>auth-service</h1>
+          <p>Sign-in, tokens and sessions for the portal.</p>
+          <h2>Running it</h2>
+          <pre>dotnet run --project src/Web</pre>
+          <h2>Redirects after login</h2>
+          <p>Only a local <code>returnUrl</code> is followed; anything else goes to <code>/</code>. See <a href="Main.dc.html">ReturnUrl.cs</a> and the <a href="https://example.com/auth-threats">threat model</a>.</p>
+          <ul><li>Tests: <code>dotnet test tests/Auth.Tests</code></li></ul>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin-top: 24px">
+            <span class="ann">ReturnUrl.cs opens in a tab here; the web link opens in the browser (middle click: a new browser window).</span>
+            <span class="ann">The preview follows the source as you type and scrolls with it. Images wait for a later slice.</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

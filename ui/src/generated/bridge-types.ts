@@ -785,6 +785,14 @@ export interface UpdateTaskRequest {
   repos: string[] | null;
 }
 
+export interface WindowCloseRequest {
+  quit: boolean;
+}
+
+export interface WindowCloseRequestedEvent {
+  quit: boolean;
+}
+
 export interface WindowInfo {
   task: string | null;
   jump: boolean;
@@ -792,6 +800,10 @@ export interface WindowInfo {
 
 export interface WindowTaskRequest {
   task: string | null;
+}
+
+export interface WindowUnsavedRequest {
+  count: number;
 }
 
 export interface WorktreeCheckDto {
@@ -882,6 +894,8 @@ export interface Requests {
   'worktrees.remove': { req: RemoveWorktreeRequest; res: Ack };
   'window.get': { req: Empty; res: WindowInfo };
   'window.setTask': { req: WindowTaskRequest; res: Ack };
+  'window.setUnsaved': { req: WindowUnsavedRequest; res: Ack };
+  'window.close': { req: WindowCloseRequest; res: Ack };
   'windows.openTask': { req: OpenTaskRequest; res: OpenTaskResult };
   'git.status': { req: GitStatusRequest; res: GitFolderStatus[] };
   'graph.load': { req: GraphLoadRequest; res: GraphPageDto };
@@ -921,6 +935,7 @@ export interface Requests {
 export interface Events {
   'window.shown': Empty;
   'window.jump': Empty;
+  'window.closeRequested': WindowCloseRequestedEvent;
   'tasks.changed': TaskChangedEvent;
   'sessions.update': SessionUpdateEvent;
   'sessions.changed': Empty;

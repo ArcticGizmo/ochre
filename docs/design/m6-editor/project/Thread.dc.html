@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>File links in a thread</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block}
+.thread{max-width:860px;width:100%;margin:0 auto;padding:20px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;flex:1;overflow:hidden}
+.user{align-self:flex-end;max-width:80%;background:#2e2c2a;border-radius:10px;padding:8px 12px}
+.card{border:1px solid #3a3836;border-radius:8px;background:#201f1e;overflow:hidden}
+.ch{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px}
+.tool{font-weight:600}
+.ok{color:#86b572}
+.flink{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12.5px;color:#e8974a;text-decoration:underline;text-decoration-color:rgba(232,151,74,.45);text-underline-offset:2px}
+.plain{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12.5px;color:#d6d1cb}
+.line{font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;color:#a39d96}
+.mini{border-top:1px solid #33312f;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12.5px;line-height:19px;padding:4px 0}
+.mini div{padding:0 12px;white-space:pre}
+.del{background:rgba(232,135,125,.13);color:#f0c2bb}
+.add{background:rgba(134,181,114,.14);color:#cfe8c4}
+.tip{position:absolute;left:0;top:28px;z-index:2;background:#2e2c2a;border:1px solid #5c5854;border-radius:6px;padding:6px 10px;font-size:12px;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.ann{font-size:12px;color:#1b1a19;background:#d9b44a;border-radius:6px;padding:4px 8px}
+.composer{max-width:860px;width:100%;margin:0 auto;padding:0 24px 16px;box-sizing:border-box}
+.field{width:100%;box-sizing:border-box;font:inherit;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:8px;padding:10px 12px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav on" aria-current="page">Tasks</a>
+      <a href="#inbox" class="nav">Inbox</a>
+      <a href="Main.dc.html" class="nav">Files</a>
+    </nav>
+  </header>
+  <div style="display: flex; align-items: center; gap: 10px; padding: 8px 24px; border-bottom: 1px solid #33312f">
+    <a href="Task.dc.html" style="font-size: 13px">Fix the login redirect</a><span class="muted">›</span>
+    <span class="dot" style="color: #86b572"></span><span style="font-weight: 600">builder</span><span style="font-size: 12px; color: #86b572">ready</span>
+    <span style="flex: 1"></span><span class="muted" style="font-size: 12px">Opus 5.5 · 48k</span>
+  </div>
+
+  <main class="thread" aria-label="builder's thread">
+    <div class="user">Fix the redirect loop after login. Keep ReturnUrl only when it's local.</div>
+
+    <div class="card">
+      <div class="ch" style="position: relative">
+        <span class="ok">✓</span><span class="tool">Read</span>
+        <a href="Main.dc.html" class="flink">LoginController.cs</a>
+        <span class="line">lines 30–80</span>
+        <span class="tip" role="tooltip">C:\git\auth-service\src\Auth\LoginController.cs · opens in Files at line 30</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 26px">
+      <div class="ch">
+        <span class="ok">✓</span><span class="tool">Edit</span>
+        <a href="Main.dc.html" class="flink" title="C:\git\auth-service\src\Auth\LoginController.cs">LoginController.cs</a>
+        <span class="line">:42</span>
+        <span style="flex: 1"></span>
+        <span class="mono"><span class="ok">+5</span> <span style="color: #e8877d">−1</span></span>
+        <a href="Changes.dc.html" style="font-size: 12px">Diff</a>
+      </div>
+      <div class="mini">
+        <div class="del">-        return Redirect(returnUrl ?? "/");</div>
+        <div class="add">+        // Only a local path: an absolute or protocol-relative URL is an open redirect.</div>
+        <div class="add">+        if (!ReturnUrl.IsLocal(returnUrl))</div>
+        <div class="add">+            returnUrl = "/";</div>
+        <div class="add">+</div>
+        <div class="add">+        return LocalRedirect(returnUrl);</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch">
+        <span class="ok">✓</span><span class="tool">Write</span>
+        <a href="Main.dc.html" class="flink" title="C:\git\auth-service\src\Auth\ReturnUrl.cs">ReturnUrl.cs</a>
+        <span class="mono muted">+28</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch">
+        <span class="ok">✓</span><span class="tool">Read</span>
+        <span class="plain" title="C:\Users\you\.nuget\packages\microsoft.aspnetcore.mvc\UrlHelper.cs">UrlHelper.cs</span>
+        <span class="muted" style="font-size: 12px">outside the task's folders</span>
+      </div>
+    </div>
+
+    <div>The redirect now only follows a local path, through <span class="mono">ReturnUrl.IsLocal</span>. Tests pass.</div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin-top: 8px">
+      <span class="ann">A path is a link when it's inside one of the task's repos or worktrees and the Editor module is on. Click opens it in Files in this window; Edit opens at the changed line.</span>
+      <span class="ann">Diff on an Edit card opens the file's diff against HEAD in Files, on the Changes tab.</span>
+      <span class="ann">Outside the task's folders the path stays plain text, saying so; it isn't opened.</span>
+    </div>
+  </main>
+  <div class="composer">
+    <label class="muted" style="font-size: 12px; display: block; margin-bottom: 4px" for="msg">Message builder</label>
+    <input id="msg" class="field" type="text" placeholder="Reply, or ask for the next step">
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Changes and diff</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid rgba(232,151,74,.4);background:rgba(232,151,74,.12);color:#e8974a}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:3px 10px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:28px;box-sizing:border-box}
+.btn:hover{background:#2e2c2a}
+.icon{width:28px;padding:0;justify-content:center}
+.kbd{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:11px;padding:0 5px;border:1px solid #3a3836;border-bottom-width:2px;border-radius:4px;color:#a39d96}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:8px 16px;border-bottom:1px solid #33312f}
+.side{width:320px;flex:none;border-right:1px solid #3a3836;display:flex;flex-direction:column;min-height:0}
+.stabs{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid #33312f}
+.stab{font:inherit;font-size:13px;color:#a39d96;background:none;border:0;border-bottom:2px solid transparent;padding:4px 10px 6px;cursor:pointer}
+.stab[aria-selected="true"]{color:#e8e4df;border-bottom-color:#cc7722}
+.list{flex:1;overflow:auto;padding:6px 0}
+.gh{display:flex;align-items:center;gap:8px;padding:10px 14px 4px;font-size:12px;font-weight:600;color:#a39d96}
+.ci{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;column-gap:8px;width:100%;font:inherit;font-size:13px;color:#e8e4df;background:none;border:0;padding:4px 14px;text-align:left;cursor:pointer;box-sizing:border-box}
+.ci:hover{background:#242322}
+.ci.sel{background:#2e2c2a}
+.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dir{color:#a39d96;font-size:12px;margin-left:6px}
+.letter{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;font-weight:700;text-align:center}
+.l-m{color:#d9b44a}
+.l-a{color:#86b572}
+.l-d{color:#e8877d}
+.counts{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;white-space:nowrap}
+.plus{color:#86b572}
+.minus{color:#e8877d}
+.seg{display:inline-flex;border:1px solid #3a3836;border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;color:#a39d96;background:transparent;border:0;padding:3px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid #3a3836}
+.seg button[aria-pressed="true"]{color:#e8e4df;background:#2e2c2a}
+.dhead{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #33312f;font-size:12px;color:#a39d96}
+.dhead div{padding:5px 16px}
+.dhead div+div{border-left:1px solid #33312f}
+.diff{flex:1;min-height:0;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:13px;line-height:20px}
+.pane{overflow:hidden;padding-top:4px}
+.pane+.pane{border-left:1px solid #33312f}
+.ln{display:grid;grid-template-columns:44px 18px minmax(0,1fr);white-space:pre}
+.ln .g{text-align:right;color:#5f5a55;padding-right:6px}
+.ln .m{color:#a39d96;text-align:center}
+.del{background:rgba(232,135,125,.13)}
+.del .m{color:#e8877d}
+.add{background:rgba(134,181,114,.14)}
+.add .m{color:#86b572}
+.gap{background:repeating-linear-gradient(135deg,transparent 0 6px,#232221 6px 12px)}
+.fold{grid-column:1 / -1;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#a39d96;padding:2px 16px;background:#1f1e1d;border-top:1px solid #2a2928;border-bottom:1px solid #2a2928}
+.k{color:#e8974a}
+.t{color:#8fbcd4}
+.s{color:#a8c97f}
+.c{color:#7f7a74;font-style:italic}
+.status{display:flex;align-items:center;gap:16px;padding:4px 16px;font-size:12px;color:#a39d96;border-top:1px solid #33312f;background:#1f1e1d}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px; flex-wrap: wrap" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav">Tasks</a>
+      <a href="#board" class="nav">Board</a>
+      <a href="#inbox" class="nav">Inbox</a>
+      <a href="GitDiff.dc.html" class="nav">Git</a>
+      <a href="#grid" class="nav">Grid</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Files</a>
+      <a href="#terminals" class="nav">Terminals</a>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <a href="Task.dc.html" style="font-weight: 600; color: #e8e4df; text-decoration: none">Fix the login redirect</a>
+    <span class="mono muted">T-0042</span>
+    <span class="pill"><span class="dot"></span>Active</span>
+    <span style="flex: 1"></span>
+    <a href="Picker.dc.html" class="btn">Go to file <span class="kbd">Ctrl</span><span class="kbd">P</span></a>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <aside class="side" aria-label="Changes in T-0042">
+      <div class="stabs" role="tablist">
+        <a href="Main.dc.html" class="stab" role="tab" aria-selected="false" style="text-decoration: none">Files</a>
+        <button class="stab" role="tab" aria-selected="true" type="button">Changes (5)</button>
+      </div>
+      <div class="list">
+        <div class="gh" title="C:\git\auth-service"><span>auth-service</span><span style="font-weight: 400">fix-login · 3</span></div>
+        <button class="ci sel" type="button" title="src/Auth/LoginController.cs"><span class="letter l-m" aria-label="Modified">M</span><span class="nm">LoginController.cs<span class="dir">src/Auth</span></span><span class="counts"><span class="plus">+6</span> <span class="minus">−2</span></span></button>
+        <button class="ci" type="button" title="src/Auth/ReturnUrl.cs"><span class="letter l-a" aria-label="Untracked">?</span><span class="nm">ReturnUrl.cs<span class="dir">src/Auth</span></span><span class="counts"><span class="plus">+28</span></span></button>
+        <button class="ci" type="button" title="tests/Auth.Tests/LoginRedirectTests.cs"><span class="letter l-a" aria-label="Added">A</span><span class="nm">LoginRedirectTests.cs<span class="dir">tests/Auth.Tests</span></span><span class="counts"><span class="plus">+42</span></span></button>
+
+        <div class="gh" title="C:\git\auth-service.worktrees\fix-login-redirect"><span>fix-login-redirect</span><span style="font-weight: 400">worktree · 1</span></div>
+        <button class="ci" type="button" title="src/Web/Startup.cs"><span class="letter l-m" aria-label="Modified">M</span><span class="nm">Startup.cs<span class="dir">src/Web</span></span><span class="counts"><span class="plus">+2</span> <span class="minus">−2</span></span></button>
+
+        <div class="gh" title="C:\git\web-portal"><span>web-portal</span><span style="font-weight: 400">main · 1</span></div>
+        <button class="ci" type="button" title="src/legacy/redirect.js"><span class="letter l-d" aria-label="Deleted">D</span><span class="nm">redirect.js<span class="dir">src/legacy</span></span><span class="counts"><span class="minus">−31</span></span></button>
+
+        <p class="muted" style="font-size: 12px; padding: 12px 14px 0; margin: 0">Since each folder's last commit. Refreshed when the window takes focus and when an agent's turn ends.</p>
+      </div>
+    </aside>
+
+    <main style="flex: 1; min-width: 0; display: flex; flex-direction: column" aria-label="Diff of LoginController.cs">
+      <div class="toolbar" style="padding: 6px 16px">
+        <span style="font-weight: 600">LoginController.cs</span>
+        <span class="muted" style="font-size: 12px">auth-service › src/Auth</span>
+        <span style="flex: 1"></span>
+        <span class="muted" style="font-size: 12px">Change 1 of 2</span>
+        <button class="btn icon" type="button" aria-label="Previous change"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+        <button class="btn icon" type="button" aria-label="Next change"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+        <div class="seg" role="group" aria-label="Diff layout">
+          <button type="button" aria-pressed="true">Side by side</button>
+          <button type="button" aria-pressed="false">Inline</button>
+        </div>
+        <a href="Main.dc.html" class="btn">Open file</a>
+      </div>
+      <div class="dhead"><div>HEAD <span class="mono">3d81f60</span> · read-only</div><div>Working tree · edits save with <span class="kbd">Ctrl</span> <span class="kbd">S</span></div></div>
+      <div class="diff">
+        <div class="pane" aria-label="At HEAD">
+          <div class="fold">⋯ 33 unchanged lines</div>
+          <div class="ln"><span class="g">34</span><span class="m"> </span><span>    [<span class="t">HttpPost</span>(<span class="s">"login"</span>)]</span></div>
+          <div class="ln"><span class="g">35</span><span class="m"> </span><span>    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="t">IActionResult</span>&gt; Login(<span class="t">LoginForm</span> form, <span class="k">string</span>? returnUrl)</span></div>
+          <div class="ln"><span class="g">36</span><span class="m"> </span><span>    {</span></div>
+          <div class="ln"><span class="g">37</span><span class="m"> </span><span>        <span class="k">var</span> user = <span class="k">await</span> _users.FindAsync(form.Email);</span></div>
+          <div class="ln"><span class="g">38</span><span class="m"> </span><span>        <span class="k">if</span> (user <span class="k">is null</span> || !_hasher.Verify(user, form.Password))</span></div>
+          <div class="ln"><span class="g">39</span><span class="m"> </span><span>            <span class="k">return</span> View(form.WithError(<span class="s">"Email or password is wrong."</span>));</span></div>
+          <div class="ln"><span class="g">40</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">41</span><span class="m"> </span><span>        <span class="k">await</span> _signIn.SignInAsync(user);</span></div>
+          <div class="ln del"><span class="g">42</span><span class="m">−</span><span>        <span class="k">return</span> Redirect(returnUrl ?? <span class="s">"/"</span>);</span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln"><span class="g">43</span><span class="m"> </span><span>    }</span></div>
+          <div class="ln"><span class="g">44</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">45</span><span class="m"> </span><span>    [<span class="t">HttpPost</span>(<span class="s">"logout"</span>)]</span></div>
+          <div class="fold">⋯ 12 unchanged lines</div>
+          <div class="ln"><span class="g">58</span><span class="m"> </span><span>    <span class="k">private const int</span> MaxAttempts = <span class="t">5</span>;</span></div>
+          <div class="ln del"><span class="g">59</span><span class="m">−</span><span>    <span class="c">// TODO: validate returnUrl</span></span></div>
+          <div class="ln"><span class="g">60</span><span class="m"> </span><span>}</span></div>
+        </div>
+        <div class="pane" aria-label="Working tree, editable">
+          <div class="fold">⋯ 33 unchanged lines</div>
+          <div class="ln"><span class="g">34</span><span class="m"> </span><span>    [<span class="t">HttpPost</span>(<span class="s">"login"</span>)]</span></div>
+          <div class="ln"><span class="g">35</span><span class="m"> </span><span>    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="t">IActionResult</span>&gt; Login(<span class="t">LoginForm</span> form, <span class="k">string</span>? returnUrl)</span></div>
+          <div class="ln"><span class="g">36</span><span class="m"> </span><span>    {</span></div>
+          <div class="ln"><span class="g">37</span><span class="m"> </span><span>        <span class="k">var</span> user = <span class="k">await</span> _users.FindAsync(form.Email);</span></div>
+          <div class="ln"><span class="g">38</span><span class="m"> </span><span>        <span class="k">if</span> (user <span class="k">is null</span> || !_hasher.Verify(user, form.Password))</span></div>
+          <div class="ln"><span class="g">39</span><span class="m"> </span><span>            <span class="k">return</span> View(form.WithError(<span class="s">"Email or password is wrong."</span>));</span></div>
+          <div class="ln"><span class="g">40</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">41</span><span class="m"> </span><span>        <span class="k">await</span> _signIn.SignInAsync(user);</span></div>
+          <div class="ln add"><span class="g">42</span><span class="m">+</span><span>        <span class="c">// Only a local path: an absolute or protocol-relative URL is an open redirect.</span></span></div>
+          <div class="ln add"><span class="g">43</span><span class="m">+</span><span>        <span class="k">if</span> (!ReturnUrl.IsLocal(returnUrl))</span></div>
+          <div class="ln add"><span class="g">44</span><span class="m">+</span><span>            returnUrl = <span class="s">"/"</span>;</span></div>
+          <div class="ln add"><span class="g">45</span><span class="m">+</span><span></span></div>
+          <div class="ln add"><span class="g">46</span><span class="m">+</span><span>        <span class="k">return</span> LocalRedirect(returnUrl);</span></div>
+          <div class="ln gap"><span class="g"></span><span class="m"></span><span> </span></div>
+          <div class="ln"><span class="g">47</span><span class="m"> </span><span>    }</span></div>
+          <div class="ln"><span class="g">48</span><span class="m"> </span><span></span></div>
+          <div class="ln"><span class="g">49</span><span class="m"> </span><span>    [<span class="t">HttpPost</span>(<span class="s">"logout"</span>)]</span></div>
+          <div class="fold">⋯ 12 unchanged lines</div>
+          <div class="ln"><span class="g">62</span><span class="m"> </span><span>    <span class="k">private const int</span> MaxAttempts = <span class="t">5</span>;</span></div>
+          <div class="ln add"><span class="g">63</span><span class="m">+</span><span>    <span class="k">private const int</span> MaxReturnUrl = <span class="t">2048</span>;</span></div>
+          <div class="ln"><span class="g">64</span><span class="m"> </span><span>}</span></div>
+        </div>
+      </div>
+      <div class="status">
+        <span>Saved</span>
+        <span style="flex: 1"></span>
+        <span>Untracked files compare with empty; a deleted file shows its HEAD text, read-only</span>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

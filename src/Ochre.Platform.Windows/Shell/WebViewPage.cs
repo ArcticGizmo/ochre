@@ -72,6 +72,9 @@ internal sealed class WebViewPage : IDisposable
     /// <summary>The jump hotkey brought this window forward: show the "jump to task" picker.</summary>
     public void NotifyJump() => Post("{\"event\":\"window.jump\",\"payload\":{}}");
 
+    /// <summary>Closing the window (or quitting) waits on the page's unsaved files: ask the user what to do with them.</summary>
+    public void NotifyCloseRequested(bool quit) => Post($"{{\"event\":\"window.closeRequested\",\"payload\":{{\"quit\":{(quit ? "true" : "false")}}}}}");
+
     private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         if (_closed || !e.Source.StartsWith(_allowedOrigin, StringComparison.Ordinal)) return;

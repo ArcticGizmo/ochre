@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Task folders with Files and Changes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:900px;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid rgba(232,151,74,.4);background:rgba(232,151,74,.12);color:#e8974a}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block}
+.h3{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#a39d96;font-weight:600;margin:0}
+.folders{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.folders li{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:6px 8px;border-radius:6px}
+.folders li:hover{background:#242322}
+.branch{font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;color:#d6d1cb;border:1px solid #3a3836;border-radius:4px;padding:0 6px}
+.links{display:flex;gap:12px;margin-left:auto;font-size:13px}
+.new{outline:1.5px dashed #d9b44a;outline-offset:3px;border-radius:3px}
+.ann{font-size:12px;color:#1b1a19;background:#d9b44a;border-radius:6px;padding:4px 8px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav on" aria-current="page">Tasks</a>
+      <a href="#inbox" class="nav">Inbox</a>
+      <a href="GitDiff.dc.html" class="nav">Git</a>
+      <a href="Main.dc.html" class="nav">Files</a>
+    </nav>
+  </header>
+  <main style="max-width: 880px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 18px">
+    <div style="display: flex; align-items: flex-start; gap: 12px">
+      <div style="flex: 1">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 600">Fix the login redirect</h1>
+        <div class="mono muted">T-0042</div>
+      </div>
+      <span class="pill"><span class="dot"></span>Active</span>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 8px" aria-label="Folders">
+      <h3 class="h3">Folders (3)</h3>
+      <ul class="folders">
+        <li>
+          <span style="font-weight: 600" title="C:\git\auth-service">auth-service</span>
+          <span class="branch">fix-login</span><span class="muted" style="font-size: 12px">↑2 · 3 changed</span>
+          <span class="links"><a href="GitDiff.dc.html">Graph</a><a href="Main.dc.html" class="new">Files</a><a href="Changes.dc.html" class="new">Changes (3)</a></span>
+        </li>
+        <li>
+          <span style="font-weight: 600" title="C:\git\auth-service.worktrees\fix-login-redirect">fix-login-redirect</span>
+          <span class="muted" style="font-size: 12px">worktree</span>
+          <span class="branch">fix-login-redirect</span><span class="muted" style="font-size: 12px">1 changed</span>
+          <span class="links"><a href="GitDiff.dc.html">Graph</a><a href="Main.dc.html" class="new">Files</a><a href="Changes.dc.html" class="new">Changes (1)</a></span>
+        </li>
+        <li>
+          <span style="font-weight: 600" title="C:\git\web-portal">web-portal</span>
+          <span class="branch">main</span><span class="muted" style="font-size: 12px">1 changed</span>
+          <span class="links"><a href="GitDiff.dc.html">Graph</a><a href="Main.dc.html" class="new">Files</a><a href="Changes.dc.html" class="new">Changes (1)</a></span>
+        </li>
+      </ul>
+      <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+        <span class="ann">New (dashed): Files opens the Files view on that folder; Changes opens it on the Changes tab with that folder's files. A clean folder shows Files only.</span>
+        <span class="ann">The Files title-bar tab keeps its task per window, like Git and Grid. Today shows neither link, as it shows no Graph link.</span>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px" aria-label="Agents">
+      <h3 class="h3">Agents (3)</h3>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px"><span class="dot" style="color: #86b572"></span><span style="font-weight: 600">builder</span><span style="font-size: 12px; color: #86b572">ready</span></div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px"><span class="dot" style="color: #86b572"></span><span style="font-weight: 600">tester</span><span style="font-size: 12px; color: #86b572">ready</span></div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px"><span class="dot" style="background: transparent; border: 1.5px solid #a39d96; box-sizing: border-box"></span><span style="font-weight: 600">reviewer</span><span class="muted" style="font-size: 12px">dormant</span></div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

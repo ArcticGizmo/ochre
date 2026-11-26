@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Files view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid rgba(232,151,74,.4);background:rgba(232,151,74,.12);color:#e8974a}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:3px 10px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:28px;box-sizing:border-box}
+.btn:hover{background:#2e2c2a}
+.btn.primary{background:#cc7722;border-color:#cc7722;color:#1b1a19;font-weight:600}
+.kbd{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:11px;padding:0 5px;border:1px solid #3a3836;border-bottom-width:2px;border-radius:4px;color:#a39d96}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:8px 16px;border-bottom:1px solid #33312f}
+.side{width:280px;flex:none;border-right:1px solid #3a3836;display:flex;flex-direction:column;min-height:0}
+.stabs{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid #33312f}
+.stab{font:inherit;font-size:13px;color:#a39d96;background:none;border:0;border-bottom:2px solid transparent;padding:4px 10px 6px;cursor:pointer}
+.stab[aria-selected="true"]{color:#e8e4df;border-bottom-color:#cc7722}
+.tree{flex:1;overflow:auto;padding:6px 0;font-size:13px}
+.ti{display:flex;align-items:center;gap:6px;width:100%;font:inherit;font-size:13px;color:#e8e4df;background:none;border:0;padding:2px 10px;text-align:left;cursor:pointer;white-space:nowrap;box-sizing:border-box}
+.ti:hover{background:#242322}
+.ti.sel{background:#2e2c2a}
+.root{font-weight:600;padding-top:8px}
+.chev{width:10px;flex:none;color:#a39d96}
+.letter{margin-left:auto;font-family:'Cascadia Mono',Consolas,monospace;font-size:11px}
+.l-m{color:#d9b44a}
+.l-a{color:#86b572}
+.l-u{color:#86b572}
+.etabs{display:flex;align-items:flex-end;gap:0;border-bottom:1px solid #33312f;padding:0 8px;background:#1f1e1d}
+.etab{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 14px;font-size:13px;color:#a39d96;border-right:1px solid #2a2928;cursor:pointer}
+.etab.on{color:#e8e4df;background:#1b1a19;box-shadow:inset 0 2px 0 #cc7722}
+.x{width:20px;height:20px;border:0;background:none;color:#a39d96;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.x:hover{background:#2e2c2a;color:#e8e4df}
+.unsaved{width:8px;height:8px;border-radius:50%;background:#e8e4df}
+.crumbs{display:flex;align-items:center;gap:6px;padding:5px 16px;font-size:12px;color:#a39d96;border-bottom:1px solid #2a2928}
+.code{flex:1;min-height:0;overflow:hidden;display:flex;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:13px;line-height:20px}
+.gut{flex:none;width:56px;text-align:right;padding:6px 14px 0 0;color:#5f5a55;user-select:none}
+.src{flex:1;padding:6px 0 0 4px;white-space:pre;color:#d6d1cb}
+.cur{background:#242322;display:block}
+.k{color:#e8974a}
+.t{color:#8fbcd4}
+.s{color:#a8c97f}
+.c{color:#7f7a74;font-style:italic}
+.n{color:#d9b44a}
+.status{display:flex;align-items:center;gap:16px;padding:4px 16px;font-size:12px;color:#a39d96;border-top:1px solid #33312f;background:#1f1e1d}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px; flex-wrap: wrap" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav">Tasks</a>
+      <a href="#board" class="nav">Board</a>
+      <a href="#inbox" class="nav">Inbox</a>
+      <a href="GitDiff.dc.html" class="nav">Git</a>
+      <a href="#grid" class="nav">Grid</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Files</a>
+      <a href="#terminals" class="nav">Terminals</a>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <a href="Task.dc.html" style="font-weight: 600; color: #e8e4df; text-decoration: none">Fix the login redirect</a>
+    <span class="mono muted">T-0042</span>
+    <span class="pill"><span class="dot"></span>Active</span>
+    <span style="flex: 1"></span>
+    <a href="Picker.dc.html" class="btn">Go to file <span class="kbd">Ctrl</span><span class="kbd">P</span></a>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <aside class="side" aria-label="Files of T-0042">
+      <div class="stabs" role="tablist">
+        <button class="stab" role="tab" aria-selected="true" type="button">Files</button>
+        <a href="Changes.dc.html" class="stab" role="tab" aria-selected="false" style="text-decoration: none">Changes (5)</a>
+      </div>
+      <div class="tree">
+        <button class="ti root" type="button" title="C:\git\auth-service"><span class="chev">▾</span>auth-service</button>
+        <button class="ti" type="button" style="padding-left: 26px"><span class="chev">▸</span>docs</button>
+        <button class="ti" type="button" style="padding-left: 26px"><span class="chev">▾</span>src</button>
+        <button class="ti" type="button" style="padding-left: 42px"><span class="chev">▾</span>Auth</button>
+        <button class="ti sel" type="button" style="padding-left: 58px"><span class="chev"></span>LoginController.cs<span class="letter l-m" title="Modified">M</span></button>
+        <button class="ti" type="button" style="padding-left: 58px"><span class="chev"></span>ReturnUrl.cs<span class="letter l-a" title="New, untracked">?</span></button>
+        <button class="ti" type="button" style="padding-left: 58px"><span class="chev"></span>TokenService.cs</button>
+        <button class="ti" type="button" style="padding-left: 42px"><span class="chev">▸</span>Web</button>
+        <button class="ti" type="button" style="padding-left: 26px"><span class="chev">▸</span>tests</button>
+        <button class="ti" type="button" style="padding-left: 26px"><span class="chev"></span>README.md</button>
+        <button class="ti" type="button" style="padding-left: 26px"><span class="chev"></span>auth-service.sln</button>
+        <button class="ti root" type="button" title="C:\git\auth-service.worktrees\fix-login-redirect"><span class="chev">▸</span>fix-login-redirect <span class="muted" style="font-weight: 400; font-size: 12px">worktree</span></button>
+        <button class="ti root" type="button" title="C:\git\web-portal"><span class="chev">▸</span>web-portal</button>
+      </div>
+    </aside>
+
+    <main style="flex: 1; min-width: 0; display: flex; flex-direction: column" aria-label="Editor">
+      <div class="etabs" role="tablist">
+        <div class="etab on" role="tab" aria-selected="true">LoginController.cs <span class="unsaved" title="Unsaved changes" aria-label="Unsaved changes"></span></div>
+        <div class="etab" role="tab" aria-selected="false">ReturnUrl.cs <button class="x" type="button" aria-label="Close ReturnUrl.cs"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4"></path></svg></button></div>
+        <div class="etab" role="tab" aria-selected="false">README.md <button class="x" type="button" aria-label="Close README.md"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4"></path></svg></button></div>
+      </div>
+      <div class="crumbs"><span>auth-service</span><span>›</span><span>src</span><span>›</span><span>Auth</span><span>›</span><span style="color: #e8e4df">LoginController.cs</span><span style="flex: 1"></span><a href="Changes.dc.html" style="font-size: 12px">Compare with HEAD</a></div>
+      <div class="code">
+        <div class="gut">34<br>35<br>36<br>37<br>38<br>39<br>40<br>41<br>42<br>43<br>44<br>45<br>46<br>47<br>48<br>49<br>50<br>51<br>52<br>53<br>54<br>55<br>56<br>57<br>58<br>59</div>
+        <div class="src">    [<span class="t">HttpPost</span>(<span class="s">"login"</span>)]
+    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="t">IActionResult</span>&gt; Login(<span class="t">LoginForm</span> form, <span class="k">string</span>? returnUrl)
+    {
+        <span class="k">var</span> user = <span class="k">await</span> _users.FindAsync(form.Email);
+        <span class="k">if</span> (user <span class="k">is null</span> || !_hasher.Verify(user, form.Password))
+            <span class="k">return</span> View(form.WithError(<span class="s">"Email or password is wrong."</span>));
+
+        <span class="k">await</span> _signIn.SignInAsync(user);
+<span class="cur">        <span class="c">// Only a local path: an absolute or protocol-relative URL is an open redirect.</span></span>        <span class="k">if</span> (!ReturnUrl.IsLocal(returnUrl))
+            returnUrl = <span class="s">"/"</span>;
+
+        <span class="k">return</span> LocalRedirect(returnUrl);
+    }
+
+    [<span class="t">HttpPost</span>(<span class="s">"logout"</span>)]
+    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="t">IActionResult</span>&gt; Logout()
+    {
+        <span class="k">await</span> _signIn.SignOutAsync();
+        <span class="k">return</span> Redirect(<span class="s">"/"</span>);
+    }
+
+    <span class="k">private const int</span> MaxAttempts = <span class="n">5</span>;
+}
+</div>
+      </div>
+      <div class="status">
+        <span style="color: #e8e4df">Unsaved</span>
+        <span><span class="kbd">Ctrl</span> <span class="kbd">S</span> save</span>
+        <span style="flex: 1"></span>
+        <span>Ln 42, Col 17</span>
+        <span>UTF-8 with BOM</span>
+        <span>CRLF</span>
+        <span>C#</span>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

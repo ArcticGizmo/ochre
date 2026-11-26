@@ -89,6 +89,37 @@ internal sealed class MainWindow : Form, IShellWindow
 
     public void NotifyShown() => _page?.NotifyShown();
 
+    private volatile int _unsaved;
+
+    /// <summary>Set once the page has dealt with its unsaved files, or when Ochre closes the window itself. UI thread.</summary>
+    public bool CloseAllowed { get; private set; }
+
+    /// <summary>The page has unsaved files and hasn't been told it may lose them.</summary>
+    public bool HoldsUnsaved => _unsaved > 0 && !CloseAllowed && _page is not null;
+
+    /// <summary>The page answered a quit's question: carry on quitting. UI thread.</summary>
+    public event Action? QuitConfirmed;
+
+    public void SetUnsaved(int count) => _unsaved = count;
+
+    public void ConfirmClose(bool quit) => BeginInvoke(() =>
+    {
+        if (IsDisposed) return;
+        CloseAllowed = true;
+        if (quit) QuitConfirmed?.Invoke();
+        else Close();
+    });
+
+    /// <summary>Asks the page to save or discard its unsaved files; it answers with <see cref="ConfirmClose"/>. UI thread.</summary>
+    public void AskToClose(bool quit) => _page?.NotifyCloseRequested(quit);
+
+    /// <summary>Closes without asking the page: Ochre quitting by itself (the CLI, an update) or closing every window. UI thread.</summary>
+    public void ForceClose()
+    {
+        CloseAllowed = true;
+        Close();
+    }
+
     private volatile bool _jumpRequested;
 
     /// <summary>The jump hotkey chose this window. A page that's loaded is told now; one still loading asks on load.</summary>
@@ -173,6 +204,12 @@ internal sealed class MainWindow : Form, IShellWindow
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        // Only the user's own close waits on unsaved edits; Windows ending the session or Task Manager doesn't.
+        if (e.CloseReason == CloseReason.UserClosing && HoldsUnsaved)
+        {
+            e.Cancel = true;
+            AskToClose(quit: false);
+        }
         base.OnFormClosing(e);
         if (!e.Cancel) ClosingFor?.Invoke(e.CloseReason);
     }

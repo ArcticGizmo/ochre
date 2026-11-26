@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Unsaved files on close</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{height:900px;position:relative;display:flex;flex-direction:column;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.muted{color:#a39d96}
+.ghost{background:#242322;border-radius:4px}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:5px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:32px;box-sizing:border-box}
+.btn:hover{background:#2e2c2a}
+.btn.primary{background:#cc7722;border-color:#cc7722;color:#1b1a19;font-weight:600}
+.btn.danger{color:#f0a8a0;border-color:#6b3a35}
+.scrim{position:absolute;inset:0;background:rgba(10,9,9,.62);display:flex;align-items:center;justify-content:center;padding:16px}
+.dialog{width:480px;max-width:100%;background:#242322;border:1px solid #3a3836;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.files{list-style:none;margin:0;padding:0;border:1px solid #33312f;border-radius:8px;overflow:hidden}
+.files li{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:13px}
+.files li+li{border-top:1px solid #33312f}
+.unsaved{width:8px;height:8px;border-radius:50%;background:#e8e4df;flex:none}
+.dir{color:#a39d96;font-size:12px;margin-left:auto;white-space:nowrap}
+.ann{font-size:12px;color:#1b1a19;background:#d9b44a;border-radius:6px;padding:4px 8px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="Task.dc.html" class="nav">Tasks</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Files</a>
+    </nav>
+  </header>
+  <div style="flex: 1; display: flex; gap: 16px; padding: 16px" aria-hidden="true">
+    <div class="ghost" style="width: 260px"></div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 10px">
+      <div class="ghost" style="height: 30px"></div>
+      <div class="ghost" style="flex: 1"></div>
+    </div>
+  </div>
+
+  <div class="scrim">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="close-title">
+      <h2 id="close-title" style="margin: 0; font-size: 17px; font-weight: 600">Close this window with 2 unsaved files?</h2>
+      <p class="muted" style="margin: 0">These edits exist only in this window. Ochre keeps running in the tray, and other windows stay open.</p>
+      <ul class="files">
+        <li title="C:\git\auth-service\src\Auth\LoginController.cs"><span class="unsaved" aria-hidden="true"></span>LoginController.cs<span class="dir">auth-service › src/Auth</span></li>
+        <li title="C:\git\auth-service\README.md"><span class="unsaved" aria-hidden="true"></span>README.md<span class="dir">auth-service</span></li>
+      </ul>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end">
+        <button class="btn" type="button">Cancel</button>
+        <button class="btn danger" type="button">Discard and close</button>
+        <button class="btn primary" type="button">Save all and close</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+    <span class="ann">Asked when the window's close button is pressed, and by Quit in the tray for each window with unsaved files. Closing one tab asks the same for that file.</span>
+    <span class="ann">If a file changed on disk, Save all stops there and shows the changed-on-disk bar; the window stays open.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

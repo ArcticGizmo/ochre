@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import ochreMark from './assets/ochre-mark.svg';
 import { Inbox, InboxBadge } from './attention/Inbox';
 import { attentionNow } from './attention/useAttention';
 import { on, request, type AppInfo, type TaskListItem } from './bridge';
@@ -275,7 +276,10 @@ export function App() {
   return (
     <div className="app">
       <header className="titlebar">
-        <span className="brand">Ochre</span>
+        <span className="brand">
+          <img className="brand-mark" src={ochreMark} alt="" />
+          Ochre
+        </span>
         {info?.profile && <span className="profile">{info.profile}</span>}
         <nav className="main-nav" aria-label="Main">
           {views.map(({ key, label, Badge }) => (

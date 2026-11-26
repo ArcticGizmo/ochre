@@ -112,8 +112,17 @@ code {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   color: var(--accent-text);
+  white-space: nowrap;
+}
+
+.brand-mark {
+  height: 18px;
+  width: auto;
 }
 
 .main-nav {

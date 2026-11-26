@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using SkiaSharp;
 using Svg.Skia;
 
@@ -6,6 +9,7 @@ using Svg.Skia;
 //   src/Ochre.Platform.Windows/Assets/ochre.ico      the tray, window and .exe icon, one frame per size Windows asks for
 //   src/Ochre.Platform.Windows/Assets/ochre-256.png  the notification identity's logo
 //   docs/assets/ochre-icon.png                       512 px, the README header
+//   ui/src/assets/ochre-mark.svg                     the shapes alone, cropped, for the title bar's "O"
 //
 // Every frame is rendered from the vector at its own size, so Windows never scales a bitmap to fit the tray.
 //
@@ -37,6 +41,7 @@ Directory.CreateDirectory(docs);
 WriteIco(picture, fit, Path.Combine(assets, "ochre.ico"), icoSizes);
 WritePng(picture, fit, Path.Combine(assets, "ochre-256.png"), 256);
 WritePng(picture, fit, Path.Combine(docs, "ochre-icon.png"), 512);
+WriteMark(svgPath, picture, fit, Path.Combine(root, "ui", "src", "assets", "ochre-mark.svg"));
 
 var preview = args.SkipWhile(a => a != "--preview").Skip(1).FirstOrDefault();
 if (preview is not null) WritePreview(picture, fit, Path.GetFullPath(preview, root), icoSizes);
@@ -64,6 +69,35 @@ static void WritePng(SKPicture picture, Fit fit, string path, int size)
     using var data = image.Encode(SKEncodedImageFormat.Png, 100);
     File.WriteAllBytes(path, data.ToArray());
     Console.WriteLine($"  {Rel(path)}  {size} px");
+}
+
+// The shapes alone, with the editor's metadata gone and the view box cropped to what's drawn, for the UI to use as
+// a letter. Only plain filled paths are copied, so a transform or other element in the source stops the tool.
+static void WriteMark(string svgPath, SKPicture picture, Fit fit, string path)
+{
+    XNamespace ns = "http://www.w3.org/2000/svg";
+    var doc = XDocument.Load(svgPath);
+    var svg = doc.Root!;
+    var viewBox = ((string?)svg.Attribute("viewBox") ?? throw new InvalidOperationException("ochre.svg has no viewBox"))
+        .Split([' ', ','], StringSplitOptions.RemoveEmptyEntries).Select(v => float.Parse(v, CultureInfo.InvariantCulture)).ToArray();
+    if (svg.Descendants().Any(e => e.Attribute("transform") is not null))
+        throw new InvalidOperationException("ochre.svg has a transform; WriteMark copies paths as they are");
+    // The picture is in CSS pixels; the paths are in view box units.
+    var unit = picture.CullRect.Width / viewBox[2];
+    var c = fit.Content;
+    string N(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+    var box = $"{N(viewBox[0] + c.Left / unit)} {N(viewBox[1] + c.Top / unit)} {N(c.Width / unit)} {N(c.Height / unit)}";
+
+    var paths = svg.Descendants(ns + "path").Select(p =>
+    {
+        var fill = Regex.Match((string?)p.Attribute("style") ?? "", @"fill:(#[0-9a-fA-F]{3,8})").Groups[1].Value;
+        if (fill.Length == 0) fill = (string?)p.Attribute("fill") ?? throw new InvalidOperationException("a path has no fill");
+        return $"  <path fill=\"{fill}\" d=\"{(string?)p.Attribute("d")}\"/>";
+    });
+    var text = $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{box}\">\n<!-- Generated from ochre.svg by tools/gen-icons.cmd; regenerate rather than edit. -->\n{string.Join("\n", paths)}\n</svg>\n";
+    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+    File.WriteAllText(path, text);
+    Console.WriteLine($"  {Rel(path)}  view box {box}");
 }
 
 // PNG frames are only for 256 px: small frames as 32-bit DIBs are what every Windows icon path reads the same way,

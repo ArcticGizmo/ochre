@@ -7,7 +7,7 @@
 
 Ochre is a task-first **agent development environment** (ADE) for Claude Code. It is a command center where the durable unit of work is the **task**, not the agent session. Sessions, worktrees, terminals, PRs and Jira issues attach to a task, come and go, and the task remembers where you got to.
 
-> **Status:** M0 (stack spike) settled the stack: a .NET 10 host with the UI in WebView2 ([results](docs/spike-stack-results.md)). M1 (tasks and controlled sessions), M2 (park, resume, Today, and sessions started outside Ochre), M3 (terminal tabs) and M4 (modules: git and worktrees, sprig, multiple windows) are done, and M5 (attention inbox, notifications and the agent grid) is built with its hand checks open. Next: an installer, then M6 (editor); see [docs/roadmap.md](docs/roadmap.md) and [docs/implementation-plan.md](docs/implementation-plan.md).
+> **Status:** M0 (stack spike) settled the stack: a .NET 10 host with the UI in WebView2 ([results](docs/spike-stack-results.md)). M1 (tasks and controlled sessions), M2 (park, resume, Today, and sessions started outside Ochre), M3 (terminal tabs) and M4 (modules: git and worktrees, sprig, multiple windows) are done, and M5 (attention inbox, notifications and the agent grid) is built with its hand checks open. Ochre installs and updates itself (see Installing). Next: M6 (editor); see [docs/roadmap.md](docs/roadmap.md) and [docs/implementation-plan.md](docs/implementation-plan.md).
 
 ## Why
 
@@ -38,16 +38,25 @@ Claude sessions end up being the to-do list, and that list disappears every time
 | [docs/landscape.md](docs/landscape.md) | Other ADEs as of Nov 2026 and where Ochre differs |
 | [docs/decisions/](docs/decisions/) | Architecture decision records |
 
-## Getting started
+## Installing
 
-Prerequisites (expected; confirmed by the spike):
+Windows 11, with Claude Code installed and signed in. In PowerShell:
 
-- Windows 11 (macOS later), .NET 10 SDK
-- Node.js LTS + pnpm (UI build), with install scripts disabled
-- Claude Code installed and signed in
-- WebView2 runtime (ships with Windows 11)
+```powershell
+irm https://raw.githubusercontent.com/ArcticGizmo/ochre/main/install.ps1 | iex
+```
 
-Start with [docs/roadmap.md](docs/roadmap.md), then the spike plan.
+It downloads the latest release's installer, checks it against the release's `SHA256SUMS.txt`, and installs Ochre for you alone (no admin): a Start menu entry, `ochre` on your PATH, and Ochre running in the tray. To pin a version: `$env:OCHRE_VERSION = '0.2.0'` first. Ochre checks for updates itself; a newer version shows in the title bar, and Settings has **Check for updates** and **Start Ochre when you sign in**. Uninstall from Settings, Apps; your tasks stay in `%APPDATA%\Ochre`.
+
+## Building
+
+Prerequisites: Windows 11, the .NET 10 SDK, Node.js 24 with pnpm (install scripts stay disabled), and Claude Code. The WebView2 runtime ships with Windows 11.
+
+- `run.cmd` builds everything and starts a dev copy on its own profile (`Ochre-dev`), so it never shares tasks or windows with an installed Ochre; `cli.cmd <args>` talks to it.
+- `publish.ps1` builds a release into `releases\` (`-Install` runs its installer). Releases are published by pushing a version tag (`git tag v0.2.0`, then `git push origin v0.2.0`), which runs `.github/workflows/release.yml`. See [ADR 0014](docs/decisions/0014-velopack-distribution.md) and [docs/testing/release-testing.md](docs/testing/release-testing.md).
+- `tools\gen-icons.cmd` renders the icons from `ochre.svg`.
+
+Start with [docs/roadmap.md](docs/roadmap.md) before changing anything.
 
 ## Related tools
 

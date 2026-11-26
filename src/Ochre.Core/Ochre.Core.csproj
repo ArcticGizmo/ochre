@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="ochre" />
     <InternalsVisibleTo Include="Ochre.Tests" />
+    <InternalsVisibleTo Include="Ochre.Platform.Windows" />
   </ItemGroup>
   <!-- In-process modules are first-party code built with Ochre (ADR 0012), so the module contracts and Core's
        helpers stay internal to Ochre's own assemblies; third-party plugins will run out of process (M7). -->

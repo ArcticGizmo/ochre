@@ -71,6 +71,11 @@ Don't build anything that assumes a single window: per-window UI state (selected
 
 **Exit:** three agents on a task stream side by side in its grid and a permission is answered in a pane; another window's inbox shows a question and a finished turn grouped by task, and answering or opening them clears them everywhere; an outside `claude` linked to the task shows read-only in the grid and in the inbox while it waits; a permission prompt pops a notification that can allow it, and answering inside Ochre takes the notification away; with the `roost` and `notifications` modules off, the inbox still works. Walked 2026-11-26 in a headless dev host: every step passed except the outside `claude` one, which is left for a hand run with real notifications; see [testing/m5-testing.md](testing/m5-testing.md).
 
+## Distribution (2026-11-26)
+
+- An installed Ochre, as Perch ships: `publish.ps1` packs a Velopack installer and update feed; a `v*` tag publishes a GitHub release (`release.yml`); `install.ps1` installs it; the app updates itself when asked; CI runs on pull requests. Added between M5 and M6 at the user's request, so Ochre can be used day to day. See [ADR 0014](decisions/0014-velopack-distribution.md) and [testing/release-testing.md](testing/release-testing.md).
+- Later: code signing; a GitHub release for macOS when its head exists.
+
 ## M6: editor
 
 - Monaco: open/edit files from a task's repos, diff against HEAD, markdown preview.

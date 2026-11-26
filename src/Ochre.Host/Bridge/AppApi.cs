@@ -16,12 +16,14 @@ public sealed record ModuleDto(string Id, string Name, string Description, bool 
 
 /// <param name="JumpHotkey">The "jump to task" shortcut, e.g. <c>Ctrl+Alt+Space</c>; "" when off.</param>
 /// <param name="JumpHotkeyError">Why it isn't working (another app has it), or null.</param>
-public sealed record SettingsDto(IReadOnlyList<ModuleDto> Modules, string JumpHotkey, string? JumpHotkeyError);
+/// <param name="StartAtSignIn">Whether Ochre starts in the tray at sign-in; null where it isn't offered (not installed).</param>
+public sealed record SettingsDto(IReadOnlyList<ModuleDto> Modules, string JumpHotkey, string? JumpHotkeyError, bool? StartAtSignIn);
 
 public sealed record ModuleChoiceDto(string Id, bool Enabled);
 
 /// <param name="JumpHotkey">A new shortcut, "" to turn it off, or null to leave it; applies at once.</param>
-public sealed record SettingsUpdateRequest(IReadOnlyList<ModuleChoiceDto> Modules, string? JumpHotkey);
+/// <param name="StartAtSignIn">On or off, or null to leave it; applies at once.</param>
+public sealed record SettingsUpdateRequest(IReadOnlyList<ModuleChoiceDto> Modules, string? JumpHotkey, bool? StartAtSignIn);
 
 /// <param name="NewWindow">Open a new browser window (middle click) rather than reuse the last one.</param>
 public sealed record OpenUrlRequest(string Url, bool NewWindow);
@@ -73,6 +75,7 @@ public sealed record OpenUrlRequest(string Url, bool NewWindow);
 [JsonSerializable(typeof(AttentionSeenRequest))]
 [JsonSerializable(typeof(AttentionItemRequest))]
 [JsonSerializable(typeof(AttentionViewingRequest))]
+[JsonSerializable(typeof(UpdateDto))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity, window lifecycle and settings.</summary>
@@ -101,7 +104,16 @@ internal static class AppApi
                 host.Settings.SetJumpHotkey(hotkey);
                 await host.ApplyJumpHotkeyAsync().ConfigureAwait(false);
             }
+            if (r.StartAtSignIn is { } signIn && host.SignInStart is { } start && start.IsOn != signIn) start.Set(signIn);
             return Settings(host);
+        });
+        bridge.Handle("app.update", j.Empty, j.UpdateDto, _ => host.Updates.State);
+        bridge.Handle("app.checkForUpdate", j.Empty, j.UpdateDto, async _ => await host.Updates.CheckAsync().ConfigureAwait(false));
+        // Quits the way the tray's Quit does, once the download is in; the new version starts after.
+        bridge.Handle("app.applyUpdate", j.Empty, j.UpdateDto, async _ =>
+        {
+            await host.Updates.ApplyAsync(() => host.Shell?.Quit()).ConfigureAwait(false);
+            return host.Updates.State;
         });
         bridge.Handle("app.restart", j.Empty, j.Ack, _ =>
         {
@@ -126,7 +138,8 @@ internal static class AppApi
     private static SettingsDto Settings(OchreHost host) =>
         new(host.Modules.States.Select(m => new ModuleDto(m.Id, m.Name, m.Description, m.Enabled, m.Running, m.Error)).ToList(),
             host.Settings.JumpHotkey,
-            host.JumpHotkeyError);
+            host.JumpHotkeyError,
+            host.SignInStart?.IsOn);
 }
 
 internal static class AppInfoProvider

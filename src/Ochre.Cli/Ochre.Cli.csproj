@@ -2,7 +2,7 @@
   <!--
     ochre-cli: the console front door to a running Ochre host. ochre.exe is a GUI-subsystem app, so a terminal
     neither waits for it nor shows what it prints; this console app talks to the host over the per-user instance
-    pipe instead. It will publish as ochre.com beside ochre.exe (cmd and PowerShell resolve a bare `ochre` to the
+    pipe instead. It publishes as ochre.com beside ochre.exe (cmd and PowerShell resolve a bare `ochre` to the
     .com first, as Perch does with perch.com), and it is the `ochre task ...` surface agents use.
   -->
   <PropertyGroup>
@@ -16,4 +16,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Ochre.Core\Ochre.Core.csproj" />
   </ItemGroup>
+  <!-- Published as ochre.com beside ochre.exe (publish.ps1); a PE image runs whatever its extension. -->
+  <Target Name="PublishAsOchreCom" AfterTargets="Publish" Condition="Exists('$(PublishDir)$(AssemblyName).exe')">
+    <Delete Files="$(PublishDir)ochre.com" />
+    <Move SourceFiles="$(PublishDir)$(AssemblyName).exe" DestinationFiles="$(PublishDir)ochre.com" />
+    <Delete Files="$(PublishDir)$(AssemblyName).pdb" />
+  </Target>
 </Project>

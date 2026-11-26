@@ -50,8 +50,10 @@ internal static class Program
 
     private static int Usage(TextWriter to, int code)
     {
-        to.WriteLine("""
-            Usage: ochre-cli <command>
+        // "ochre" installed (ochre.com), "ochre-cli" in a dev checkout.
+        var name = Path.GetFileNameWithoutExtension(Environment.ProcessPath) ?? "ochre";
+        to.WriteLine($$"""
+            Usage: {{name}} <command>
 
               status                 whether Ochre is running, and its version and profile
               open                   open a window here, starting Ochre if it isn't running

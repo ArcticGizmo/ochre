@@ -8,6 +8,9 @@
     <ApplicationIcon>..\Ochre.Platform.Windows\Assets\ochre.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Velopack" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Ochre.Core\Ochre.Core.csproj" />
     <ProjectReference Include="..\Ochre.Platform.Windows\Ochre.Platform.Windows.csproj" />
     <ProjectReference Include="..\..\modules\Ochre.Modules.Terminals\Ochre.Modules.Terminals.csproj" />

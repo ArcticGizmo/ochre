@@ -172,6 +172,34 @@ code {
   color: var(--muted);
 }
 
+.update-progress {
+  color: var(--accent-text);
+}
+
+button.update-badge {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.update-error {
+  font-size: 12px;
+}
+
+.update-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.update-settings .settings-note {
+  margin: 0;
+}
+
 .banner {
   grid-row: 2;
   display: flex;

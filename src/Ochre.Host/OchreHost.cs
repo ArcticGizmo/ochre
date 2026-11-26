@@ -53,9 +53,20 @@ internal sealed class OchreHost : IDisposable
             new ModuleKernel(log, paths.LocalRoot, Tasks, Sessions, ledger, services, Windows.Broadcast,
                 new AttentionKernel(Attention, AttentionViews, AttentionActions), ShowTask));
         Modules.StartAll();
+
+        Updates = new AppUpdater(log);
+        // Only an installed copy has a path that stays put, so only it is offered a sign-in start.
+        SignInStart = Updates.State.State != UpdateStateDto.Unsupported && services.TryGetValue(typeof(ISignInStart), out var signIn) ? (ISignInStart)signIn : null;
+        Updates.Changed += state => Windows.Broadcast(BridgeDispatcher.SerializeEvent("app.updateChanged", state, AppJson.Default.UpdateDto));
+        Updates.Start();
     }
 
     public ModuleHost Modules { get; }
+
+    public AppUpdater Updates { get; }
+
+    /// <summary>Null where it isn't offered (not an installed copy).</summary>
+    public ISignInStart? SignInStart { get; }
 
     /// <summary>Opens web links in the user's browser.</summary>
     public IUrlOpener Urls { get; }
@@ -144,6 +155,7 @@ internal sealed class OchreHost : IDisposable
 
     public void Dispose()
     {
+        Updates.Dispose();
         Modules.Dispose();
         Attention.Dispose();
         Sessions.Dispose();

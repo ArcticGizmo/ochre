@@ -15,6 +15,9 @@ public static class BridgeContract
         new("app.ready", typeof(Empty), typeof(Ack)),
         new("app.openUrl", typeof(OpenUrlRequest), typeof(Ack)),
         new("app.restart", typeof(Empty), typeof(Ack)),
+        new("app.update", typeof(Empty), typeof(UpdateDto)),
+        new("app.checkForUpdate", typeof(Empty), typeof(UpdateDto)),
+        new("app.applyUpdate", typeof(Empty), typeof(UpdateDto)),
         new("settings.get", typeof(Empty), typeof(SettingsDto)),
         new("settings.update", typeof(SettingsUpdateRequest), typeof(SettingsDto)),
         new("tasks.list", typeof(Empty), typeof(IReadOnlyList<TaskListItem>)),
@@ -63,5 +66,7 @@ public static class BridgeContract
         new("sessions.changed", typeof(Empty)),
         // What needs the user changed; carries the whole list, which is short.
         new("attention.changed", typeof(AttentionSnapshot)),
+        // Checking for, finding or downloading an update.
+        new("app.updateChanged", typeof(UpdateDto)),
     ];
 }

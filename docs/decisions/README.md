@@ -30,3 +30,4 @@ Template:
 | [0011](0011-host-owned-terminals.md) | The host owns terminals, filters their output and keeps their scrollback | accepted |
 | [0012](0012-module-contracts.md) | Module contracts, first cut | accepted |
 | [0013](0013-attention-inbox-and-roost.md) | The attention inbox is kernel; the Roost grid and notifications are modules | accepted |
+| [0014](0014-velopack-distribution.md) | Ochre ships with Velopack from GitHub releases, as Perch does | accepted |

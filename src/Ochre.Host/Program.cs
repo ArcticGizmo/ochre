@@ -3,7 +3,9 @@ using Ochre.Core.Hosting;
 using Ochre.Core.Sessions;
 using Ochre.Host.Bridge;
 using Ochre.Platform.Windows;
+using Ochre.Platform.Windows.Install;
 using Ochre.Platform.Windows.Shell;
+using Velopack;
 
 namespace Ochre.Host;
 
@@ -18,6 +20,18 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        // First, before anything else runs: the installer starts the exe with its own arguments to run these hooks,
+        // and Velopack exits once they're done. A build that isn't installed passes straight through.
+        VelopackApp.Build()
+            .OnAfterInstallFastCallback(_ => InstallRegistration.AddToPath())
+            .OnAfterUpdateFastCallback(_ => InstallRegistration.AddToPath())
+            .OnBeforeUninstallFastCallback(_ =>
+            {
+                InstallRegistration.RemoveFromPath();
+                InstallRegistration.RemoveUserEntries(NotificationId(OchreProfile.Current));
+            })
+            .Run();
+
         var profile = OchreProfile.Current;
         var command = args.Contains("--tray") ? "tray" : args.Contains("--close-window") ? "close" : "open";
 
@@ -55,6 +69,7 @@ internal static class Program
             [typeof(Ochre.Core.Platform.IDataProtector)] = new DataProtector(),
             [typeof(Ochre.Core.Platform.IUrlOpener)] = urls,
             [typeof(Ochre.Core.Platform.IDesktopNotifier)] = notifier,
+            [typeof(Ochre.Core.Platform.ISignInStart)] = new InstallRegistration.SignInStart(),
         };
         using var host = new OchreHost(profile, paths, log, urls, services);
         var shell = new WindowsShell(host.Windows, shellOptions, urls);
@@ -170,9 +185,10 @@ internal static class Program
     private static Ochre.Core.Platform.IDesktopNotifier NotifierFor(OchreProfile profile, OchrePaths paths, ShellOptions options, AppLog log)
     {
         if (options.Headless && Environment.GetEnvironmentVariable("OCHRE_DEV_NOTIFY") != "1") return new RecordingNotifier(log.Info);
-        var aumid = profile.IsDefault ? "Ochre" : $"Ochre.{profile.Name}";
-        return new Ochre.Platform.Windows.Notifications.ToastNotifier(aumid, options.Title, Path.Combine(paths.LocalRoot, "notifications"), log.Info);
+        return new Ochre.Platform.Windows.Notifications.ToastNotifier(NotificationId(profile), options.Title, Path.Combine(paths.LocalRoot, "notifications"), log.Info);
     }
+
+    private static string NotificationId(OchreProfile profile) => profile.IsDefault ? "Ochre" : $"Ochre.{profile.Name}";
 
     private static ShellOptions ShellOptionsFor(OchreProfile profile, OchrePaths paths, AppLog log)
     {

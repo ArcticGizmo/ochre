@@ -13,6 +13,7 @@ import { TaskBoard } from './tasks/TaskBoard';
 import { TaskList } from './tasks/TaskList';
 import { TaskView } from './tasks/TaskView';
 import { Today } from './tasks/Today';
+import { UpdateBadge } from './updates/Updates';
 import { useOpenInWindow } from './windows/useOpenInWindow';
 
 // The kernel's views; modules add theirs after these (ADR 0012).
@@ -290,7 +291,7 @@ export function App() {
           ))}
         </nav>
         <span className="spacer" />
-        {info && <span className="version">v{info.version}</span>}
+        {info && <UpdateBadge />}
         <button className="link gear" aria-label="Settings" title="Settings" onClick={() => setSettingsOpen(true)}>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.4" />

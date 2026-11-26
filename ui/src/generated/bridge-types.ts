@@ -25,6 +25,8 @@ export type TaskStateDto = 'backlog' | 'active' | 'parked' | 'done';
 
 export type ToolStatusDto = 'running' | 'done' | 'failed';
 
+export type UpdateStateDto = 'unsupported' | 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'restarting' | 'error';
+
 export interface Ack {
   ok: boolean;
 }
@@ -484,11 +486,13 @@ export interface SettingsDto {
   modules: ModuleDto[];
   jumpHotkey: string;
   jumpHotkeyError: string | null;
+  startAtSignIn: boolean | null;
 }
 
 export interface SettingsUpdateRequest {
   modules: ModuleChoiceDto[];
   jumpHotkey: string | null;
+  startAtSignIn: boolean | null;
 }
 
 export interface ShellProfileDto {
@@ -679,6 +683,15 @@ export interface TerminalSnapshot {
   seq: number;
 }
 
+export interface UpdateDto {
+  state: UpdateStateDto;
+  current: string;
+  available: string | null;
+  percent: number | null;
+  error: string | null;
+  checkedAt: string | null;
+}
+
 export interface UpdateTaskRequest {
   id: string;
   title: string | null;
@@ -746,6 +759,9 @@ export interface Requests {
   'app.ready': { req: Empty; res: Ack };
   'app.openUrl': { req: OpenUrlRequest; res: Ack };
   'app.restart': { req: Empty; res: Ack };
+  'app.update': { req: Empty; res: UpdateDto };
+  'app.checkForUpdate': { req: Empty; res: UpdateDto };
+  'app.applyUpdate': { req: Empty; res: UpdateDto };
   'settings.get': { req: Empty; res: SettingsDto };
   'settings.update': { req: SettingsUpdateRequest; res: SettingsDto };
   'tasks.list': { req: Empty; res: TaskListItem[] };
@@ -816,6 +832,7 @@ export interface Events {
   'sessions.update': SessionUpdateEvent;
   'sessions.changed': Empty;
   'attention.changed': AttentionSnapshot;
+  'app.updateChanged': UpdateDto;
   'git.changed': GitChangedEvent;
   'sprig.changed': Empty;
   'terminals.output': TerminalOutputEvent;

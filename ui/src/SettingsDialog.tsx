@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { request, type ModuleDto } from './bridge';
 import { Dialog } from './Dialog';
+import { UpdateSettings } from './updates/Updates';
 
 interface Props {
   open: boolean;
@@ -8,13 +9,15 @@ interface Props {
 }
 
 /**
- * Modules on and off (ADR 0012), and the jump-to-task shortcut. A module change applies when Ochre next starts, so
- * after saving one the dialog offers to restart now; the shortcut applies at once.
+ * Modules on and off (ADR 0012), the jump-to-task shortcut, starting at sign-in and updates. A module change applies
+ * when Ochre next starts, so after saving one the dialog offers to restart now; the rest apply at once.
  */
 export function SettingsDialog({ open, onClose }: Props) {
   const [modules, setModules] = useState<ModuleDto[]>([]);
   const [choices, setChoices] = useState<Record<string, boolean>>({});
   const [hotkey, setHotkey] = useState({ saved: '', draft: '', error: null as string | null });
+  // Null where it isn't offered (a copy that isn't installed).
+  const [signIn, setSignIn] = useState({ saved: null as boolean | null, draft: null as boolean | null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +29,7 @@ export function SettingsDialog({ open, onClose }: Props) {
         setModules(s.modules);
         setChoices(Object.fromEntries(s.modules.map((m) => [m.id, m.enabled])));
         setHotkey({ saved: s.jumpHotkey, draft: s.jumpHotkey, error: s.jumpHotkeyError });
+        setSignIn({ saved: s.startAtSignIn, draft: s.startAtSignIn });
       })
       .catch((e: Error) => setError(e.message));
   }, [open]);
@@ -33,7 +37,8 @@ export function SettingsDialog({ open, onClose }: Props) {
   // Saved choices that differ from what's running now; they wait for a restart.
   const pending = modules.filter((m) => m.enabled !== m.running && !m.error);
   const hotkeyChanged = hotkey.draft.trim() !== hotkey.saved;
-  const unsaved = modules.some((m) => choices[m.id] !== m.enabled) || hotkeyChanged;
+  const signInChanged = signIn.draft !== signIn.saved;
+  const unsaved = modules.some((m) => choices[m.id] !== m.enabled) || hotkeyChanged || signInChanged;
 
   async function save() {
     setBusy(true);
@@ -42,9 +47,11 @@ export function SettingsDialog({ open, onClose }: Props) {
       const s = await request('settings.update', {
         modules: modules.map((m) => ({ id: m.id, enabled: choices[m.id] ?? m.enabled })),
         jumpHotkey: hotkeyChanged ? hotkey.draft.trim() : null,
+        startAtSignIn: signInChanged ? signIn.draft : null,
       });
       setModules(s.modules);
       setHotkey({ saved: s.jumpHotkey, draft: s.jumpHotkey, error: s.jumpHotkeyError });
+      setSignIn({ saved: s.startAtSignIn, draft: s.startAtSignIn });
       if (!s.modules.some((m) => m.enabled !== m.running) && !s.jumpHotkeyError) onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -117,6 +124,17 @@ export function SettingsDialog({ open, onClose }: Props) {
         />
       </label>
       {hotkey.error && !hotkeyChanged && <p className="error">{hotkey.error}</p>}
+      <h3 className="settings-heading">Ochre</h3>
+      {signIn.draft !== null && (
+        <label className="check-field">
+          <input type="checkbox" checked={signIn.draft} onChange={(e) => setSignIn((s) => ({ ...s, draft: e.target.checked }))} />
+          <span>
+            Start Ochre when you sign in
+            <small>In the tray, with no window, so agents and terminals are there when you need them.</small>
+          </span>
+        </label>
+      )}
+      <UpdateSettings />
       {pending.length > 0 && !unsaved && (
         <p className="muted">
           Restarting closes and reopens Ochre. Agents come back dormant;{' '}

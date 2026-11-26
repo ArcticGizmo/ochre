@@ -22,20 +22,21 @@ internal static class ControlledSessions
 
     /// <summary>Fires whenever the owned set or a session's status changes, so <see cref="SessionMonitor"/> can
     /// rescan promptly — a registry change writes no file, so nothing else would trigger the overlay to
-    /// refresh until the reconcile poll. Best-effort and may fire on any thread; the monitor debounces it.</summary>
-    public static event Action? Changed;
+    /// refresh until the reconcile poll. Best-effort and may fire on any thread; the monitor debounces it. Carries
+    /// the session id, since the registry is process-wide and a listener may care about only its own sessions.</summary>
+    public static event Action<string>? Changed;
 
     public static void Register(string sessionId)
     {
         if (string.IsNullOrEmpty(sessionId)) return;
         Ids[sessionId] = ControlledActivity.Idle;
-        Changed?.Invoke();
+        Changed?.Invoke(sessionId);
     }
 
     public static void Unregister(string? sessionId)
     {
         if (!string.IsNullOrEmpty(sessionId) && Ids.TryRemove(sessionId, out _))
-            Changed?.Invoke();
+            Changed?.Invoke(sessionId);
     }
 
     public static bool Owns(string? sessionId) =>
@@ -51,7 +52,7 @@ internal static class ControlledSessions
         if (string.IsNullOrEmpty(sessionId)) return;
         if (!Ids.TryGetValue(sessionId, out var current) || current == activity) return;
         Ids[sessionId] = activity;
-        Changed?.Invoke();
+        Changed?.Invoke(sessionId);
     }
 
     /// <summary>The live status of a session this instance owns, or null when it doesn't own it.</summary>

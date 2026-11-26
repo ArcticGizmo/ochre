@@ -17,7 +17,11 @@ public class ControlledSessionsTests
     {
         var id = FreshId();
         int fires = 0;
-        void OnChanged() => fires++;
+        // Other test classes register sessions of their own in parallel; count only this one's.
+        void OnChanged(string changed)
+        {
+            if (changed == id) fires++;
+        }
         ControlledSessions.Changed += OnChanged;
         try
         {

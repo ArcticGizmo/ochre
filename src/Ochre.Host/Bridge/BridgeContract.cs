@@ -37,6 +37,15 @@ public static class BridgeContract
         new("sessions.setEffort", typeof(SetEffortRequest), typeof(Ack)),
         new("sessions.bind", typeof(BindSessionRequest), typeof(Ack)),
         new("sessions.unbind", typeof(SessionIdRequest), typeof(Ack)),
+        new("terminals.profiles", typeof(Empty), typeof(IReadOnlyList<ShellProfileDto>)),
+        new("terminals.list", typeof(Empty), typeof(IReadOnlyList<TerminalDto>)),
+        new("terminals.open", typeof(OpenTerminalRequest), typeof(TerminalDto)),
+        new("terminals.attach", typeof(TerminalIdRequest), typeof(TerminalSnapshot)),
+        new("terminals.input", typeof(TerminalInputRequest), typeof(Ack)),
+        new("terminals.resize", typeof(TerminalResizeRequest), typeof(Ack)),
+        new("terminals.restart", typeof(TerminalIdRequest), typeof(TerminalDto)),
+        new("terminals.setTask", typeof(TerminalSetTaskRequest), typeof(TerminalDto)),
+        new("terminals.close", typeof(TerminalIdRequest), typeof(Ack)),
     ];
 
     public static IReadOnlyList<EventContract> Events { get; } =
@@ -46,5 +55,9 @@ public static class BridgeContract
         new("sessions.update", typeof(SessionUpdateEvent)),
         // A session appeared or went, or an observed one's suggestions may have changed: fetch sessions.list again.
         new("sessions.changed", typeof(Empty)),
+        // A chunk of a terminal's output, numbered so a window that attached mid-stream skips what its snapshot holds.
+        new("terminals.output", typeof(TerminalOutputEvent)),
+        // A terminal opened, closed, exited, or changed title, folder or task: fetch terminals.list again.
+        new("terminals.changed", typeof(Empty)),
     ];
 }

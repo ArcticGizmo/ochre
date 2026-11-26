@@ -37,6 +37,7 @@ internal sealed class WindowHost : IWindowHost
         AppApi.Register(dispatcher, _host);
         TaskApi.Register(dispatcher, _host.Tasks, _host.Parking);
         SessionApi.Register(dispatcher, _host.Sessions);
+        TerminalApi.Register(dispatcher, _host.Terminals, _host.Tasks);
         CheckAgainstContract(dispatcher);
         var session = new Session(this, dispatcher, post);
         lock (_gate) _sessions.Add(session);

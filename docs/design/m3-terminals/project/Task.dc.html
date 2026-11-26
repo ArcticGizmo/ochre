@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Task detail with terminals</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.muted{color:#a39d96}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.hollow{background:transparent;border:1.5px solid currentColor}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.s-active{color:#e8974a;border-color:rgba(232,151,74,.4);background:rgba(232,151,74,.12)}
+.btn{font:inherit;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:5px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+h3{margin:22px 0 8px;font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#a39d96}
+.row{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:6px 0;border-bottom:1px solid #242322}
+.st{display:inline-flex;align-items:center;gap:6px;width:88px;font-size:13px}
+.new{border-left:0;background:rgba(232,151,74,.06);border-radius:8px;padding:10px 14px;margin:0 -14px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#" class="nav">Today</a>
+      <a href="#" class="nav on" aria-current="page">Tasks</a>
+      <a href="#" class="nav">Board</a>
+      <a href="Main.dc.html" class="nav">Terminals <span class="muted" style="font-size: 12px">3</span></a>
+    </nav>
+    <span style="flex: 1"></span>
+    <span class="muted" style="font-size: 12px">v0.1.0</span>
+  </header>
+
+  <main style="width: 100%; max-width: 900px; margin: 0 auto; padding: 20px 24px 40px; box-sizing: border-box">
+    <div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap">
+      <div style="flex: 1; min-width: 280px">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 600">Usage readout for multi-org accounts</h1>
+        <div class="muted" style="font-size: 13px"><span class="mono">T-0012</span> · created 3 days ago · updated 12 minutes ago</div>
+      </div>
+      <span class="pill s-active"><span class="dot"></span>Active</span>
+      <button class="btn">Park</button>
+    </div>
+
+    <h3>Plan</h3>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label style="display: flex; gap: 8px; color: #a39d96; text-decoration: line-through"><input type="checkbox" checked>Reproduce with the two-org fixture</label>
+      <label style="display: flex; gap: 8px"><input type="checkbox">Per-account bar</label>
+      <label style="display: flex; gap: 8px"><input type="checkbox">Manual test doc</label>
+    </div>
+
+    <h3>Agents</h3>
+    <div class="row">
+      <span class="st" style="color: #86b572"><span class="dot"></span>ready</span>
+      <span>implement</span>
+      <span class="mono muted" title="C:\git\example-app">…\git\example-app</span>
+      <a href="#">Open</a>
+    </div>
+    <button class="btn" style="margin-top: 10px">Start agent</button>
+
+    <div class="new" style="margin-top: 18px">
+      <h3 style="margin-top: 0">Terminals</h3>
+      <div class="row">
+        <span class="st" style="color: #86b572"><span class="dot"></span>running</span>
+        <span>pnpm dev</span>
+        <span class="mono muted" title="C:\git\example-app">…\git\example-app</span>
+        <span class="muted" style="font-size: 12px">PowerShell</span>
+        <a href="Main.dc.html">Open</a>
+      </div>
+      <div class="row">
+        <span class="st" style="color: #86b572"><span class="dot"></span>running</span>
+        <span>pwsh</span>
+        <span class="mono muted" title="C:\git\example-lib">…\git\example-lib</span>
+        <span class="muted" style="font-size: 12px">PowerShell</span>
+        <a href="Main.dc.html">Open</a>
+      </div>
+      <div class="row" style="border-bottom: 0">
+        <span class="st muted"><span class="dot hollow"></span>exited 1</span>
+        <span>build</span>
+        <span class="mono muted" title="C:\git\example-lib">…\git\example-lib</span>
+        <span class="muted" style="font-size: 12px">Command Prompt</span>
+        <a href="Main.dc.html">Open</a>
+      </div>
+      <a href="NewTerminal.dc.html" class="btn" style="margin-top: 10px; text-decoration: none">Open terminal</a>
+    </div>
+
+    <h3>Repos</h3>
+    <div class="mono muted" style="display: flex; flex-direction: column; gap: 2px">
+      <span title="C:\git\example-app">…\git\example-app</span>
+      <span title="C:\git\example-lib">…\git\example-lib</span>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

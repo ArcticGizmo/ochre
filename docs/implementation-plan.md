@@ -201,11 +201,48 @@ Decided 2026-11-25: launched agents use the CLI reliably once its commands are p
 - Walk the exit criterion, write `docs/testing/m2-testing.md`.
 - Done 2026-11-25; see `docs/testing/m2-testing.md`. Walked with two real agents in the dev window: parked at night with notes, restarted, both on Today with notes, one click into an agent, and a resumed agent recalled a word it was given before the park. Found on the way: paths are now normalised when a repo or agent folder is given (a doubled separator got through), and sending to an agent on a Parked task resumes the agent but leaves the task Parked (left as is, for the user to decide).
 
-## M3 onwards (outline)
+## M3: terminal tabs
+
+Exit (from the roadmap): run a dev server in a tab, close all windows, reopen: still running. Quit and relaunch: tabs restored with scrollback.
+
+Planned 2026-11-26. Perch has no terminal code, so everything here is new or lifted from the `spike-stack` tag (`PseudoConsoleSession`, `Native`, `OutputPump`, `terminal.ts`). The shape is in [ADR 0011](decisions/0011-host-owned-terminals.md): the host owns each PTY, filters its output, keeps its scrollback, and sends it to every window; xterm.js only draws. Terminals live in host-local state (`%LOCALAPPDATA%\Ochre\terminals\`), not in task files, because a PTY belongs to one machine and task files roam.
+
+### Slice 1: terminals in the host
+
+- `IPseudoConsoleFactory` in Core (`Ochre.Core.Platform`), ConPTY implementation in `Ochre.Platform.Windows` lifted from the spike: `CreatePseudoConsole`, a reader thread with a stateful UTF-8 decoder, write, resize, close.
+- `TerminalManager` in Core: open (shell profile, folder, optional task, optional startup command), input, resize, close, list. Output runs through the filter, is coalesced on a 16 ms timer, appended to a per-terminal scrollback ring (about 1 M chars, trimmed by whole chunks), and raised with a sequence number so a window can join mid-stream without gaps or repeats.
+- Shell profiles are detected on the host (PowerShell 7 on PATH, Windows PowerShell, Command Prompt, Git Bash if installed) and the bridge accepts only a profile id, never a command line. The startup command is typed into the shell after it starts, so it adds nothing the renderer can't already do by typing.
+- `TerminalOutputFilter` (security threat 7): an allow list of OSC numbers (titles, colours, cwd, links, shell integration marks), OSC 52 and anything unknown dropped, OSC 8 targets kept only for `http`/`https`, sequences re-emitted with the filter's own terminator so xterm sees exactly what the filter checked, and an incomplete sequence held back so every chunk ends on a sequence boundary. OSC 7 and OSC 9;9 report the shell's folder, which restore uses. **Tests:** the filter, since it's a security boundary.
+- Bridge: `terminals.profiles`, `terminals.list`, `terminals.open`, `terminals.attach` (scrollback and its sequence number), `terminals.input`, `terminals.resize`, `terminals.close`, `terminals.setTask`; events `terminals.output` and `terminals.changed`. Checked by hand with `cli dev eval` against the bridge before any UI exists.
+- Done 2026-11-26; see `docs/testing/m3-terminals-host-testing.md`. Also `terminals.restart` (a fresh shell in a tab whose shell exited, after its scrollback). The exit line is written into the stream, so late windows and restored tabs show it. Input is queued to a writer thread, so a shell that stops reading never blocks the UI thread. ConPTY re-emits OSC 8 itself (adding an `id`), and passes OSC 52 through, so the host filter is what stops it.
+
+### Slice 2: terminal tabs in the window
+
+- Larger visual change, so it starts from a design artefact agreed first (`docs/design/m3-terminals/`): where tabs live, how a task shows its terminals, the new-terminal dialog, link hover.
+- xterm.js (`@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links`, pinned) lazy-loaded like Monaco would be, so it stays off the window-open path. No clipboard addon, so OSC 52 has nowhere to land even if the filter missed one.
+- Links: hovering shows the target; Ctrl+click opens it in the browser through the host, which re-checks the scheme; middle click opens a new browser window (UX conventions).
+- Input from a window is sent only while that window has focus, and never while it replays scrollback, so query replies from a second window or a replay don't reach the shell. PTY size follows the window that last resized it.
+- Terminals attach to a task: opened from the task (folder from its repos), or attached and detached from the tab's menu. The task view lists its terminals.
+
+### Slice 3: restore across quit
+
+- `terminals.json` (tabs, order, profile, folder, task, startup command, title) written atomically on every change; scrollback written encrypted with DPAPI (`IDataProtector` in Core, `ProtectedData` in Platform.Windows) every 30 s while it changes and on quit. A per-tab "Don't keep scrollback" switch (security threat 6) keeps nothing on disk for that tab.
+- On host start every saved tab comes back with its old scrollback, a "restored" divider, and a fresh shell in its last known folder. The startup command is **not** re-run (explicit over magic); the tab offers "Run `<command>` again".
+- Closing every window leaves PTYs running (ADR 0008); quitting closes them, which ends the shells and the programs attached to their consoles. If hand testing shows orphaned dev servers, put each terminal in a Job Object.
+
+### Slice 4: exit run
+
+- Walk the exit criterion by hand, write `docs/testing/m3-testing.md`.
+
+### Not in M3
+
+- "View as terminal" for an agent's thread (roadmap, "to look at"): stays unbuilt until dogfooding asks for it.
+- Split panes, search in scrollback, per-tab themes.
+
+## M4 onwards (outline)
 
 Re-plan each milestone in detail when it starts. Notes worth keeping now:
 
-- **M3: terminal tabs.** The spike's ConPTY and throughput findings feed directly in. Scrollback encrypted with DPAPI; OSC 52 and OSC 8 gating (security threat 7). Test the escape-sequence filter, since it's a security boundary.
 - **M4: module host.** This is where the contracts from ADR 0007 get designed, using the real features built in M1 to M3 as the examples. Move terminal, git and others behind modules, then add the "every module off" kernel test. Git graph, Jira, sprig and multi-window follow.
 - **M5 to M8** stay as written in the roadmap; too far out to plan usefully.
 

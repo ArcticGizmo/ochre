@@ -71,6 +71,15 @@ export interface LinkDto {
   summary: string | null;
 }
 
+export interface OpenTerminalRequest {
+  profile: string;
+  folder: string;
+  taskId: string | null;
+  startupCommand: string | null;
+  cols: number;
+  rows: number;
+}
+
 export interface ParkDto {
   at: string;
   note: string;
@@ -217,6 +226,11 @@ export interface SettingsDto {
   autoParkOnShutdown: boolean;
 }
 
+export interface ShellProfileDto {
+  id: string;
+  name: string;
+}
+
 export interface StartSessionRequest {
   taskId: string;
   cwd: string;
@@ -277,6 +291,51 @@ export interface TaskListItem {
   sessions: SessionRefDto[];
 }
 
+export interface TerminalDto {
+  id: string;
+  profile: string;
+  profileName: string;
+  folder: string;
+  taskId: string | null;
+  title: string | null;
+  startupCommand: string | null;
+  running: boolean;
+  exitCode: number | null;
+  openedAt: string;
+}
+
+export interface TerminalIdRequest {
+  id: string;
+}
+
+export interface TerminalInputRequest {
+  id: string;
+  data: string;
+}
+
+export interface TerminalOutputEvent {
+  id: string;
+  data: string;
+  seq: number;
+}
+
+export interface TerminalResizeRequest {
+  id: string;
+  cols: number;
+  rows: number;
+}
+
+export interface TerminalSetTaskRequest {
+  id: string;
+  taskId: string | null;
+}
+
+export interface TerminalSnapshot {
+  id: string;
+  data: string;
+  seq: number;
+}
+
 export interface UpdateTaskRequest {
   id: string;
   title: string | null;
@@ -310,6 +369,15 @@ export interface Requests {
   'sessions.setEffort': { req: SetEffortRequest; res: Ack };
   'sessions.bind': { req: BindSessionRequest; res: Ack };
   'sessions.unbind': { req: SessionIdRequest; res: Ack };
+  'terminals.profiles': { req: Empty; res: ShellProfileDto[] };
+  'terminals.list': { req: Empty; res: TerminalDto[] };
+  'terminals.open': { req: OpenTerminalRequest; res: TerminalDto };
+  'terminals.attach': { req: TerminalIdRequest; res: TerminalSnapshot };
+  'terminals.input': { req: TerminalInputRequest; res: Ack };
+  'terminals.resize': { req: TerminalResizeRequest; res: Ack };
+  'terminals.restart': { req: TerminalIdRequest; res: TerminalDto };
+  'terminals.setTask': { req: TerminalSetTaskRequest; res: TerminalDto };
+  'terminals.close': { req: TerminalIdRequest; res: Ack };
 }
 
 export interface Events {
@@ -317,4 +385,6 @@ export interface Events {
   'tasks.changed': TaskChangedEvent;
   'sessions.update': SessionUpdateEvent;
   'sessions.changed': Empty;
+  'terminals.output': TerminalOutputEvent;
+  'terminals.changed': Empty;
 }

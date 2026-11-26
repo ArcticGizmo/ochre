@@ -20,7 +20,7 @@ Ochre runs agents that can execute anything, holds Jira/GitHub tokens, persists 
 | 4 | **Local IPC abuse** by other local processes or by websites (DNS rebinding, CSRF against loopback) | Named pipes with a per-user ACL for CLI/MCP; no loopback HTTP unless unavoidable, and then a random token plus Host/Origin checks |
 | 5 | **XSS in the UI becomes code execution** through the bridge | Renderer treated as untrusted; narrow typed bridge validated on the host; no host objects injected into script; strict CSP (no inline or remote script); markdown sanitised (DOMPurify); UI never loaded from a remote URL |
 | 6 | **Secrets at rest** in settings, scrollback or logs | Tokens in Credential Manager / Keychain; scrollback encrypted (DPAPI) with per-tab opt-out; logs never contain tokens or message bodies |
-| 7 | **Terminal escape sequences** (clipboard write, deceptive links, title spoofing) | OSC 52 off or prompt; OSC 8 links limited to http(s) and shown before opening; titles never trusted for decisions |
+| 7 | **Terminal escape sequences** (clipboard write, deceptive links, title spoofing) | OSC 52 off or prompt; OSC 8 links limited to http(s) and shown before opening; titles never trusted for decisions. Enforced on the host by `TerminalOutputFilter` before output is stored or sent (ADR 0011), with tests |
 | 8 | **Embedded browser** content reaching the app or the user's identity | Separate WebView profile; no bridge in the preview pane; no auto-granted permissions; CDP opened on demand, random port, throwaway profile |
 | 9 | **Dependency supply chain** (npm, NuGet) | Lockfiles; exact pinned versions; minimal dependencies; pnpm with install scripts disabled; no `npx`/`pnpm dlx` against unpinned packages; review new dependencies |
 | 10 | **Update channel tampering** | Signed builds; published SHA-256 sums verified before install (Perch's `install.ps1` pattern) |
@@ -28,7 +28,7 @@ Ochre runs agents that can execute anything, holds Jira/GitHub tokens, persists 
 
 ## Stack-specific notes
 
-- **Web UI:** threat 5 is the defining risk; the mitigations there are not optional. With a system WebView, the browser engine is patched by the OS; Electron would make Chromium patching our job.
+- **Web UI:** threat 5 is the defining risk; the mitigations there are not optional. Since M3, script in the page can type into a terminal, so an XSS is directly code execution; the bridge only limits how a terminal starts (a detected shell, an existing folder), not what is typed. With a system WebView, the browser engine is patched by the OS; Electron would make Chromium patching our job.
 - **.NET host:** there is no in-process sandbox in modern .NET, so third-party code never loads into the host process. Per-host network egress control for plugins is unsolved (AppContainer breaks realistic plugins); treat any network capability as "can exfiltrate" when asking for consent.
 
 ## Dev builds

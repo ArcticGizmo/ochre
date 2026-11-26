@@ -1,8 +1,10 @@
 using Ochre.Core;
 using Ochre.Core.Bridge;
 using Ochre.Core.Hosting;
+using Ochre.Core.Platform;
 using Ochre.Core.Sessions;
 using Ochre.Core.Tasks;
+using Ochre.Core.Terminals;
 using Ochre.Host.Bridge;
 
 namespace Ochre.Host;
@@ -13,7 +15,7 @@ namespace Ochre.Host;
 /// </summary>
 internal sealed class OchreHost : IDisposable
 {
-    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log)
+    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log, ITerminalPlatform terminalPlatform)
     {
         Profile = profile;
         Paths = paths;
@@ -34,7 +36,14 @@ internal sealed class OchreHost : IDisposable
         Sessions.StartObserving();
         Parking = new ParkCoordinator(Tasks, Sessions, ParkRequests, log);
         Parking.Changed += id => Windows.Broadcast(BridgeDispatcher.SerializeEvent("tasks.changed", new TaskChangedEvent(id), AppJson.Default.TaskChangedEvent));
+        Terminals = new TerminalManager(terminalPlatform, log);
+        Terminals.Output += (t, data, seq) =>
+            Windows.Broadcast(BridgeDispatcher.SerializeEvent("terminals.output", new TerminalOutputEvent(t.Id, data, seq), AppJson.Default.TerminalOutputEvent));
+        Terminals.Changed += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("terminals.changed", new Empty(), AppJson.Default.Empty));
     }
+
+    /// <summary>Terminal tabs; their shells keep running with every window closed, until the host quits.</summary>
+    public TerminalManager Terminals { get; }
 
     /// <summary>Agents asked for a park note; shared with the agent command handler, which takes the notes.</summary>
     public ParkRequests ParkRequests { get; } = new();
@@ -57,6 +66,7 @@ internal sealed class OchreHost : IDisposable
 
     public void Dispose()
     {
+        Terminals.Dispose();
         Sessions.Dispose();
         Tasks.Dispose();
     }

@@ -41,6 +41,16 @@ public sealed record SettingsDto(bool AutoParkOnShutdown);
 [JsonSerializable(typeof(BindSessionRequest))]
 [JsonSerializable(typeof(SettingsDto))]
 [JsonSerializable(typeof(SessionUpdateEvent))]
+[JsonSerializable(typeof(IReadOnlyList<ShellProfileDto>))]
+[JsonSerializable(typeof(IReadOnlyList<TerminalDto>))]
+[JsonSerializable(typeof(TerminalDto))]
+[JsonSerializable(typeof(OpenTerminalRequest))]
+[JsonSerializable(typeof(TerminalIdRequest))]
+[JsonSerializable(typeof(TerminalInputRequest))]
+[JsonSerializable(typeof(TerminalResizeRequest))]
+[JsonSerializable(typeof(TerminalSetTaskRequest))]
+[JsonSerializable(typeof(TerminalSnapshot))]
+[JsonSerializable(typeof(TerminalOutputEvent))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity, window lifecycle and settings.</summary>

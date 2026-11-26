@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Terminals view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace}
+.muted{color:#a39d96}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.hollow{background:transparent;border:1.5px solid currentColor}
+.btn{font:inherit;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:5px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.icon{font:inherit;color:#a39d96;background:transparent;border:0;border-radius:4px;padding:2px 4px;cursor:pointer;line-height:0}
+.icon:hover{color:#e8e4df;background:#3a3836}
+.ttab{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;color:#a39d96;font-size:13px;white-space:nowrap}
+.ttab.on{background:#141312;border-color:#3a3836;color:#e8e4df}
+.chip{font-size:11px;padding:0 6px;border-radius:4px;background:#2e2c2a;color:#e8974a}
+.menu{position:absolute;right:16px;top:40px;width:240px;background:#242322;border:1px solid #3a3836;border-radius:8px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:2}
+.mi{display:flex;align-items:center;gap:8px;width:100%;font:inherit;font-size:13px;color:#e8e4df;background:transparent;border:0;border-radius:6px;padding:6px 10px;text-align:left;cursor:pointer}
+.mi:hover{background:#2e2c2a}
+.mi[disabled]{color:#77716b;cursor:default}
+.sep{height:1px;background:#3a3836;margin:4px 0}
+.term{background:#141312;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:13px;line-height:1.45;padding:10px 14px;white-space:pre;overflow:auto;color:#d6d1cb}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px" aria-label="Main">
+      <a href="#" class="nav">Today</a>
+      <a href="#" class="nav">Tasks</a>
+      <a href="#" class="nav">Board</a>
+      <a href="#" class="nav on" aria-current="page">Terminals <span class="muted" style="font-size: 12px">3</span></a>
+    </nav>
+    <span style="flex: 1"></span>
+    <span class="muted" style="font-size: 12px">v0.1.0</span>
+  </header>
+
+  <div style="display: flex; align-items: flex-end; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid #3a3836; overflow-x: auto">
+    <div class="ttab on">
+      <span class="dot" style="color: #86b572"></span>
+      <span>pnpm dev</span>
+      <span class="chip">T-0012</span>
+      <button class="icon" aria-label="Close pnpm dev"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+    </div>
+    <div class="ttab">
+      <span class="dot" style="color: #86b572"></span>
+      <span>pwsh</span>
+      <span class="muted" style="font-size: 12px">example-lib</span>
+      <span class="chip">T-0012</span>
+      <button class="icon" aria-label="Close pwsh"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+    </div>
+    <div class="ttab">
+      <span class="dot hollow" style="color: #a39d96"></span>
+      <span>cmd</span>
+      <span class="muted" style="font-size: 12px">exited 1</span>
+      <button class="icon" aria-label="Close cmd"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+    </div>
+    <button class="btn" style="margin: 0 0 4px 6px; padding: 3px 10px; font-size: 13px" aria-label="New terminal"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>New</button>
+  </div>
+
+  <div style="position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 6px 16px; font-size: 13px; background: #141312; border-bottom: 1px solid #242322">
+    <span class="muted">PowerShell</span>
+    <span class="mono muted" style="font-size: 12px" title="C:\git\example-app">…\git\example-app</span>
+    <span>Task <a href="#">T-0012</a> <span class="muted">Usage readout for multi-org accounts</span></span>
+    <span style="flex: 1"></span>
+    <button class="btn" style="padding: 2px 10px; font-size: 13px" aria-haspopup="menu" aria-expanded="true">⋯</button>
+    <div class="menu" role="menu">
+      <button class="mi" role="menuitem">Attach to another task…</button>
+      <button class="mi" role="menuitem">Detach from T-0012</button>
+      <button class="mi" role="menuitem" disabled>Restart shell <span class="muted" style="margin-left: auto; font-size: 12px">after it exits</span></button>
+      <button class="mi" role="menuitemcheckbox" aria-checked="true">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.5l2.5 2.5L11 4.5" fill="none" stroke="#e8974a" stroke-width="1.6" stroke-linecap="round"></path></svg>
+        Keep scrollback when Ochre quits
+      </button>
+      <div class="sep"></div>
+      <button class="mi" role="menuitem" style="color: #e08a7a">Close terminal…</button>
+    </div>
+  </div>
+
+  <div class="term" style="flex: 1; min-height: 420px">PS C:\git\example-app&gt; pnpm dev
+
+&gt; example-app@0.4.1 dev C:\git\example-app
+&gt; vite
+
+  <span style="color: #86b572; font-weight: 700">VITE</span> <span style="color: #86b572">v8.3.8</span>  ready in <b>412</b> ms
+
+  <span style="color: #86b572">➜</span>  <b>Local</b>:   <span style="color: #8fb3e0; text-decoration: underline">http://localhost:5173/</span>
+  <span style="color: #86b572">➜</span>  <b>Network</b>: use <b>--host</b> to expose
+  <span style="color: #77716b">➜  press h + enter to show help</span>
+<span style="color: #77716b">12:04:31</span> <span style="color: #8fb3e0">[vite]</span> hmr update /src/App.tsx
+<span style="color: #77716b">12:06:02</span> <span style="color: #8fb3e0">[vite]</span> hmr update /src/usage/AccountBar.tsx
+<span style="background: #d6d1cb"> </span></div>
+
+  <footer style="display: flex; align-items: center; gap: 10px; padding: 4px 16px; font-size: 12px; background: #242322; border-top: 1px solid #3a3836">
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M5 7a2.5 2.5 0 0 0 3.5 0l1.5-1.5a2.5 2.5 0 0 0-3.5-3.5L6 2.5M7 5a2.5 2.5 0 0 0-3.5 0L2 6.5A2.5 2.5 0 0 0 5.5 10l.5-.5" fill="none" stroke="#a39d96" stroke-width="1.2" stroke-linecap="round"></path></svg>
+    <span class="mono">http://localhost:5173/</span>
+    <span class="muted">Ctrl+click to open in your browser · middle click for a new browser window</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

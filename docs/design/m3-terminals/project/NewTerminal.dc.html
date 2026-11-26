@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New terminal dialog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#0f0e0e;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+.muted{color:#a39d96}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:13px}
+.dlg{width:100%;max-width:520px;background:#242322;border:1px solid #3a3836;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.5);padding:20px 22px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:13px;font-weight:600}
+.hint{font-size:12px;color:#a39d96}
+.in{font:inherit;color:#e8e4df;background:#1b1a19;border:1px solid #3a3836;border-radius:6px;padding:7px 10px}
+.btn{font:inherit;color:#e8e4df;background:#2e2c2a;border:1px solid #3a3836;border-radius:6px;padding:6px 14px;cursor:pointer}
+.btn.primary{background:#cc7722;border-color:#cc7722;color:#1b1a19;font-weight:600}
+.opt{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #3a3836;border-radius:6px;cursor:pointer}
+.opt.on{border-color:#cc7722;background:rgba(232,151,74,.08)}
+</style>
+</helmet>
+<div class="app">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="nt-title">
+    <h2 id="nt-title" style="margin: 0; font-size: 17px; font-weight: 600">New terminal</h2>
+
+    <div class="field">
+      <label for="nt-task">Task</label>
+      <select id="nt-task" class="in">
+        <option>T-0012 · Usage readout for multi-org accounts</option>
+        <option>None</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <span style="font-size: 13px; font-weight: 600">Folder</span>
+      <div style="display: flex; flex-direction: column; gap: 6px" role="radiogroup" aria-label="Folder">
+        <label class="opt on"><input type="radio" name="nt-folder" checked><span class="mono" title="C:\git\example-app">…\git\example-app</span><span class="hint" style="margin-left: auto">task repo</span></label>
+        <label class="opt"><input type="radio" name="nt-folder"><span class="mono" title="C:\git\example-lib">…\git\example-lib</span><span class="hint" style="margin-left: auto">task repo</span></label>
+        <label class="opt"><input type="radio" name="nt-folder"><input class="in mono" style="flex: 1; padding: 4px 8px" placeholder="Another folder, e.g. C:\path\to\folder" aria-label="Another folder"></label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="nt-shell">Shell</label>
+      <select id="nt-shell" class="in">
+        <option>PowerShell</option>
+        <option>Windows PowerShell</option>
+        <option>Command Prompt</option>
+        <option>Git Bash</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="nt-cmd">Startup command <span class="muted" style="font-weight: 400">(optional)</span></label>
+      <input id="nt-cmd" class="in mono" value="pnpm dev">
+      <span class="hint">Typed into the shell once it starts. After Ochre restarts, the tab offers to run it again; it never runs by itself.</span>
+    </div>
+
+    <label style="display: flex; gap: 8px; align-items: flex-start; font-size: 13px">
+      <input type="checkbox" checked style="margin-top: 3px">
+      <span>Keep scrollback when Ochre quits<br><span class="hint">Saved encrypted for your Windows account. Turn off for a tab that will show secrets.</span></span>
+    </label>
+
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px">
+      <button class="btn">Cancel</button>
+      <button class="btn primary">Open terminal</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-26T01:10:00Z" },
+  "title": "Ochre terminal tabs",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 800, "title": "Terminals view: a dev server running", "expand": "fill" },
+    "Task.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 800, "title": "Task detail: its terminals", "expand": "fill" },
+    "NewTerminal.dc.html": { "x": 0, "y": 920, "w": 1280, "h": 800, "title": "New terminal dialog (from a task)", "expand": "fill" },
+    "Restored.dc.html": { "x": 1360, "y": 920, "w": 1280, "h": 800, "title": "After a quit and relaunch: restored tabs", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "Task.dc.html", "NewTerminal.dc.html", "Restored.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "Ochre: terminal tabs (M3 slice 2)", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

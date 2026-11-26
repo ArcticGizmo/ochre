@@ -24,6 +24,13 @@ internal sealed class MainWindow : Form
         Size = new Size(1400, 900);
         MinimumSize = new Size(640, 400);
         StartPosition = FormStartPosition.CenterScreen;
+        if (options.Headless)
+        {
+            // Still a visible window as far as Windows and WebView2 are concerned, so the page renders and captures.
+            StartPosition = FormStartPosition.Manual;
+            Location = new Point(-32000, -32000);
+            ShowInTaskbar = false;
+        }
         BackColor = Color.FromArgb(0x1b, 0x1a, 0x19);
         _web.DefaultBackgroundColor = BackColor;
         Controls.Add(_web);
@@ -43,8 +50,8 @@ internal sealed class MainWindow : Form
 
     public CoreWebView2? Core => _page is null ? null : _web.CoreWebView2;
 
-    // A window opened onto another desktop for a test run shouldn't steal focus from whatever the user is doing.
-    protected override bool ShowWithoutActivation => _options.VirtualDesktop is not null;
+    // A window opened for a test run shouldn't steal focus from whatever the user is doing.
+    protected override bool ShowWithoutActivation => _options.Unattended;
 
     private async Task InitAsync(Task<CoreWebView2Environment> environment)
     {

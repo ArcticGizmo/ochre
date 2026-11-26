@@ -6,6 +6,7 @@
     <Project Path="src/Ochre.Platform.Windows/Ochre.Platform.Windows.csproj" />
   </Folder>
   <Folder Name="/modules/">
+    <Project Path="modules/Ochre.Modules.Git/Ochre.Modules.Git.csproj" />
     <Project Path="modules/Ochre.Modules.ShutdownPark/Ochre.Modules.ShutdownPark.csproj" />
     <Project Path="modules/Ochre.Modules.Terminals/Ochre.Modules.Terminals.csproj" />
   </Folder>

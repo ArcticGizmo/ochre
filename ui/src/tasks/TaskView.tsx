@@ -9,7 +9,8 @@ import { StartAgentDialog } from '../sessions/StartAgentDialog';
 import { useSessions } from '../sessions/useSessions';
 import { ParkDialog } from './ParkDialog';
 import { LinkSuggestions } from '../sessions/OutsideSessions';
-import type { AppContext, TaskSectionProps } from '../modules';
+import type { AppContext, FolderStatuses, TaskSectionProps } from '../modules';
+import { TaskFolders } from '../worktrees/TaskFolders';
 import { agentStatus, agentWord, ParkNote, sessionName, stateLabel, states, when } from './present';
 
 interface Props {
@@ -19,12 +20,14 @@ interface Props {
   onOpenSession: (sessionId: string | null) => void;
   /** Sections the running modules add below Agents (ADR 0012). */
   sections: { id: string; Section: ComponentType<TaskSectionProps> }[];
+  /** What the running modules show beside each repo and worktree. */
+  folderStatuses: FolderStatuses;
   ctx: AppContext;
   onError: (message: string) => void;
   onDeleted: () => void;
 }
 
-export function TaskView({ id, openSession, onOpenSession, sections, ctx, onError, onDeleted }: Props) {
+export function TaskView({ id, openSession, onOpenSession, sections, folderStatuses, ctx, onError, onDeleted }: Props) {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [gone, setGone] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -231,7 +234,7 @@ export function TaskView({ id, openSession, onOpenSession, sections, ctx, onErro
 
       <section>
         <h3>Repos</h3>
-        <Repos repos={task.repos} onSave={(repos) => update({ repos })} />
+        <TaskFolders taskId={task.id} repos={task.repos} worktrees={task.worktrees} statuses={folderStatuses} onSaveRepos={(repos) => update({ repos })} />
       </section>
 
       <section>
@@ -273,7 +276,9 @@ export function TaskView({ id, openSession, onOpenSession, sections, ctx, onErro
         <StartAgentDialog
           open={startingAgent}
           taskId={task.id}
+          title={task.title}
           repos={task.repos}
+          worktrees={task.worktrees}
           onClose={() => setStartingAgent(false)}
           onStarted={(sessionId) => {
             setStartingAgent(false);
@@ -451,37 +456,6 @@ function Notes({ notes, onSave }: { notes: string; onSave: (notes: string) => vo
       >
         Edit notes
       </button>
-    </div>
-  );
-}
-
-function Repos({ repos, onSave }: { repos: string[]; onSave: (repos: string[]) => void }) {
-  const [path, setPath] = useState('');
-  return (
-    <div className="repos">
-      {repos.length === 0 && <p className="empty">No repos. Agents need one to start in.</p>}
-      <ul className="plain">
-        {repos.map((r) => (
-          <li key={r}>
-            <PathText path={r} />
-            <button className="link" onClick={() => onSave(repos.filter((x) => x !== r))}>
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
-      <form
-        className="step-input"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const p = path.trim();
-          if (!p) return;
-          onSave([...repos, p]);
-          setPath('');
-        }}
-      >
-        <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\path\to\repo" />
-      </form>
     </div>
   );
 }

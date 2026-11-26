@@ -18,6 +18,12 @@ updated: 2026-11-25T16:40:00Z
 repos:
   - C:\git\example-app
   - C:\git\example-lib
+worktrees:
+  - path: C:\git\example-app.worktrees\t-0042-usage-readout
+    repo: C:\git\example-app   # the task repo it was made from
+    provider: git-worktree     # the module that made it, and removes it
+    branch: t-0042-usage-readout
+    created: 2026-11-25T09:05:00Z
 links:
   - id: l1
     kind: jira
@@ -58,6 +64,7 @@ Free-form notes, decisions, gotchas.
 ```
 
 - Plan items carry **stable ids** (`{#p3}`) so agents address items by id, not by position.
+- `worktrees` lists the checkouts made for the task by a worktree provider (ADR 0012): the git module's `git-worktree`, later sprig. It is the one list of a task's checkouts; agents and terminals can start in any of them, and with the provider's module off they are plain folders. Keys a provider adds that this version doesn't know are kept on every write.
 - `links` is the **data-source hub**: kind + ref + a short title and summary. Detail is fetched on demand through the module that owns the link kind (`LinkResolver`).
 
 ## Lifecycle

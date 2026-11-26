@@ -1,4 +1,5 @@
 using Ochre.Core.Modules;
+using Ochre.Modules.Git;
 using Ochre.Modules.ShutdownPark;
 using Ochre.Modules.Terminals;
 
@@ -12,6 +13,7 @@ internal static class ModuleCatalog
 {
     public static IReadOnlyList<IModule> Create() =>
     [
+        new GitModule(),
         new TerminalsModule(),
         new ShutdownParkModule(),
     ];

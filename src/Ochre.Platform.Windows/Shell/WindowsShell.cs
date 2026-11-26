@@ -133,14 +133,15 @@ public sealed class WindowsShell : IShell, IShellDevTools
             _host.WindowOpenRequested();
             // A window on the desktop the user is on comes forward; one on another desktop is left where it is, and a
             // new window opens here instead (roadmap, "Multiple windows": never switch desktops). The dev setting
-            // puts every window on one other desktop, so there the single window is always reused.
-            var here = _windows.LastOrDefault(w => !w.IsDisposed && (_options.VirtualDesktop is not null || VirtualDesktop.IsOnCurrentDesktop(w.Handle, _options.Log)));
+            // settings (another desktop, or headless) keep every window away from the user, so there the single window
+            // is always reused.
+            var here = _windows.LastOrDefault(w => !w.IsDisposed && (_options.Unattended || VirtualDesktop.IsOnCurrentDesktop(w.Handle, _options.Log)));
             if (here is not null)
             {
                 var wasHidden = !here.Visible;
                 here.Show();
                 if (here.WindowState == FormWindowState.Minimized) here.WindowState = FormWindowState.Normal;
-                if (_options.VirtualDesktop is null) here.Activate();
+                if (!_options.Unattended) here.Activate();
                 if (wasHidden) here.NotifyShown();
                 Touch(here);
                 return;
@@ -149,7 +150,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
             _environment ??= CoreWebView2Environment.CreateAsync(
                 null,
                 _options.WebViewDataFolder,
-                new CoreWebView2EnvironmentOptions(_options.VirtualDesktop is null ? null : VirtualDesktop.UnthrottledBrowserArguments));
+                new CoreWebView2EnvironmentOptions(_options.Unattended ? VirtualDesktop.UnthrottledBrowserArguments : null));
             var window = new MainWindow(_host, _options, _urls, _environment, _icon);
             window.FormClosed += (_, _) => _windows.Remove(window);
             window.Activated += (_, _) => Touch(window);

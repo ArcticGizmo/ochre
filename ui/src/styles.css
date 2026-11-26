@@ -1455,6 +1455,57 @@ button.agent-chip:hover {
   font-size: 13px;
 }
 
+.today-card .folders {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.folder-ref {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* A folder's git state: branch, then ahead/behind, then changes. Dirty reads as warn, clean as ok. */
+.git-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  flex: none;
+}
+
+.git-branch {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  color: var(--text);
+}
+
+.git-ahead,
+.git-behind {
+  font-variant-numeric: tabular-nums;
+}
+
+.git-dirty {
+  color: var(--warn);
+}
+
+.git-clean {
+  color: var(--ok);
+}
+
+.worktree-plan .path {
+  max-width: 100%;
+}
+
+small.warn {
+  color: var(--warn);
+}
+
 .tasks-toolbar {
   display: flex;
   gap: 6px;

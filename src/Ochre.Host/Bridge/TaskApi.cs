@@ -190,7 +190,8 @@ internal static class TaskApi
     private static string? Iso(DateTimeOffset? t) => t?.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
 
     private static TaskListItem ToListItem(TaskSummary s) =>
-        new(s.Id, s.Title, ToDto(s.State), Iso(s.Updated), s.PlanDone, s.PlanTotal, s.NextStep, s.ParkNote, Iso(s.ParkedAt), s.Links.Select(ToDto).ToList(), s.Sessions.Select(ToDto).ToList());
+        new(s.Id, s.Title, ToDto(s.State), Iso(s.Updated), s.PlanDone, s.PlanTotal, s.NextStep, s.ParkNote, Iso(s.ParkedAt), s.Links.Select(ToDto).ToList(), s.Sessions.Select(ToDto).ToList(),
+            s.Repos, s.Worktrees.Select(WorktreeApi.ToDto).ToList());
 
     private static LinkDto ToDto(TaskLink l) => new(l.Id, l.Kind, l.Ref, l.Title, l.Summary);
 
@@ -206,6 +207,7 @@ internal static class TaskApi
             Iso(doc.Created),
             Iso(doc.Updated),
             doc.Repos,
+            doc.Worktrees.Select(WorktreeApi.ToDto).ToList(),
             doc.Links.Select(ToDto).ToList(),
             doc.Sessions.Select(ToDto).ToList(),
             doc.Park is { } p ? new ParkDto(Iso(p.At)!, p.Note) : null,

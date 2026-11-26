@@ -218,6 +218,8 @@ public sealed class AgentCommands(TaskStore store, ParkRequests? parkRequests = 
         {
             sb.Append("\nNotes:\n").Append(doc.Notes.Length > 0 ? doc.Notes.Trim() : "(none)").Append('\n');
             if (doc.Repos.Count > 0) sb.Append("\nRepos:\n").Append(string.Join('\n', doc.Repos.Select(r => "  " + r))).Append('\n');
+            if (doc.Worktrees.Count > 0)
+                sb.Append("\nWorktrees:\n").Append(string.Join('\n', doc.Worktrees.Select(w => w.Branch is { } b ? $"  {w.Path}  ({b})" : "  " + w.Path))).Append('\n');
         }
         return sb.ToString().TrimEnd();
     }

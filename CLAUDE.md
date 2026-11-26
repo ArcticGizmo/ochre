@@ -2,7 +2,7 @@
 
 A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray host plus a web UI in WebView2, hosted in a minimal WinForms shell on Windows (`docs/decisions/0002-stack-dotnet-host-web-ui.md`). The durable unit of work is the **task**; sessions, worktrees, terminals and links attach to it.
 
-**Status: M0 (stack spike), M1 (tasks and controlled sessions), M2 (park, resume and Today) and M3 (terminal tabs) done; M4 (module host) next.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md`, `docs/roadmap.md` and `docs/implementation-plan.md` before writing code. Spike findings that M1 must carry over are in `docs/spike-stack-results.md`; the spike code is at the git tag `spike-stack`.
+**Status: M0 (stack spike), M1 (tasks and controlled sessions), M2 (park, resume and Today) and M3 (terminal tabs) done; M4 (modules) in progress: slice 1 (module host) and slice 2 (git module and worktrees) done, slice 3 (sprig) next.** Read `README.md`, then `docs/vision.md`, `docs/architecture.md`, `docs/task-model.md`, `docs/roadmap.md` and `docs/implementation-plan.md` before writing code. Spike findings that M1 must carry over are in `docs/spike-stack-results.md`; the spike code is at the git tag `spike-stack`.
 
 ## Layout
 
@@ -42,7 +42,7 @@ A task-first agent development environment (ADE) for Claude Code: a .NET 10 tray
 - Tests never plant runnable executables (EDR flags them); plant empty files and assert resolution.
 - After changing a bridge record or `BridgeContract`, run `dotnet run --project tools/Ochre.BridgeGen` and commit `ui/src/generated/bridge-types.ts` (ADR 0009).
 - `run.cmd` builds everything and starts the dev host; `cli.cmd <args>` builds and runs the console CLI against it (`cli status`, `cli quit`, ...). Both use the dev profile.
-- Check UI changes in the real window, not just the build: set `OCHRE_DEV_DESKTOP=<virtual desktop guid>` before `run.cmd` (so the window doesn't land on the user's screen), then drive it with `cli dev eval "<js>"` and look with `cli dev capture captures/<timestamp>-<reason>.png`. From PowerShell or bash, call the scripts as `.\run.cmd` / `.\cli.cmd`.
+- Check UI changes in the real window, not just the build: set `OCHRE_DEV_HEADLESS=1` (the window opens off-screen, with no taskbar button or focus; Debug builds only) and `OCHRE_DEV_DESKTOP=<virtual desktop guid>` before `run.cmd`, so nothing lands on the user's screen, then drive it with `cli dev eval "<js>"` and look with `cli dev capture captures/<timestamp>-<reason>.png`. From PowerShell or bash, call the scripts as `.\run.cmd` / `.\cli.cmd`.
 - Experimental phase: write automated tests only for data-loss and security boundaries, the controlled-session lifecycle (in-memory `claude` via `tests/Ochre.Tests/FakeClaude.cs`; never start a real process or read `~/.claude` in a test), or once a feature's direction has settled. Code copied from Perch brings its existing tests. Everything else is verified by hand through the manual testing docs. See `docs/implementation-plan.md`.
 
 ## Copying from Perch

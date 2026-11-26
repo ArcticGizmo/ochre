@@ -15,6 +15,13 @@ public sealed record TaskSessionRef(string Id, string Cwd, string? ConfigDir, st
 
 public sealed record ParkNote(DateTimeOffset At, string Note);
 
+/// <summary>A checkout made for the task by a worktree provider (ADR 0012).</summary>
+/// <param name="Path">The checkout's folder; also its key on the task.</param>
+/// <param name="Repo">The task repo it was made from.</param>
+/// <param name="Provider">The provider that made it and can remove it (<c>git-worktree</c>).</param>
+/// <param name="Branch">The branch checked out there, as created.</param>
+public sealed record TaskWorktree(string Path, string Repo, string Provider, string? Branch, DateTimeOffset? Created);
+
 /// <param name="Line">Index of the item's line in the task body; only valid for the document it came from.</param>
 public sealed record PlanItem(string? Id, string Text, bool Done, int Indent, int Line, IReadOnlyList<PlanItem> Children)
 {
@@ -43,6 +50,7 @@ public sealed record TaskSummary(
     DateTimeOffset? ParkedAt,
     IReadOnlyList<TaskLink> Links,
     IReadOnlyList<TaskSessionRef> Sessions,
-    IReadOnlyList<string> Repos);
+    IReadOnlyList<string> Repos,
+    IReadOnlyList<TaskWorktree> Worktrees);
 
 public sealed class TaskFormatException(string message) : Exception(message);

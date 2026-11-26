@@ -38,6 +38,11 @@ public static class BridgeContract
         new("sessions.setEffort", typeof(SetEffortRequest), typeof(Ack)),
         new("sessions.bind", typeof(BindSessionRequest), typeof(Ack)),
         new("sessions.unbind", typeof(SessionIdRequest), typeof(Ack)),
+        new("worktrees.providers", typeof(Empty), typeof(IReadOnlyList<WorktreeProviderDto>)),
+        new("worktrees.plan", typeof(WorktreeRequest), typeof(WorktreePlanDto)),
+        new("worktrees.create", typeof(WorktreeRequest), typeof(WorktreeDto)),
+        new("worktrees.check", typeof(WorktreePathRequest), typeof(WorktreeCheckDto)),
+        new("worktrees.remove", typeof(RemoveWorktreeRequest), typeof(Ack)),
     ];
 
     public static IReadOnlyList<EventContract> Events { get; } =

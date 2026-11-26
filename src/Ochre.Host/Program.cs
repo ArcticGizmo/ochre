@@ -125,6 +125,7 @@ internal static class Program
         options = options with
         {
             EnableDevTools = true,
+            Headless = Environment.GetEnvironmentVariable("OCHRE_DEV_HEADLESS") == "1",
             DevServer = Uri.TryCreate(Environment.GetEnvironmentVariable("OCHRE_DEV_SERVER"), UriKind.Absolute, out var dev) && dev.IsLoopback ? dev : null,
         };
 #endif

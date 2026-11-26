@@ -55,4 +55,7 @@ internal interface IModuleContext
 
     /// <summary>Windows is ending the session; there are a few seconds at most, and the shutdown may yet be cancelled.</summary>
     void OnSessionEnding(Action handler);
+
+    /// <summary>Offers a way to make a checkout for a task ("Start agent in a new worktree").</summary>
+    void AddWorktreeProvider(IWorktreeProvider provider);
 }

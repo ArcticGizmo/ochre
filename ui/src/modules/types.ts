@@ -27,10 +27,21 @@ export interface TaskSectionProps {
   ctx: AppContext;
 }
 
+/** A folder the task works in: one of its repos or worktrees. */
+export interface FolderStatusProps {
+  taskId: string;
+  path: string;
+}
+
+/** The running modules' folder statuses, in module order, as the app hands them to its views. */
+export type FolderStatuses = { id: string; Status: ComponentType<FolderStatusProps> }[];
+
 /** One module's contributions to the UI. Ids match the host's module ids. */
 export interface ModuleUi {
   id: string;
   view?: ModuleView;
   /** A section of the task detail, below Agents. */
   TaskSection?: ComponentType<TaskSectionProps>;
+  /** Drawn after each of a task's folders, on the task and on Today (e.g. its branch and changes). */
+  FolderStatus?: ComponentType<FolderStatusProps>;
 }

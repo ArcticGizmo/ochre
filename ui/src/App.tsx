@@ -83,6 +83,7 @@ export function App() {
 
   const moduleView = modules.find((m) => m.view?.key === view)?.view;
   const taskSections = modules.flatMap((m) => (m.TaskSection ? [{ id: m.id, Section: m.TaskSection }] : []));
+  const folderStatuses = modules.flatMap((m) => (m.FolderStatus ? [{ id: m.id, Status: m.FolderStatus }] : []));
 
   let body;
   if (moduleView) {
@@ -96,6 +97,7 @@ export function App() {
           <Today
             tasks={tasks}
             live={live}
+            folderStatuses={folderStatuses}
             onOpenTask={openTask}
             onOpenAgent={(sessionId, task) => setThread({ sessionId, parkNote: task.parkNote })}
             onOpenSession={(sessionId) => setThread({ sessionId, parkNote: null })}
@@ -139,6 +141,7 @@ export function App() {
               openSession={taskThread}
               onOpenSession={setTaskThread}
               sections={taskSections}
+              folderStatuses={folderStatuses}
               ctx={ctx}
               onError={setError}
               onDeleted={() => setSelected(null)}

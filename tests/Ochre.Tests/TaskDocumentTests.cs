@@ -243,6 +243,92 @@ public class TaskDocumentTests
         Assert.Contains("- [x] bare step {#p1}", doc.Serialize(), StringComparison.Ordinal);
     }
 
+    // A later provider (sprig) records keys this version doesn't know; they must survive every write.
+    private const string WithWorktrees = """
+        ---
+        id: T-0050
+        title: Worktrees
+        state: active
+        repos:
+          - C:\git\example-app
+        worktrees:
+          - path: C:\git\example-app.worktrees\t-0050-fix
+            repo: C:\git\example-app
+            provider: git-worktree
+            branch: t-0050-fix
+            created: 2026-11-26T10:00:00Z
+          - path: C:\git\example-app.worktrees\slot-2
+            repo: C:\git\example-app
+            provider: sprig
+            key: slot-2
+          - note: hand-written, no path
+        ---
+
+        ## Plan
+
+        ## Notes
+
+        ## Log
+
+        """;
+
+    [Fact]
+    public void Worktrees_are_read_and_an_unchanged_file_stays_byte_identical()
+    {
+        var text = Lf(WithWorktrees);
+        var doc = TaskDocument.Parse(text);
+
+        Assert.Equal(
+            [
+                new TaskWorktree(@"C:\git\example-app.worktrees\t-0050-fix", @"C:\git\example-app", "git-worktree", "t-0050-fix", new DateTimeOffset(2026, 11, 26, 10, 0, 0, TimeSpan.Zero)),
+                new TaskWorktree(@"C:\git\example-app.worktrees\slot-2", @"C:\git\example-app", "sprig", null, null),
+            ],
+            doc.Worktrees);
+        Assert.Equal(2, doc.ToSummary("T-0050").Worktrees.Count);
+        Assert.Equal(text, doc.Serialize());
+
+        // Re-emitted frontmatter keeps the documented layout too.
+        doc.Updated = new DateTimeOffset(2026, 11, 26, 11, 0, 0, TimeSpan.Zero);
+        Assert.Contains("    provider: sprig\n    key: slot-2\n  - note: hand-written, no path\n", doc.Serialize(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Adding_and_removing_a_worktree_leaves_the_other_entries_exactly_as_they_were()
+    {
+        var doc = TaskDocument.Parse(Lf(WithWorktrees));
+        var created = new DateTimeOffset(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
+
+        doc.AddWorktree(new TaskWorktree(@"C:\git\example-app.worktrees\t-0050-more", @"C:\git\example-app", "git-worktree", "t-0050-more", created));
+        var added = doc.Serialize();
+        Assert.Contains(
+            "  - path: C:\\git\\example-app.worktrees\\t-0050-more\n    repo: C:\\git\\example-app\n    provider: git-worktree\n    branch: t-0050-more\n    created: 2026-11-26T12:00:00Z\n---",
+            added,
+            StringComparison.Ordinal);
+
+        var reparsed = TaskDocument.Parse(added);
+        Assert.Equal(3, reparsed.Worktrees.Count);
+        // Paths compare without case, as Windows folders do.
+        Assert.True(reparsed.RemoveWorktree(@"c:\git\example-app.worktrees\T-0050-FIX"));
+        Assert.False(reparsed.RemoveWorktree(@"C:\nowhere"));
+        var removed = reparsed.Serialize();
+
+        Assert.DoesNotContain("t-0050-fix", removed, StringComparison.Ordinal);
+        Assert.Contains("    provider: sprig\n    key: slot-2\n  - note: hand-written, no path\n  - path:", removed, StringComparison.Ordinal);
+        Assert.Equal(["sprig", "git-worktree"], TaskDocument.Parse(removed).Worktrees.Select(w => w.Provider));
+    }
+
+    [Fact]
+    public void Removing_the_last_worktree_drops_the_key()
+    {
+        var doc = TaskDocument.CreateNew("T-0001", "One", new DateTimeOffset(2026, 11, 26, 9, 0, 0, TimeSpan.Zero));
+        doc.AddWorktree(new TaskWorktree(@"C:\w\a", @"C:\r", "git-worktree", "a", null));
+        Assert.Contains("worktrees:", doc.Serialize(), StringComparison.Ordinal);
+
+        Assert.True(doc.RemoveWorktree(@"C:\w\a"));
+        Assert.DoesNotContain("worktrees", doc.Serialize(), StringComparison.Ordinal);
+        Assert.Empty(doc.Worktrees);
+    }
+
     [Theory]
     [InlineData("no frontmatter")]
     [InlineData("---\nid: T-1\n")]

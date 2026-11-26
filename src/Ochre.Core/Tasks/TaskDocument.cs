@@ -180,6 +180,33 @@ public sealed partial class TaskDocument
         return true;
     }
 
+    /// <summary>Entries without a path or provider are left out here but kept in the file.</summary>
+    public IReadOnlyList<TaskWorktree> Worktrees => Mappings("worktrees")
+        .Select(m => new TaskWorktree(Scalar(m, "path") ?? "", Scalar(m, "repo") ?? "", Scalar(m, "provider") ?? "", Scalar(m, "branch"), ParseTimestamp(Scalar(m, "created"))))
+        .Where(w => w.Path.Length > 0 && w.Provider.Length > 0)
+        .ToList();
+
+    public void AddWorktree(TaskWorktree worktree)
+    {
+        var map = new YamlMappingNode { { "path", SingleLine(worktree.Path) }, { "repo", SingleLine(worktree.Repo) }, { "provider", SingleLine(worktree.Provider) } };
+        if (worktree.Branch is { } branch) map.Add("branch", SingleLine(branch));
+        if (worktree.Created is { } created) map.Add("created", Format(created));
+        SequenceFor("worktrees").Add(map);
+        _frontDirty = true;
+    }
+
+    /// <summary>Takes the worktree off the task; the folder itself is the provider's business. False when it wasn't there.</summary>
+    public bool RemoveWorktree(string path)
+    {
+        if (!_front.Children.TryGetValue(new YamlScalarNode("worktrees"), out var node) || node is not YamlSequenceNode seq) return false;
+        var match = seq.Children.OfType<YamlMappingNode>().FirstOrDefault(m => string.Equals(Scalar(m, "path"), path, StringComparison.OrdinalIgnoreCase));
+        if (match is null) return false;
+        seq.Children.Remove(match);
+        if (seq.Children.Count == 0) Remove("worktrees");
+        _frontDirty = true;
+        return true;
+    }
+
     public ParkNote? Park
     {
         get
@@ -393,7 +420,8 @@ public sealed partial class TaskDocument
             Park?.At,
             Links,
             Sessions,
-            Repos);
+            Repos,
+            Worktrees);
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------

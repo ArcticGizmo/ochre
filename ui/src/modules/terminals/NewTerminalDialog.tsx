@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { request, type ShellProfileDto, type TaskListItem } from '../../bridge';
+import { request, type ShellProfileDto, type TaskDetail, type TaskListItem } from '../../bridge';
 import { Dialog } from '../../Dialog';
+import { useFolderChoice } from '../../worktrees/useFolderChoice';
 
 interface Props {
   open: boolean;
@@ -11,16 +12,21 @@ interface Props {
   onOpened: (terminalId: string) => void;
 }
 
-const OTHER = '__other__';
 const NONE = '';
 
 /** Opens a terminal tab: a shell the host found, in a folder (the task's repos first), optionally on a task. */
 export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Props) {
   const [profiles, setProfiles] = useState<ShellProfileDto[]>([]);
   const [task, setTask] = useState(NONE);
-  const [repos, setRepos] = useState<string[]>([]);
-  const [folder, setFolder] = useState(OTHER);
-  const [otherFolder, setOtherFolder] = useState('');
+  const [detail, setDetail] = useState<TaskDetail | null>(null);
+  const choice = useFolderChoice({
+    taskId: detail?.id ?? null,
+    title: detail?.title ?? '',
+    repos: detail?.repos ?? [],
+    worktrees: detail?.worktrees ?? [],
+    otherMayBeEmpty: true,
+    otherPlaceholder: 'Empty for your home folder, or C:\\path\\to\\folder',
+  });
   const [profile, setProfile] = useState('');
   const [command, setCommand] = useState('');
   const [keep, setKeep] = useState(true);
@@ -30,7 +36,6 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
   useEffect(() => {
     if (!open) return;
     setTask(taskId ?? NONE);
-    setOtherFolder('');
     setCommand('');
     setKeep(true);
     setError(null);
@@ -42,36 +47,37 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
       .catch((e: Error) => setError(e.message));
   }, [open, taskId]);
 
-  // The folder choices follow the task: its repos, then any other folder.
+  // The folder choices follow the task: its repos and worktrees, a new worktree, then any other folder.
   useEffect(() => {
     if (!open) return;
     if (!task) {
-      setRepos([]);
-      setFolder(OTHER);
+      setDetail(null);
       return;
     }
     let alive = true;
     request('tasks.get', { id: task })
-      .then((t) => {
-        if (!alive) return;
-        setRepos(t.repos);
-        setFolder(t.repos[0] ?? OTHER);
-      })
-      .catch(() => alive && setRepos([]));
+      .then((t) => alive && setDetail(t))
+      .catch(() => alive && setDetail(null));
     return () => {
       alive = false;
     };
   }, [open, task]);
 
-  const cwd = folder === OTHER ? otherFolder.trim() : folder;
+  // A different task (or none) starts the folder choice afresh; a reload of the same task leaves it alone.
+  const detailId = detail?.id ?? null;
+  useEffect(() => {
+    if (open) choice.reset(null);
+  }, [open, detailId]);
+
   const choosable = tasks.filter((t) => t.state !== 'done' || t.id === task);
 
   async function submit() {
-    if (!profile) return;
+    if (!profile || !choice.ready) return;
     setBusy(true);
     setError(null);
     try {
-      const t = await request('terminals.open', { profile, folder: cwd, taskId: task || null, startupCommand: command.trim() || null, cols: 120, rows: 30, keepScrollback: keep });
+      const folder = await choice.resolve();
+      const t = await request('terminals.open', { profile, folder, taskId: task || null, startupCommand: command.trim() || null, cols: 120, rows: 30, keepScrollback: keep });
       onOpened(t.id);
     } catch (e) {
       setError((e as Error).message);
@@ -91,8 +97,8 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={busy || !profile}>
-            Open terminal
+          <button type="submit" className="primary" disabled={busy || !profile || !choice.ready}>
+            {busy && choice.isNew ? 'Making worktree...' : 'Open terminal'}
           </button>
         </>
       }
@@ -108,23 +114,7 @@ export function NewTerminalDialog({ open, taskId, tasks, onClose, onOpened }: Pr
           ))}
         </select>
       </label>
-      <label className="field">
-        <span>Folder</span>
-        <select value={folder} onChange={(e) => setFolder(e.target.value)}>
-          {repos.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-          <option value={OTHER}>{repos.length ? 'Another folder...' : 'A folder of your choice'}</option>
-        </select>
-      </label>
-      {folder === OTHER && (
-        <label className="field">
-          <span>Folder path</span>
-          <input value={otherFolder} onChange={(e) => setOtherFolder(e.target.value)} placeholder="Empty for your home folder, or C:\path\to\folder" />
-        </label>
-      )}
+      {choice.fields}
       <label className="field">
         <span>Shell</span>
         <select value={profile} onChange={(e) => setProfile(e.target.value)}>

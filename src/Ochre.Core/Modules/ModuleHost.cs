@@ -51,6 +51,11 @@ internal sealed class ModuleHost : IDisposable
     /// <summary>The bridge requests of the running modules, for checking registrations against.</summary>
     public IEnumerable<RequestContract> RunningRequests => _running.SelectMany(r => r.Module.Requests);
 
+    /// <summary>The worktree providers of the running modules, in start order.</summary>
+    public IReadOnlyList<IWorktreeProvider> WorktreeProviders => _running.SelectMany(r => r.Context.WorktreeProviders).ToList();
+
+    public IWorktreeProvider? WorktreeProvider(string id) => WorktreeProviders.FirstOrDefault(p => p.Id == id);
+
     public void StartAll()
     {
         if (_started) throw new InvalidOperationException("modules already started");
@@ -124,6 +129,7 @@ internal sealed class ModuleHost : IDisposable
     {
         public List<Action<BridgeDispatcher>> Bridges { get; } = [];
         public List<Action> SessionEndingHandlers { get; } = [];
+        public List<IWorktreeProvider> WorktreeProviders { get; } = [];
 
         public AppLog Log => kernel.Log;
         public string DataFolder => Path.Combine(kernel.DataRoot, module.Id);
@@ -147,5 +153,7 @@ internal sealed class ModuleHost : IDisposable
         }
 
         public void OnSessionEnding(Action handler) => SessionEndingHandlers.Add(handler);
+
+        public void AddWorktreeProvider(IWorktreeProvider provider) => WorktreeProviders.Add(provider);
     }
 }

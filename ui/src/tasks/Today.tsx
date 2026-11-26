@@ -1,10 +1,14 @@
 import { request, type SessionSummary, type TaskListItem } from '../bridge';
+import type { FolderStatuses } from '../modules';
+import { PathText } from '../PathText';
 import { OutsideSessions } from '../sessions/OutsideSessions';
+import { FolderStatus } from '../worktrees/TaskFolders';
 import { agentStatus, agentWord, byActivity, ParkNote, sessionName, StatePill, when } from './present';
 
 interface Props {
   tasks: TaskListItem[];
   live: SessionSummary[];
+  folderStatuses: FolderStatuses;
   onOpenTask: (id: string) => void;
   onOpenAgent: (sessionId: string, task: TaskListItem) => void;
   onOpenSession: (sessionId: string) => void;
@@ -13,7 +17,7 @@ interface Props {
 }
 
 /** The morning view: every Active and Parked task, with where you left off and one click back into each agent. */
-export function Today({ tasks, live, onOpenTask, onOpenAgent, onOpenSession, onNew, onError }: Props) {
+export function Today({ tasks, live, folderStatuses, onOpenTask, onOpenAgent, onOpenSession, onNew, onError }: Props) {
   const shown = tasks.filter((t) => t.state === 'active' || t.state === 'parked').sort(byActivity);
   const active = shown.filter((t) => t.state === 'active').length;
 
@@ -107,6 +111,29 @@ export function Today({ tasks, live, onOpenTask, onOpenAgent, onOpenSession, onN
               {t.state === 'parked' && (
                 <button onClick={() => request('tasks.setState', { id: t.id, state: 'active' }).catch((e: Error) => onError(e.message))}>Resume task</button>
               )}
+            </div>
+          )}
+
+          {(t.repos.length > 0 || t.worktrees.length > 0) && (
+            <div className="row">
+              <span className="label">Repos</span>
+              <div className="vals folders">
+                {t.repos.map((r) => (
+                  <span key={r} className="folder-ref">
+                    <PathText path={r} />
+                    <FolderStatus statuses={folderStatuses} taskId={t.id} path={r} />
+                  </span>
+                ))}
+                {t.worktrees
+                  .filter((w) => w.exists)
+                  .map((w) => (
+                    <span key={w.path} className="folder-ref">
+                      <span className="kind">worktree</span>
+                      <PathText path={w.path} />
+                      <FolderStatus statuses={folderStatuses} taskId={t.id} path={w.path} />
+                    </span>
+                  ))}
+              </div>
             </div>
           )}
 

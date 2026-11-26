@@ -91,6 +91,8 @@ public sealed class ModuleHostTests : IDisposable
         host.SessionEnding();
         Assert.Contains("ending fine", _events);
         Assert.DoesNotContain("ending broken", _events);
+        Assert.Equal(["fine-tree"], host.WorktreeProviders.Select(p => p.Id));
+        Assert.Null(host.WorktreeProvider("broken-tree"));
     }
 
     [Fact]
@@ -130,10 +132,21 @@ public sealed class ModuleHostTests : IDisposable
             Context = context;
             context.AddBridge(b => b.Handle($"{id}.ping", BridgeTestJson.Default.Empty, BridgeTestJson.Default.Ack, _ => new Ack()));
             context.OnSessionEnding(() => events.Add($"ending {id}"));
+            context.AddWorktreeProvider(new FakeProvider($"{id}-tree"));
             if (ThrowOnStart) throw new InvalidOperationException("boom");
             events.Add($"start {id}");
             return new Stop(() => events.Add($"stop {id}"));
         }
+    }
+
+    private sealed class FakeProvider(string id) : IWorktreeProvider
+    {
+        public string Id => id;
+        public string Name => id;
+        public Task<WorktreePlan> PlanAsync(string repo, string branch, CancellationToken ct) => throw new NotSupportedException();
+        public Task<WorktreePlan> CreateAsync(string repo, string branch, CancellationToken ct) => throw new NotSupportedException();
+        public Task<WorktreeCheck> CheckAsync(TaskWorktree worktree, CancellationToken ct) => throw new NotSupportedException();
+        public Task RemoveAsync(TaskWorktree worktree, bool discardChanges, bool deleteBranch, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private sealed class Stop(Action action) : IDisposable

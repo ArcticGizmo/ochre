@@ -15,6 +15,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Ochre.Modules.Terminals" />
     <InternalsVisibleTo Include="Ochre.Modules.ShutdownPark" />
+    <InternalsVisibleTo Include="Ochre.Modules.Git" />
     <InternalsVisibleTo Include="Ochre.BridgeGen" />
   </ItemGroup>
 </Project>

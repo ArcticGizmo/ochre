@@ -7,8 +7,8 @@ namespace Ochre.Core.Sessions;
 public sealed record BindSuggestion(string TaskId, string Reason);
 
 /// <summary>
-/// Which tasks a session started outside Ochre probably belongs to: its folder is inside one of the task's repos,
-/// or its branch names a Jira issue the task links to. These are suggestions only; the user links it (task-model.md,
+/// Which tasks a session started outside Ochre probably belongs to: its folder is inside one of the task's worktrees
+/// or repos, or its branch names a Jira issue the task links to. These are suggestions only; the user links it (task-model.md,
 /// "Explicit over magic").
 /// </summary>
 public static class BindSuggestions
@@ -27,7 +27,13 @@ public static class BindSuggestions
                 reasons.Add($"branch names {key}");
                 strength += 2;
             }
-            if (t.Repos.FirstOrDefault(r => IsInside(cwd, r)) is { } repo)
+            // A worktree is made for one task, so it says more than a repo several tasks may share.
+            if (t.Worktrees.FirstOrDefault(w => IsInside(cwd, w.Path)) is { } worktree)
+            {
+                reasons.Add($"folder is its worktree {Leaf(worktree.Path)}");
+                strength += 2;
+            }
+            else if (t.Repos.FirstOrDefault(r => IsInside(cwd, r)) is { } repo)
             {
                 reasons.Add($"folder is in {Leaf(repo)}");
                 strength += 1;

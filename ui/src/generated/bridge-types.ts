@@ -64,6 +64,25 @@ export interface CreateTaskRequest {
 
 export type Empty = Record<string, never>;
 
+export interface GitChangedEvent {
+  taskId: string;
+}
+
+export interface GitFolderStatus {
+  path: string;
+  missing: boolean;
+  isRepo: boolean;
+  branch: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  changed: number;
+}
+
+export interface GitStatusRequest {
+  taskId: string;
+}
+
 export interface LinkDto {
   id: string;
   kind: string;
@@ -146,6 +165,13 @@ export interface QuestionDto {
 export interface QuestionOptionDto {
   label: string;
   description: string;
+}
+
+export interface RemoveWorktreeRequest {
+  taskId: string;
+  path: string;
+  discardChanges: boolean;
+  deleteBranch: boolean;
 }
 
 export interface RespondRequest {
@@ -286,6 +312,7 @@ export interface TaskDetail {
   created: string | null;
   updated: string | null;
   repos: string[];
+  worktrees: WorktreeDto[];
   links: LinkDto[];
   sessions: SessionRefDto[];
   park: ParkDto | null;
@@ -314,6 +341,8 @@ export interface TaskListItem {
   parkedAt: string | null;
   links: LinkDto[];
   sessions: SessionRefDto[];
+  repos: string[];
+  worktrees: WorktreeDto[];
 }
 
 export interface TerminalDto {
@@ -376,6 +405,48 @@ export interface UpdateTaskRequest {
   repos: string[] | null;
 }
 
+export interface WorktreeCheckDto {
+  exists: boolean;
+  branch: string | null;
+  changed: number;
+  unpushedCommits: number | null;
+  runningAgents: number;
+  providerRunning: boolean;
+}
+
+export interface WorktreeDto {
+  path: string;
+  repo: string;
+  provider: string;
+  branch: string | null;
+  created: string | null;
+  exists: boolean;
+}
+
+export interface WorktreePathRequest {
+  taskId: string;
+  path: string;
+}
+
+export interface WorktreePlanDto {
+  path: string;
+  branch: string;
+  newBranch: boolean;
+  base: string | null;
+}
+
+export interface WorktreeProviderDto {
+  id: string;
+  name: string;
+}
+
+export interface WorktreeRequest {
+  taskId: string;
+  repo: string;
+  provider: string;
+  branch: string;
+}
+
 export interface Requests {
   'app.info': { req: Empty; res: AppInfo };
   'app.ready': { req: Empty; res: Ack };
@@ -404,6 +475,12 @@ export interface Requests {
   'sessions.setEffort': { req: SetEffortRequest; res: Ack };
   'sessions.bind': { req: BindSessionRequest; res: Ack };
   'sessions.unbind': { req: SessionIdRequest; res: Ack };
+  'worktrees.providers': { req: Empty; res: WorktreeProviderDto[] };
+  'worktrees.plan': { req: WorktreeRequest; res: WorktreePlanDto };
+  'worktrees.create': { req: WorktreeRequest; res: WorktreeDto };
+  'worktrees.check': { req: WorktreePathRequest; res: WorktreeCheckDto };
+  'worktrees.remove': { req: RemoveWorktreeRequest; res: Ack };
+  'git.status': { req: GitStatusRequest; res: GitFolderStatus[] };
   'terminals.profiles': { req: Empty; res: ShellProfileDto[] };
   'terminals.list': { req: Empty; res: TerminalDto[] };
   'terminals.open': { req: OpenTerminalRequest; res: TerminalDto };
@@ -423,6 +500,7 @@ export interface Events {
   'tasks.changed': TaskChangedEvent;
   'sessions.update': SessionUpdateEvent;
   'sessions.changed': Empty;
+  'git.changed': GitChangedEvent;
   'terminals.output': TerminalOutputEvent;
   'terminals.changed': Empty;
 }

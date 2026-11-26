@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
-import { request } from '../bridge';
+import { request, type WorktreeDto } from '../bridge';
 import { Dialog } from '../Dialog';
 import { PathText } from '../PathText';
+import { useFolderChoice } from '../worktrees/useFolderChoice';
 
 interface Props {
   open: boolean;
   taskId: string;
+  title: string;
   repos: string[];
+  worktrees: WorktreeDto[];
   onClose: () => void;
   onStarted: (sessionId: string) => void;
 }
 
-const OTHER = '__other__';
 const DEFAULT_PROMPT = 'Read the task, then start on the next unchecked plan item. Tick items as you finish them.';
 
 const modes: { value: string; label: string }[] = [
@@ -22,23 +24,21 @@ const modes: { value: string; label: string }[] = [
 ];
 
 /** Launches a controlled Claude session bound to the task. Asks about folder trust when Claude Code would have. */
-export function StartAgentDialog({ open, taskId, repos, onClose, onStarted }: Props) {
-  const [folder, setFolder] = useState(repos[0] ?? OTHER);
-  const [otherFolder, setOtherFolder] = useState('');
+export function StartAgentDialog({ open, taskId, title, repos, worktrees, onClose, onStarted }: Props) {
+  const choice = useFolderChoice({ taskId, title, repos, worktrees, otherPlaceholder: 'C:\\path\\to\\folder' });
   const [role, setRole] = useState('');
   const [mode, setMode] = useState('default');
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [askTrust, setAskTrust] = useState(false);
+  const [cwd, setCwd] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Reset only when the dialog opens: the task reloads whenever an agent ticks the plan, and a new repos array then
   // must not wipe what's being typed.
-  const firstRepo = repos[0] ?? OTHER;
   useEffect(() => {
     if (open) {
-      setFolder(firstRepo);
-      setOtherFolder('');
+      choice.reset(null);
       setRole('');
       setMode('default');
       setPrompt(DEFAULT_PROMPT);
@@ -47,16 +47,16 @@ export function StartAgentDialog({ open, taskId, repos, onClose, onStarted }: Pr
     }
   }, [open]);
 
-  const cwd = folder === OTHER ? otherFolder.trim() : folder;
-
   async function start(trustFolder: boolean) {
-    if (!cwd) return;
+    if (!choice.ready) return;
     setBusy(true);
     setError(null);
     try {
+      const folder = await choice.resolve();
+      setCwd(folder);
       const result = await request('sessions.start', {
         taskId,
-        cwd,
+        cwd: folder,
         role: role.trim() || null,
         permissionMode: mode,
         firstPrompt: prompt.trim() || null,
@@ -109,29 +109,13 @@ export function StartAgentDialog({ open, taskId, repos, onClose, onStarted }: Pr
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={busy || !cwd}>
-            Start agent
+          <button type="submit" className="primary" disabled={busy || !choice.ready}>
+            {busy && choice.isNew ? 'Making worktree...' : 'Start agent'}
           </button>
         </>
       }
     >
-      <label className="field">
-        <span>Folder</span>
-        <select value={folder} onChange={(e) => setFolder(e.target.value)}>
-          {repos.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-          <option value={OTHER}>Another folder...</option>
-        </select>
-      </label>
-      {folder === OTHER && (
-        <label className="field">
-          <span>Folder path</span>
-          <input autoFocus value={otherFolder} onChange={(e) => setOtherFolder(e.target.value)} placeholder="C:\path\to\folder" />
-        </label>
-      )}
+      {choice.fields}
       <label className="field">
         <span>Role (optional)</span>
         <input value={role} maxLength={40} onChange={(e) => setRole(e.target.value)} placeholder="e.g. implement, review, tests" />

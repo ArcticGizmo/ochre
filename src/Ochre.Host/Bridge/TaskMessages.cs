@@ -31,7 +31,9 @@ public sealed record TaskListItem(
     string? ParkNote,
     string? ParkedAt,
     IReadOnlyList<LinkDto> Links,
-    IReadOnlyList<SessionRefDto> Sessions);
+    IReadOnlyList<SessionRefDto> Sessions,
+    IReadOnlyList<string> Repos,
+    IReadOnlyList<WorktreeDto> Worktrees);
 
 public sealed record PlanItemDto(string Id, string Text, bool Done, IReadOnlyList<PlanItemDto> Children);
 
@@ -48,6 +50,7 @@ public sealed record TaskDetail(
     string? Created,
     string? Updated,
     IReadOnlyList<string> Repos,
+    IReadOnlyList<WorktreeDto> Worktrees,
     IReadOnlyList<LinkDto> Links,
     IReadOnlyList<SessionRefDto> Sessions,
     ParkDto? Park,

@@ -194,7 +194,8 @@ public sealed record QuestionAnswerDto(string Question, IReadOnlyList<string> La
 
 /// <param name="SwitchMode">With an allow: the permission mode to switch to afterwards (the CLI's suggestion).</param>
 /// <param name="Answers">For a question: the chosen option labels per question.</param>
-public sealed record RespondRequest(string Id, string RequestId, bool Allow, string? SwitchMode, IReadOnlyList<QuestionAnswerDto>? Answers);
+/// <param name="DenyMessage">With a deny: what to tell Claude instead, e.g. what to change in a plan; null for the default.</param>
+public sealed record RespondRequest(string Id, string RequestId, bool Allow, string? SwitchMode, IReadOnlyList<QuestionAnswerDto>? Answers, string? DenyMessage);
 
 /// <param name="Reset">The thread changed shape; fetch it again with sessions.get.</param>
 /// <param name="Items">The items that changed, by index. An index past the end is a new item.</param>

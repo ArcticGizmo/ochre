@@ -541,7 +541,7 @@ internal sealed class SessionManager : IDisposable
     /// <summary>Answers the pending permission, question or plan approval with id <paramref name="requestId"/>.
     /// False when that prompt is no longer pending (answered elsewhere, or the turn moved on).</summary>
     public bool Respond(LiveSession session, string requestId, bool allow, string? switchMode,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? answers)
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? answers, string? denyMessage = null)
     {
         if (session.Observed) return false;
         lock (session.Gate)
@@ -554,7 +554,7 @@ internal sealed class SessionManager : IDisposable
                 updated = AskUserQuestionInput.BuildAnswer(item.Request.InputJson, answers);
                 summary = AskUserQuestionInput.Summarise(AskUserQuestionInput.Parse(item.Request.InputJson), answers);
             }
-            session.Controller.RespondToPermission(item.Request, allow, updatedInput: updated);
+            session.Controller.RespondToPermission(item.Request, allow, allow ? null : denyMessage, updated);
             if (allow && switchMode is not null) session.Controller.SetPermissionMode(switchMode);
             session.Conversation.ResolvePermission(item, allow, allow ? switchMode : null, summary);
             return true;

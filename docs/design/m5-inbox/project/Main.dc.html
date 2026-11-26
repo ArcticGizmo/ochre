@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inbox</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border-bottom:1px solid #3a3836}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.nav-count{font-size:12px;color:#a39d96}
+.badge{font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#d9b44a;color:#1b1a19;display:inline-flex;align-items:center;justify-content:center}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.muted{color:#a39d96}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap;background:none;font-family:inherit;cursor:pointer}
+.f-all{color:#e8e4df;border-color:#5c5854;background:#2e2c2a}
+.f-need{color:#d9b44a;border-color:rgba(217,180,74,.45);background:rgba(217,180,74,.08)}
+.f-done{color:#86b572;border-color:rgba(134,181,114,.4);background:rgba(134,181,114,.08)}
+.s-active{color:#e8974a;border-color:rgba(232,151,74,.4);background:rgba(232,151,74,.12);cursor:default}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:4px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:30px;box-sizing:border-box}
+.btn:hover{background:#2e2c2a;color:#e8e4df}
+.btn.primary{background:#cc7722;border-color:#cc7722;color:#1b1a19;font-weight:600}
+.btn.primary:hover{background:#d98530;color:#1b1a19}
+.btn.allow{background:#2f4a2a;border-color:#4f7a44;color:#cfe8c4;font-weight:600}
+.btn.allow:hover{background:#3a5a34;color:#e3f3dc}
+.btn.deny{color:#f0a8a0;border-color:#6b3a35}
+.btn.deny:hover{background:#3a2422;color:#f6c2bb}
+.btn.quiet{background:none;border-color:transparent;color:#a39d96}
+.btn.quiet:hover{background:#242322;color:#e8e4df}
+.group{background:#242322;border:1px solid #3a3836;border-radius:10px;overflow:hidden}
+.ghead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid #33312f}
+.ttl{font-size:15px;font-weight:600;color:#e8e4df;text-decoration:none}
+.ttl:hover{color:#e8974a}
+.item{display:flex;gap:12px;padding:14px 18px;border-bottom:1px solid #33312f}
+.item:last-child{border-bottom:none}
+.who{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.name{font-weight:600}
+.k-need .dot{background:#d9b44a}
+.k-need .what{color:#d9b44a}
+.k-done .dot{background:#86b572}
+.k-fail .dot{background:#e0796e}
+.k-fail .what{color:#e0796e}
+.ago{font-size:12px;color:#a39d96;margin-left:auto;white-space:nowrap}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.cmd{background:#1b1a19;border:1px solid #33312f;border-radius:6px;padding:8px 10px;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12.5px;color:#e8e4df;white-space:pre-wrap;word-break:break-word}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border:1px solid #33312f;border-radius:6px;cursor:pointer}
+.opt:hover{border-color:#5c5854}
+.opt.sel{border-color:#cc7722;background:rgba(204,119,34,.08)}
+.opt input{margin:3px 0 0;accent-color:#cc7722}
+.opt .d{font-size:12px;color:#a39d96}
+.plan{background:#1b1a19;border:1px solid #33312f;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.field{font:inherit;font-size:13px;color:#e8e4df;background:#1b1a19;border:1px solid #3a3836;border-radius:6px;padding:5px 10px;min-height:30px;box-sizing:border-box;flex:1;min-width:200px}
+.field::placeholder{color:#7a746e}
+.kbd{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:11px;padding:1px 5px;border:1px solid #3a3836;border-bottom-width:2px;border-radius:4px;color:#a39d96}
+.reply{color:#e8e4df;font-size:13.5px}
+</style>
+</helmet>
+<div class="app">
+  <header class="bar">
+    <span class="brand">Ochre</span>
+    <span class="tag">DEV</span>
+    <nav style="display: flex; gap: 4px; margin-left: 8px; flex-wrap: wrap" aria-label="Main">
+      <a href="#today" class="nav">Today</a>
+      <a href="#tasks" class="nav">Tasks</a>
+      <a href="Main.dc.html" class="nav on" aria-current="page">Inbox <span class="badge" aria-label="4 need you">4</span></a>
+      <a href="#terminals" class="nav">Terminals <span class="nav-count">2</span></a>
+      <a href="#git" class="nav">Git</a>
+    </nav>
+    <span style="flex: 1"></span>
+    <span class="muted" style="font-size: 12px">v0.1.0</span>
+  </header>
+
+  <main style="max-width: 880px; margin: 0 auto; padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 4px">
+      <div style="flex: 1; min-width: 240px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 600">Inbox</h1>
+        <div class="muted" style="margin-top: 2px">What your agents are waiting on, by task. <span class="kbd">Ctrl</span> <span class="kbd">.</span> goes to the next one from any window.</div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap" role="group" aria-label="Show">
+        <button class="pill f-all" type="button" aria-pressed="true">All 6</button>
+        <button class="pill f-need" type="button" aria-pressed="false"><span class="dot"></span>Needs you 4</button>
+        <button class="pill f-done" type="button" aria-pressed="false"><span class="dot"></span>Finished 2</button>
+      </div>
+    </div>
+
+    <section class="group" aria-label="T-0042 Fix the login redirect">
+      <div class="ghead">
+        <div style="flex: 1; min-width: 0">
+          <a href="#task" class="ttl">Fix the login redirect</a>
+          <div class="mono muted">T-0042</div>
+        </div>
+        <span class="pill s-active"><span class="dot"></span>Active</span>
+        <a href="#task" class="btn quiet">Open task</a>
+      </div>
+
+      <div class="item k-need">
+        <div class="body">
+          <div class="who">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="name">builder</span>
+            <span class="what">wants to use Bash</span>
+            <span class="ago">waiting 4 min</span>
+          </div>
+          <div class="cmd">git push --force-with-lease origin fix/login-redirect</div>
+          <div class="actions">
+            <button class="btn allow" type="button">Allow</button>
+            <button class="btn deny" type="button">Deny</button>
+            <a href="#thread" class="btn quiet">Open thread</a>
+            <span class="muted" style="font-size: 12px; margin-left: auto">in ochre · fix/login-redirect</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="item k-need">
+        <div class="body">
+          <div class="who">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="name">planner</span>
+            <span class="what">asks you a question</span>
+            <span class="ago">waiting 2 min</span>
+          </div>
+          <div style="font-weight: 600">Which session store should the login fix use?</div>
+          <div style="display: flex; flex-direction: column; gap: 6px" role="radiogroup" aria-label="Session store">
+            <label class="opt sel"><input type="radio" name="store" checked><span><span>Cookie session</span><br><span class="d">What the app uses today; no new infrastructure.</span></span></label>
+            <label class="opt"><input type="radio" name="store"><span><span>Redis-backed session</span><br><span class="d">Survives restarts and scales out; needs Redis in every environment.</span></span></label>
+            <label class="opt"><input type="radio" name="store"><span><span>Stateless JWT</span><br><span class="d">No server state; logout needs a deny list.</span></span></label>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="button">Answer</button>
+            <a href="#thread" class="btn quiet">Open thread</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="item k-done">
+        <div class="body">
+          <div class="who">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="name">tester</span>
+            <span class="what muted">finished</span>
+            <span class="ago">6 min ago</span>
+          </div>
+          <div class="reply">All 586 tests pass. The redirect now keeps the ReturnUrl only when it's local.</div>
+          <div class="actions">
+            <input class="field" type="text" placeholder="Reply to tester" aria-label="Reply to tester">
+            <button class="btn" type="button">Send</button>
+            <a href="#thread" class="btn quiet">Open thread</a>
+            <button class="btn quiet" type="button">Dismiss</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="group" aria-label="T-0039 Docs walkthrough for exports">
+      <div class="ghead">
+        <div style="flex: 1; min-width: 0">
+          <a href="#task" class="ttl">Docs walkthrough for exports</a>
+          <div class="mono muted">T-0039</div>
+        </div>
+        <span class="pill s-active"><span class="dot"></span>Active</span>
+        <a href="#task" class="btn quiet">Open task</a>
+      </div>
+
+      <div class="item k-need">
+        <div class="body">
+          <div class="who">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="name">writer</span>
+            <span class="what">has a plan for you to approve</span>
+            <span class="ago">waiting 1 min</span>
+          </div>
+          <div class="plan">
+            <div style="font-weight: 600">Export guide</div>
+            <div>1. Walk the export dialog for CSV, PDF and the scheduled export</div>
+            <div>2. Capture each step and record what the errors say</div>
+            <div>3. Draft the guide from the evidence pack</div>
+            <a href="#thread" style="font-size: 12px">Show the whole plan</a>
+          </div>
+          <div class="actions">
+            <button class="btn allow" type="button">Approve</button>
+            <input class="field" type="text" placeholder="What to change (to reject)" aria-label="Feedback for writer">
+            <button class="btn deny" type="button">Reject</button>
+            <a href="#thread" class="btn quiet">Open thread</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="item k-fail">
+        <div class="body">
+          <div class="who">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="name">checker</span>
+            <span class="what">stopped with an error</span>
+            <span class="ago">12 min ago</span>
+          </div>
+          <div class="muted">claude exited (1) API error: overloaded (529)</div>
+          <div class="actions">
+            <a href="#thread" class="btn">Open thread</a>
+            <button class="btn quiet" type="button">Dismiss</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="group" aria-label="Not on a task">
+      <div class="ghead">
+        <div style="flex: 1; min-width: 0">
+          <span class="ttl">Not on a task</span>
+          <div class="muted" style="font-size: 12px">Claude sessions started outside Ochre</div>
+        </div>
+      </div>
+
+      <div class="item k-need">
+        <div class="body">
+          <div class="who">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="name mono" style="font-size: 13px" title="C:\Users\you\git\perch">perch</span>
+            <span class="what">is waiting outside Ochre</span>
+            <span class="ago">waiting 9 min</span>
+          </div>
+          <div class="muted" style="font-size: 13px">Answer it where it runs; it's read-only here.</div>
+          <div class="actions">
+            <a href="#thread" class="btn">Open thread</a>
+            <a href="#link" class="btn quiet">Link to a task</a>
+            <button class="btn quiet" type="button">Dismiss</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -2415,3 +2415,291 @@ button.link.term-task {
   font-size: 12px;
   margin-right: auto;
 }
+
+kbd {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+/* The attention inbox (docs/design/m5-inbox). Amber is "needs you" everywhere, as on agent chips. */
+.inbox {
+  max-width: 880px;
+}
+
+.inbox-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--warn);
+  color: #1b1a19;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inbox-filter {
+  --st: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--st) 40%, transparent);
+  background: none;
+  color: var(--st);
+}
+
+.inbox-filter.on {
+  background: color-mix(in srgb, var(--st) 16%, transparent);
+  border-color: var(--st);
+}
+
+.inbox-filter-need {
+  --st: var(--warn);
+}
+
+.inbox-filter-done {
+  --st: var(--st-done);
+}
+
+.inbox-empty {
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.inbox-group {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.inbox-group-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #33312f;
+}
+
+.inbox-group-head .title-link {
+  font-size: 15px;
+}
+
+.inbox-id {
+  display: block;
+}
+
+.inbox-group-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inbox-item {
+  --k: var(--warn);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #33312f;
+  transition: opacity 0.3s;
+}
+
+.inbox-item:last-child {
+  border-bottom: none;
+}
+
+.inbox-item.answered {
+  opacity: 0.75;
+}
+
+.inbox-done {
+  --k: var(--st-done);
+}
+
+.inbox-failed {
+  --k: var(--danger);
+}
+
+.inbox-who {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inbox-who .dot {
+  background: var(--k);
+}
+
+.inbox-what {
+  color: var(--k);
+}
+
+.inbox-done .inbox-what {
+  color: var(--muted);
+}
+
+.inbox-age {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.inbox-cmd {
+  margin: 0;
+  background: var(--bg);
+  border: 1px solid #33312f;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.inbox-text,
+.inbox-question {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.inbox-question {
+  font-weight: 600;
+}
+
+.inbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.inbox-actions button {
+  min-height: 30px;
+}
+
+.inbox-actions button.allow {
+  background: #2f4a2a;
+  border-color: #4f7a44;
+  color: #cfe8c4;
+  font-weight: 600;
+}
+
+.inbox-actions button.deny {
+  color: #f0a8a0;
+  border-color: #6b3a35;
+}
+
+.inbox-where {
+  margin-left: auto;
+}
+
+.inbox-field {
+  flex: 1;
+  min-width: 200px;
+  min-height: 30px;
+  background: var(--bg);
+}
+
+.inbox-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inbox-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 7px 10px;
+  border: 1px solid #33312f;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.inbox-option:hover {
+  border-color: #5c5854;
+}
+
+.inbox-option.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.inbox-option input {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.inbox-option small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inbox-plan {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid #33312f;
+  border-radius: 6px;
+  padding: 4px 12px 8px;
+  font-size: 13px;
+  max-height: 160px;
+  overflow: hidden;
+}
+
+.inbox-plan.whole {
+  max-height: none;
+}
+
+.inbox-plan .inbox-more {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 12px 6px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--accent-text);
+  background: linear-gradient(transparent, var(--bg) 60%);
+}
+
+.inbox-receipt {
+  font-size: 13px;
+  color: var(--st-done);
+}
+
+.inbox-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}

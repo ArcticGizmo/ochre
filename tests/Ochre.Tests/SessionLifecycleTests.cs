@@ -177,6 +177,26 @@ public sealed class SessionLifecycleTests : IDisposable
     }
 
     [Fact]
+    public async Task A_denial_carries_the_users_message_and_an_allow_ignores_one()
+    {
+        var sessions = NewManager();
+        var (s, _) = await sessions.StartAsync(await NewTask(), _repo, null, null, "go", false);
+
+        _claude.Last.Emit(StreamJson.AskPermission("req-1", "git push"));
+        Until(() => Locked(s!, c => c.PendingPermission is not null), "the first prompt");
+        Assert.True(sessions.Respond(s!, "req-1", allow: false, null, null, "Push to a branch of your own instead."));
+
+        _claude.Last.Emit(StreamJson.AskPermission("req-2", "git status"));
+        Until(() => Locked(s!, c => c.PendingPermission?.Request.RequestId == "req-2"), "the second prompt");
+        Assert.True(sessions.Respond(s!, "req-2", allow: true, null, null, "ignored"));
+
+        var answers = _claude.Last.Sent.Where(n => (string?)n["type"] == "control_response").Select(n => n["response"]?["response"]).ToList();
+        Assert.Equal(("deny", "Push to a branch of your own instead."), ((string?)answers[0]?["behavior"], (string?)answers[0]?["message"]));
+        Assert.Equal("allow", (string?)answers[1]?["behavior"]);
+        Assert.Null(answers[1]?["message"]);
+    }
+
+    [Fact]
     public async Task When_claude_exits_the_agent_goes_dormant_and_sending_resumes_the_same_session()
     {
         var sessions = NewManager();

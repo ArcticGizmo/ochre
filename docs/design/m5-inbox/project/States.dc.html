@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inbox states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#1b1a19}
+a{color:#e8974a}a:hover{color:#f0aa66}
+.app{min-height:100vh;background:#1b1a19;color:#e8e4df;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;border:1px solid #3a3836;border-radius:8px}
+.brand{font-weight:600;color:#e8974a}
+.tag{font-size:11px;padding:1px 6px;border:1px solid #3a3836;border-radius:4px;color:#a39d96}
+.nav{color:#a39d96;text-decoration:none;padding:5px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px}
+.nav:hover{color:#e8e4df;background:#242322}
+.nav.on{color:#e8e4df;background:#2e2c2a}
+.nav-count{font-size:12px;color:#a39d96}
+.badge{font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#d9b44a;color:#1b1a19;display:inline-flex;align-items:center;justify-content:center}
+.mono{font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12px}
+.muted{color:#a39d96}
+.h{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#a39d96;margin:0}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block;box-sizing:border-box}
+.btn{font:inherit;font-size:13px;color:#e8e4df;background:#242322;border:1px solid #3a3836;border-radius:6px;padding:4px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:30px;box-sizing:border-box}
+.btn:hover{background:#2e2c2a;color:#e8e4df}
+.btn.quiet{background:none;border-color:transparent;color:#a39d96}
+.btn.quiet:hover{background:#242322;color:#e8e4df}
+.group{background:#242322;border:1px solid #3a3836;border-radius:10px;overflow:hidden}
+.item{display:flex;gap:12px;padding:14px 18px;border-bottom:1px solid #33312f}
+.item:last-child{border-bottom:none}
+.who{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.name{font-weight:600}
+.k-need .dot{background:#d9b44a}
+.k-need .what{color:#d9b44a}
+.k-done .dot{background:#86b572}
+.ago{font-size:12px;color:#a39d96;margin-left:auto;white-space:nowrap}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.cmd{background:#1b1a19;border:1px solid #33312f;border-radius:6px;padding:8px 10px;font-family:'Cascadia Mono',Consolas,ui-monospace,monospace;font-size:12.5px;color:#e8e4df;white-space:pre-wrap;word-break:break-word}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.receipt{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#86b572}
+.agent{display:inline-flex;align-items:center;gap:7px;padding:3px 11px;border:1px solid #3a3836;border-radius:999px;color:#e8e4df;text-decoration:none;background:#242322;font-size:13px}
+.agent .st{font-size:12px;color:#a39d96}
+.a-busy .dot{background:#e8974a}
+.a-waiting{border-color:rgba(217,180,74,.6)}
+.a-waiting .dot{background:#d9b44a}
+.a-waiting .st{color:#d9b44a}
+.note{font-size:12.5px;color:#a39d96;max-width:760px}
+</style>
+</helmet>
+<div class="app" style="padding: 32px 40px 48px">
+  <div style="max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px">
+
+    <section style="display: flex; flex-direction: column; gap: 10px" aria-label="Title bar">
+      <h2 class="h">Title bar</h2>
+      <header class="bar">
+        <span class="brand">Ochre</span>
+        <nav style="display: flex; gap: 4px; flex-wrap: wrap" aria-label="Nothing waiting">
+          <a href="#today" class="nav on">Today</a>
+          <a href="#tasks" class="nav">Tasks</a>
+          <a href="Main.dc.html" class="nav">Inbox</a>
+          <a href="#terminals" class="nav">Terminals <span class="nav-count">2</span></a>
+        </nav>
+        <span class="muted" style="font-size: 12px; margin-left: auto">Nothing needs you: no badge. Finished turns alone never add one.</span>
+      </header>
+      <header class="bar">
+        <span class="brand">Ochre</span>
+        <nav style="display: flex; gap: 4px; flex-wrap: wrap" aria-label="Some waiting">
+          <a href="#today" class="nav on">Today</a>
+          <a href="#tasks" class="nav">Tasks</a>
+          <a href="Main.dc.html" class="nav">Inbox <span class="badge" aria-label="4 need you">4</span></a>
+          <a href="#terminals" class="nav">Terminals <span class="nav-count">2</span></a>
+        </nav>
+        <span class="muted" style="font-size: 12px; margin-left: auto">The badge counts what's blocked on you, in every window. The tray tooltip says the same.</span>
+      </header>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 10px" aria-label="Elsewhere and answered">
+      <h2 class="h">Other kinds, and an answer landing</h2>
+      <div class="group">
+        <div class="item k-need">
+          <div class="body">
+            <div class="who">
+              <span class="dot" aria-hidden="true"></span>
+              <span class="name">builder</span>
+              <span class="what">is waiting on a prompt Ochre can't show</span>
+              <span class="ago">waiting 3 min</span>
+            </div>
+            <div class="muted" style="font-size: 13px">Claude asked through another client (Remote Control). Open the thread to see where.</div>
+            <div class="actions">
+              <a href="#thread" class="btn">Open thread</a>
+              <button class="btn quiet" type="button">Dismiss</button>
+            </div>
+          </div>
+        </div>
+        <div class="item k-need" style="opacity: .75">
+          <div class="body">
+            <div class="who">
+              <span class="dot" aria-hidden="true"></span>
+              <span class="name">builder</span>
+              <span class="what">wants to use Bash</span>
+              <span class="ago">just now</span>
+            </div>
+            <div class="cmd">dotnet test tests/Ochre.Tests/Ochre.Tests.csproj</div>
+            <div class="actions">
+              <span class="receipt"><span class="dot" aria-hidden="true"></span>Allowed</span>
+              <span class="muted" style="font-size: 12px">Stays a moment so the answer is seen, then leaves the list.</span>
+            </div>
+          </div>
+        </div>
+        <div class="item k-need" style="opacity: .75">
+          <div class="body">
+            <div class="who">
+              <span class="dot" aria-hidden="true"></span>
+              <span class="name">planner</span>
+              <span class="what">asks you a question</span>
+              <span class="ago">just now</span>
+            </div>
+            <div class="actions">
+              <span class="muted" style="font-size: 13px">Answered in another window: Cookie session</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note" style="margin: 0">An answer from anywhere (this list, the thread, another window, a notification) clears the item everywhere. If the prompt has gone by the time you click (answered elsewhere, or the agent stopped), the button says so instead of acting.</p>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 10px" aria-label="Elsewhere in Ochre">
+      <h2 class="h">The same items elsewhere</h2>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
+        <span class="agent a-busy"><span class="dot"></span>tester<span class="st">working</span></span>
+        <a href="Main.dc.html" class="agent a-waiting" title="Open in the inbox"><span class="dot"></span>builder<span class="st">needs you</span></a>
+        <span class="muted" style="font-size: 13px">Agent chips on Today and a task keep their status; "needs you" comes from the same list, so the counts agree.</span>
+      </div>
+      <div class="group">
+        <div class="item k-done">
+          <div class="body">
+            <div class="who">
+              <span class="dot" aria-hidden="true"></span>
+              <span class="name">tester</span>
+              <span class="what muted">finished</span>
+              <span class="ago">6 min ago</span>
+            </div>
+            <div>All 586 tests pass. The redirect now keeps the ReturnUrl only when it's local.</div>
+          </div>
+        </div>
+      </div>
+      <p class="note" style="margin: 0">A finished turn counts as read once its thread (or, later, its grid pane) is on screen in the window you're using, or when you send that agent another message. Nothing from before a restart is listed.</p>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

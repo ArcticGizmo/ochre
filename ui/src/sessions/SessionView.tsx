@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useReportSeen } from '../attention/useAttention';
 import { on, request, type AssistantPartDto, type PermissionDto, type SessionHeader, type SessionItemDto } from '../bridge';
 import { ConfirmDialog } from '../Dialog';
 import { renderMarkdown } from '../markdown';
@@ -71,6 +72,8 @@ export function SessionView({ id, backLabel, parkNote, onBack, onError }: Props)
       });
     });
   }, [id, load]);
+
+  useReportSeen(id);
 
   // Follow the thread while the reader is at the bottom; leave them alone once they scroll up.
   useLayoutEffect(() => {
@@ -293,6 +296,7 @@ function Permission({ sessionId, p, onError }: { sessionId: string; p: Permissio
         allow,
         switchMode,
         answers: withAnswers ? Object.entries(answers).map(([question, labels]) => ({ question, labels })) : null,
+        denyMessage: null,
       });
     } catch (e) {
       onError((e as Error).message);

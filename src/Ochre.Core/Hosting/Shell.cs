@@ -36,6 +36,9 @@ public interface IShell
 
     /// <summary>Saves the window layout, closes every window and ends <see cref="Run"/>. Safe from any thread.</summary>
     void Quit();
+
+    /// <summary>A short line added to the tray icon's tooltip ("2 need you"), or null for none. Safe from any thread.</summary>
+    void SetTrayStatus(string? status);
 }
 
 public enum OpenTaskChoice

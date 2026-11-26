@@ -15,6 +15,7 @@ internal static partial class SessionApi
     private const int MaxPrompt = 100_000;
     private const int MaxRole = 40;
     private const int MaxAnswers = 20;
+    private const int MaxDenyMessage = 4_000;
     // Tool inputs and diffs can be whole files; the thread shows enough to recognise the change.
     private const int MaxInputChars = 20_000;
     private const int MaxDiffLines = 400;
@@ -150,7 +151,9 @@ internal static partial class SessionApi
                 answers = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
                 foreach (var a in given) answers[a.Question] = a.Labels;
             }
-            if (!sessions.Respond(Find(sessions, r.Id), r.RequestId, r.Allow, r.SwitchMode, answers))
+            var denyMessage = r.Allow || string.IsNullOrWhiteSpace(r.DenyMessage) ? null : r.DenyMessage.Trim();
+            if (denyMessage is { Length: > MaxDenyMessage }) throw new BridgeRejectException("that message is too long");
+            if (!sessions.Respond(Find(sessions, r.Id), r.RequestId, r.Allow, r.SwitchMode, answers, denyMessage))
                 throw new BridgeRejectException("that prompt is no longer waiting for an answer");
             return new Ack();
         });
@@ -304,7 +307,8 @@ internal static partial class SessionApi
         return lines;
     }
 
-    private static PermissionDto Permission(PermissionItem p) => new(
+    /// <summary>The prompt as the thread shows it. Callers hold the session's gate.</summary>
+    public static PermissionDto Permission(PermissionItem p) => new(
         p.Request.RequestId,
         p.Request.ToolName,
         p.Request.Description,

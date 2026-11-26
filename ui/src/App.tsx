@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { Inbox, InboxBadge } from './attention/Inbox';
+import { attentionNow } from './attention/useAttention';
 import { on, request, type AppInfo, type TaskListItem } from './bridge';
 import { runningModules, type AppContext } from './modules';
 import { SessionView } from './sessions/SessionView';
@@ -13,10 +15,11 @@ import { Today } from './tasks/Today';
 import { useOpenInWindow } from './windows/useOpenInWindow';
 
 // The kernel's views; modules add theirs after these (ADR 0012).
-const kernelViews: { key: string; label: string }[] = [
+const kernelViews: { key: string; label: string; Badge?: ComponentType }[] = [
   { key: 'today', label: 'Today' },
   { key: 'tasks', label: 'Tasks' },
   { key: 'board', label: 'Board' },
+  { key: 'inbox', label: 'Inbox', Badge: InboxBadge },
 ];
 
 interface Thread {
@@ -89,14 +92,43 @@ export function App() {
     setTaskThread(null);
   }, []);
 
-  // Jump to task: Ctrl+K here, or the global hotkey bringing this window forward.
+  // A thread opens beside its task, or on Today for a session no task has.
+  const openThread = useCallback((sessionId: string, taskId: string) => {
+    if (taskId) {
+      setView('tasks');
+      setSelected(taskId);
+      setTaskThread(sessionId);
+    } else {
+      setView('today');
+      setThread({ sessionId, parkNote: null });
+    }
+  }, []);
+
+  // Ctrl+. walks the items needing the user in the inbox's order, wrapping; with none, it shows the inbox.
+  const lastJumped = useRef<string | null>(null);
+  const nextNeedingYou = useCallback(() => {
+    const needs = attentionNow().items.filter((i) => i.needsYou);
+    if (needs.length === 0) {
+      setView('inbox');
+      return;
+    }
+    const at = needs.findIndex((i) => i.id === lastJumped.current);
+    const next = needs[(at + 1) % needs.length];
+    lastJumped.current = next.id;
+    openThread(next.sessionId, next.taskId);
+  }, [openThread]);
+
+  // Jump to task: Ctrl+K here, or the global hotkey bringing this window forward. Ctrl+. for the next item needing you.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'k') return;
-      // Shells use Ctrl+K (clear to the end of the line); a focused terminal keeps it.
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'k' && k !== '.') return;
+      // Shells use Ctrl+K (clear to the end of the line); a focused terminal keeps both.
       if (e.target instanceof Element && e.target.closest('.xterm')) return;
       e.preventDefault();
-      setJumping(true);
+      if (k === 'k') setJumping(true);
+      else nextNeedingYou();
     };
     window.addEventListener('keydown', key);
     const off = on('window.jump', () => setJumping(true));
@@ -104,7 +136,7 @@ export function App() {
       window.removeEventListener('keydown', key);
       off();
     };
-  }, []);
+  }, [nextNeedingYou]);
 
   const show = (v: string) => {
     setView(v);
@@ -152,6 +184,12 @@ export function App() {
             onError={setError}
           />
         )}
+      </main>
+    );
+  } else if (view === 'inbox') {
+    body = (
+      <main className="content">
+        <Inbox tasks={tasks} onOpenTask={openTask} onOpenThread={openThread} onShowOutside={() => show('today')} />
       </main>
     );
   } else if (view === 'board') {

@@ -397,6 +397,14 @@ Slice 1 is the notifications spike, which needs nothing else; slices 2 to 4 are 
 - A permission is allowed or denied in place; a question or plan approval is answered in place with the thread's own cards; anything else opens the thread in this window. A finished item shows the reply's last lines with Open and Dismiss.
 - Ctrl+. in any window goes to the next item needing you (the inbox's order, wrapping), opening its thread. The tray tooltip says how many need you.
 - The task list and Today keep their "needs you" status; they draw it from the same items so the counts agree.
+- Done 2026-11-26; see `docs/testing/m5-inbox-testing.md` and the agreed design in `docs/design/m5-inbox/`. Decisions made while building:
+  - **The pending prompt rides on the item** (`AttentionItemDto.Prompt`, the thread's own `PermissionDto`), so a question or plan is answered in place without fetching the thread.
+  - **Reject with feedback**: `sessions.respond` gained `denyMessage`, passed to Claude as the denial's message (the controller already took one); ignored with an allow, at most 4,000 characters.
+  - **Seen** is reported by `SessionView` itself (on open, on window focus, and when a turn finishes while it's shown), only while its window has focus.
+  - **Answered elsewhere**: a prompt that leaves the list without being answered in this inbox lingers for a moment as "No longer waiting: answered elsewhere, or the agent moved on". The design's "Answered in another window: …" with the answer would need the host to say who answered; not worth it yet.
+  - **"Needs you" on chips** stays the session status (`waiting`), which is the same condition the board reads, so the counts agree without the task list reading the board. A dismissed outside wait still shows "needs you" on its chip, which is true.
+  - **Tray**: `IShell.SetTrayStatus` adds "N need you" to the tray tooltip.
+  - **Link to a task** for an unlinked outside session goes to Today, where the outside sessions and their suggested tasks are listed.
 
 ### Slice 4: notifications
 

@@ -1,0 +1,5 @@
+# Design: attention inbox (M5 slice 3)
+
+Agreed 2026-11-26, before the UI was changed (`docs/ux-conventions.md`, Process), with all three open choices as drawn: a reply box on finished items, questions and plans answered in place (a question with several parts or more than five options shows Open thread instead), and filter pills with counts rather than tabs. Published as a private design canvas at https://claude.ai/artifact/Ta7Xfc57U4qgcSju9RxAAR; this folder is its local copy. Ochre's own colours, as in `docs/design/m4-graph/`, rather than a design system.
+
+Artboards in `project/`: `Main.dc.html` (the **Inbox** title-bar view: filter pills, groups by task, a permission, a question, a finished turn, a plan, a failed turn and an outside session waiting), `States.dc.html` (the title bar with and without the badge, the "waiting on a prompt Ochre can't show" kind, an answer landing and one answered in another window, and how agent chips elsewhere use the same items) and `Empty.dc.html` (nothing needs you). They render only inside the canvas, which supplies `support.js`. Sample tasks, agents and commands are made up.

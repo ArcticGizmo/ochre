@@ -37,7 +37,11 @@ internal sealed class OchreHost : IDisposable
         Sessions.ListChanged += () => Windows.Broadcast(BridgeDispatcher.SerializeEvent("sessions.changed", new Empty(), AppJson.Default.Empty));
         Attention = new AttentionBoard(Sessions);
         Attention.Changed += () =>
-            Windows.Broadcast(BridgeDispatcher.SerializeEvent("attention.changed", AttentionApi.Snapshot(Attention), AppJson.Default.AttentionSnapshot));
+        {
+            var snapshot = AttentionApi.Snapshot(Attention, Sessions);
+            Windows.Broadcast(BridgeDispatcher.SerializeEvent("attention.changed", snapshot, AppJson.Default.AttentionSnapshot));
+            Shell?.SetTrayStatus(TrayStatus(snapshot.NeedsYou));
+        };
         Sessions.StartObserving();
         Parking = new ParkCoordinator(Tasks, Sessions, ParkRequests, log);
         Parking.Changed += id => Windows.Broadcast(BridgeDispatcher.SerializeEvent("tasks.changed", new TaskChangedEvent(id), AppJson.Default.TaskChangedEvent));
@@ -72,7 +76,18 @@ internal sealed class OchreHost : IDisposable
     /// <summary>Set when the user asked to restart (to apply module changes); Program starts a new host after this one exits.</summary>
     public bool RestartRequested { get; private set; }
 
-    public void Attach(IShell shell) => Shell = shell;
+    public void Attach(IShell shell)
+    {
+        Shell = shell;
+        shell.SetTrayStatus(TrayStatus(Attention.Items.Count(i => i.NeedsYou)));
+    }
+
+    private static string? TrayStatus(int needsYou) => needsYou switch
+    {
+        0 => null,
+        1 => "1 needs you",
+        _ => $"{needsYou} need you",
+    };
 
     /// <summary>False for a dev run driven by a test (another desktop, or headless): it mustn't take the user's
     /// system-wide shortcut.</summary>

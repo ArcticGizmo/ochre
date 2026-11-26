@@ -52,6 +52,8 @@ public sealed class WindowsShell : IShell, IShellDevTools
 
     public void Quit() => Post(c => c.Quit());
 
+    public void SetTrayStatus(string? status) => Post(c => c.SetTrayStatus(status));
+
     private void Post(Action<TrayContext> action)
     {
         if (_context is { } context) context.Post(action);
@@ -170,6 +172,13 @@ public sealed class WindowsShell : IShell, IShellDevTools
                 if (e.Button == MouseButtons.Left) OpenWindow();
             };
             Application.Idle += OnFirstIdle;
+        }
+
+        public void SetTrayStatus(string? status)
+        {
+            var text = status is null ? _options.Title : $"{_options.Title}: {status}";
+            // Windows refuses a tray tooltip longer than 127 characters.
+            _tray.Text = text.Length <= 127 ? text : text[..127];
         }
 
         private void OnFirstIdle(object? sender, EventArgs e)

@@ -64,6 +64,7 @@ export interface AttentionItemDto {
   requestId: string | null;
   role: string | null;
   cwd: string;
+  prompt: PermissionDto | null;
 }
 
 export interface AttentionItemRequest {
@@ -327,6 +328,7 @@ export interface RespondRequest {
   allow: boolean;
   switchMode: string | null;
   answers: QuestionAnswerDto[] | null;
+  denyMessage: string | null;
 }
 
 export interface SendPromptRequest {

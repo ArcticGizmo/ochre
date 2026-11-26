@@ -1,0 +1,17 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-26T16:00:00Z" },
+  "title": "Ochre M5 inbox",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 1240, "title": "Inbox: grouped by task, answered in place", "expand": "fill" },
+    "States.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 1240, "title": "Title-bar badge, item kinds and an answered prompt", "expand": "fill" },
+    "Empty.dc.html": { "x": 0, "y": 1360, "w": 1280, "h": 560, "title": "Nothing needs you", "expand": "fill" }
+  },
+  "order": ["Main.dc.html", "States.dc.html", "Empty.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "Ochre: attention inbox (M5 slice 3)", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

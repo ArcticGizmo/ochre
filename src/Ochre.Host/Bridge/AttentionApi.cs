@@ -39,6 +39,7 @@ public enum AttentionKindDto
 /// <param name="Title">What it wants, after the agent's name: "wants to use Bash", "finished".</param>
 /// <param name="Detail">One short line: the command, the question, the reply's last line.</param>
 /// <param name="RequestId">For a permission, question or plan: the prompt to answer with <c>sessions.respond</c>.</param>
+/// <param name="Prompt">That prompt as the thread shows it, so it can be answered in place; null once it has gone.</param>
 public sealed record AttentionItemDto(
     string Id,
     string SessionId,
@@ -50,7 +51,8 @@ public sealed record AttentionItemDto(
     string Since,
     string? RequestId,
     string? Role,
-    string Cwd);
+    string Cwd,
+    PermissionDto? Prompt);
 
 /// <param name="Items">Grouped by task, in the order the inbox shows them.</param>
 /// <param name="NeedsYou">How many items are blocked on the user, for the badge.</param>
@@ -68,7 +70,7 @@ internal static class AttentionApi
     {
         var j = AppJson.Default;
 
-        bridge.Handle("attention.list", j.Empty, j.AttentionSnapshot, _ => Snapshot(board));
+        bridge.Handle("attention.list", j.Empty, j.AttentionSnapshot, _ => Snapshot(board, sessions));
 
         bridge.Handle("attention.seen", j.AttentionSeenRequest, j.Ack, r =>
         {
@@ -84,13 +86,20 @@ internal static class AttentionApi
         });
     }
 
-    public static AttentionSnapshot Snapshot(AttentionBoard board)
+    public static AttentionSnapshot Snapshot(AttentionBoard board, SessionManager sessions)
     {
-        var items = board.Items.Select(Dto).ToList();
+        var items = board.Items.Select(i => Dto(i, PromptOf(i, sessions))).ToList();
         return new AttentionSnapshot(items, items.Count(i => i.NeedsYou));
     }
 
-    private static AttentionItemDto Dto(AttentionItem i) => new(
+    private static PermissionDto? PromptOf(AttentionItem item, SessionManager sessions)
+    {
+        if (item.RequestId is not { } requestId || sessions.Get(item.SessionId) is not { } session) return null;
+        lock (session.Gate)
+            return session.Conversation.PendingPermission is { } p && p.Request.RequestId == requestId ? SessionApi.Permission(p) : null;
+    }
+
+    private static AttentionItemDto Dto(AttentionItem i, PermissionDto? prompt) => new(
         i.Id,
         i.SessionId,
         i.TaskId,
@@ -110,5 +119,6 @@ internal static class AttentionApi
         i.Since.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
         i.RequestId,
         i.Role,
-        i.Cwd);
+        i.Cwd,
+        prompt);
 }

@@ -480,6 +480,11 @@ code {
   box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
 }
 
+.menu-list.context-menu {
+  position: fixed;
+  right: auto;
+}
+
 .menu-item {
   display: flex;
   align-items: center;
@@ -869,7 +874,8 @@ select {
   flex: none;
 }
 
-button.link.gear {
+button.link.gear,
+button.link.icon-only {
   display: inline-flex;
   padding: 4px;
 }

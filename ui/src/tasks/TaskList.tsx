@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { SessionSummary, TaskListItem, TaskStateDto } from '../bridge';
+import { ContextMenu } from '../Menu';
 import { agentStatus, agentWord, byActivity, sessionName, StatePill, when, type AgentStatus } from './present';
 
 type Filter = 'open' | TaskStateDto;
@@ -46,16 +47,19 @@ interface Props {
   search: string;
   onSelect: (id: string) => void;
   onOpenAgent: (taskId: string, sessionId: string) => void;
+  onOpenInWindow: (taskId: string) => void;
   onSearch: (s: string) => void;
   onNew: () => void;
 }
 
 const isRunning = (s: AgentStatus) => s === 'busy' || s === 'idle' || s === 'waiting';
 
-export function TaskList({ tasks, live, selected, openSession, search, onSelect, onOpenAgent, onSearch, onNew }: Props) {
+export function TaskList({ tasks, live, selected, openSession, search, onSelect, onOpenAgent, onOpenInWindow, onSearch, onNew }: Props) {
   const [filter, setFilter] = useState<Filter>('open');
   // Tasks the user opened or closed by hand; the rest are open while one of their agents is running.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   const found = tasks.filter((t) => matchesSearch(t, search));
   const inFilter = (t: TaskListItem, f: Filter) => (f === 'open' ? t.state !== 'done' : t.state === f);
@@ -79,7 +83,15 @@ export function TaskList({ tasks, live, selected, openSession, search, onSelect,
           const needsYou = statuses.filter((s) => s === 'waiting').length;
           const expanded = t.sessions.length > 0 && (toggled[t.id] ?? statuses.some(isRunning));
           return (
-            <li key={t.id} className={t.id === selected && !openSession ? 'selected' : ''} onClick={() => onSelect(t.id)}>
+            <li
+              key={t.id}
+              className={t.id === selected && !openSession ? 'selected' : ''}
+              onClick={() => onSelect(t.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, id: t.id });
+              }}
+            >
               <div className="row">
                 <StatePill state={t.state} small />
                 <span className="title">{t.title}</span>
@@ -148,6 +160,18 @@ export function TaskList({ tasks, live, selected, openSession, search, onSelect,
         })}
       </ul>
       {shown.length === 0 && <p className="empty">{search.trim() ? 'No tasks match.' : 'Nothing here.'}</p>}
+      <ContextMenu
+        at={menu}
+        onClose={closeMenu}
+        items={
+          menu
+            ? [
+                { key: 'open', label: 'Open', onSelect: () => onSelect(menu.id) },
+                { key: 'window', label: 'Open in new window', onSelect: () => onOpenInWindow(menu.id) },
+              ]
+            : []
+        }
+      />
     </aside>
   );
 }

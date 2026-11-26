@@ -43,6 +43,9 @@ public static class BridgeContract
         new("worktrees.create", typeof(WorktreeRequest), typeof(WorktreeDto)),
         new("worktrees.check", typeof(WorktreePathRequest), typeof(WorktreeCheckDto)),
         new("worktrees.remove", typeof(RemoveWorktreeRequest), typeof(Ack)),
+        new("window.get", typeof(Empty), typeof(WindowInfo)),
+        new("window.setTask", typeof(WindowTaskRequest), typeof(Ack)),
+        new("windows.openTask", typeof(OpenTaskRequest), typeof(OpenTaskResult)),
     ];
 
     public static IReadOnlyList<EventContract> Events { get; } =

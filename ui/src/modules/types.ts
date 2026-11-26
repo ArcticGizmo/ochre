@@ -8,6 +8,8 @@ import type { TaskDetail, TaskListItem } from '../bridge';
 export interface AppContext {
   tasks: TaskListItem[];
   openTask: (taskId: string) => void;
+  /** Shows the task in a window of its own on this desktop (asking first if one on another desktop shows it). */
+  openInWindow: (taskId: string) => void;
   /** Shows a view in the title bar, with a parameter it understands (e.g. which terminal tab). */
   showView: (key: string, param?: string | null) => void;
   onError: (message: string) => void;

@@ -3,6 +3,10 @@
 
 export type ItemKindDto = 'user' | 'assistant' | 'note' | 'permission';
 
+export type OpenTaskChoiceDto = 'ask' | 'bring' | 'new';
+
+export type OpenTaskOutcomeDto = 'opened' | 'focused' | 'moved' | 'elsewhere';
+
 export type PartKindDto = 'text' | 'thinking' | 'tool';
 
 export type ResolutionDto = 'pending' | 'allowed' | 'denied' | 'expired' | 'answeredElsewhere';
@@ -103,6 +107,15 @@ export interface ModuleDto {
   enabled: boolean;
   running: boolean;
   error: string | null;
+}
+
+export interface OpenTaskRequest {
+  id: string;
+  choice: OpenTaskChoiceDto;
+}
+
+export interface OpenTaskResult {
+  outcome: OpenTaskOutcomeDto;
 }
 
 export interface OpenTerminalRequest {
@@ -472,6 +485,14 @@ export interface UpdateTaskRequest {
   repos: string[] | null;
 }
 
+export interface WindowInfo {
+  task: string | null;
+}
+
+export interface WindowTaskRequest {
+  task: string | null;
+}
+
 export interface WorktreeCheckDto {
   exists: boolean;
   branch: string | null;
@@ -551,6 +572,9 @@ export interface Requests {
   'worktrees.create': { req: WorktreeRequest; res: WorktreeDto };
   'worktrees.check': { req: WorktreePathRequest; res: WorktreeCheckDto };
   'worktrees.remove': { req: RemoveWorktreeRequest; res: Ack };
+  'window.get': { req: Empty; res: WindowInfo };
+  'window.setTask': { req: WindowTaskRequest; res: Ack };
+  'windows.openTask': { req: OpenTaskRequest; res: OpenTaskResult };
   'git.status': { req: GitStatusRequest; res: GitFolderStatus[] };
   'sprig.status': { req: SprigTaskRequest; res: SprigTaskStatus };
   'sprig.act': { req: SprigActRequest; res: SprigActResult };

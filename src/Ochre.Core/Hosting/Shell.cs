@@ -11,15 +11,59 @@ public interface IShell
 
     /// <summary>
     /// Activates a window on the user's current virtual desktop, or opens a new one there; never switches desktops.
-    /// Safe from any thread.
+    /// The first call also reopens the windows saved when Ochre last quit, each on its own desktop. Safe from any
+    /// thread.
     /// </summary>
     void OpenWindow();
+
+    /// <summary>
+    /// Shows a task in a window on the current desktop: brings forward one already showing it here, or opens a new
+    /// one. When the only windows showing it are on other desktops, <paramref name="choice"/> decides; the shell never
+    /// switches desktops. <paramref name="from"/> (the window that asked) doesn't count as showing it. Safe from any
+    /// thread.
+    /// </summary>
+    Task<OpenTaskOutcome> OpenTaskAsync(string taskId, OpenTaskChoice choice, IShellWindow? from);
 
     /// <summary>Closes every window; the app keeps running in the tray. Safe from any thread.</summary>
     void CloseWindow();
 
-    /// <summary>Closes every window and ends <see cref="Run"/>. Safe from any thread.</summary>
+    /// <summary>Saves the window layout, closes every window and ends <see cref="Run"/>. Safe from any thread.</summary>
     void Quit();
+}
+
+public enum OpenTaskChoice
+{
+    /// <summary>Answer <see cref="OpenTaskOutcome.Elsewhere"/> rather than pick for the user.</summary>
+    Ask,
+
+    /// <summary>Move the window showing it on another desktop to this one.</summary>
+    Bring,
+
+    /// <summary>Open another window for it here.</summary>
+    New,
+}
+
+public enum OpenTaskOutcome
+{
+    Opened,
+    Focused,
+    Moved,
+
+    /// <summary>Only windows on other desktops show it; ask the user.</summary>
+    Elsewhere,
+}
+
+/// <summary>One window, as the host's bridge sees it.</summary>
+public interface IShellWindow
+{
+    /// <summary>Short and unique while the host runs, e.g. <c>w2</c>.</summary>
+    string Id { get; }
+
+    /// <summary>The task the window opened on (restored, or opened for a task), for the page to show first.</summary>
+    string? InitialTask { get; }
+
+    /// <summary>The task the page shows now, as it last reported. Safe from any thread.</summary>
+    void ReportTask(string? taskId);
 }
 
 /// <summary>
@@ -28,11 +72,20 @@ public interface IShell
 /// </summary>
 public interface IShellDevTools
 {
-    /// <summary>Runs <paramref name="script"/> in the most recently used window's page and returns its result as JSON.</summary>
-    Task<string> EvalAsync(string script);
+    /// <summary>
+    /// Runs <paramref name="script"/> in a window's page (<paramref name="windowId"/>, or the most recently used) and
+    /// returns its result as JSON.
+    /// </summary>
+    Task<string> EvalAsync(string script, string? windowId = null);
 
-    /// <summary>Writes a PNG of the most recently used window's page to <paramref name="path"/>.</summary>
-    Task CaptureAsync(string path);
+    /// <summary>Writes a PNG of a window's page (<paramref name="windowId"/>, or the most recently used) to <paramref name="path"/>.</summary>
+    Task CaptureAsync(string path, string? windowId = null);
+
+    /// <summary>One line per open window: id, task, desktop, whether it's on the current desktop, and bounds.</summary>
+    Task<string> ListWindowsAsync();
+
+    /// <summary>Moves a window to a virtual desktop, as the user would from Task View.</summary>
+    Task<string> MoveWindowAsync(string windowId, Guid desktop);
 }
 
 /// <summary>What a shell calls back into: one session per loaded page.</summary>
@@ -45,7 +98,10 @@ public interface IWindowHost
     /// Called once a window's page is wired up. <paramref name="post"/> sends a message to that page and is safe
     /// from any thread.
     /// </summary>
-    IWindowSession Connect(Action<string> post);
+    IWindowSession Connect(IShellWindow window, Action<string> post);
+
+    /// <summary>Whether a task id names a task that exists, so a saved window's task can be dropped when it's gone.</summary>
+    bool TaskExists(string taskId);
 
     void TrayReady();
 }

@@ -136,6 +136,12 @@ export function TaskView({ id, openSession, onOpenSession, sections, folderStatu
           ) : (
             task.state !== 'done' && <button onClick={() => setParking(true)}>Park</button>
           )}
+          <button className="link icon-only" aria-label="Open in new window" title="Open in new window" onClick={() => ctx.openInWindow(task.id)}>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="1.7" y="4.7" width="9.6" height="9.6" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M5 1.7h7.8a1.5 1.5 0 0 1 1.5 1.5V11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
           <Menu
             ariaLabel="More actions"
             buttonClass="link more"

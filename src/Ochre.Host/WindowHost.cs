@@ -30,11 +30,14 @@ internal sealed class WindowHost : IWindowHost
         if (requested != 0) _host.Log.Info($"window ready {Stopwatch.GetElapsedTime(requested).TotalMilliseconds:F0} ms after open request");
     }
 
-    public IWindowSession Connect(Action<string> post)
+    public bool TaskExists(string taskId) => _host.Tasks.Get(taskId) is not null;
+
+    public IWindowSession Connect(IShellWindow window, Action<string> post)
     {
         var dispatcher = new BridgeDispatcher(post);
         dispatcher.UnexpectedError += (type, ex) => _host.Log.Error($"bridge {type} failed", ex);
         AppApi.Register(dispatcher, _host);
+        WindowApi.Register(dispatcher, _host, window);
         TaskApi.Register(dispatcher, _host.Tasks, _host.Parking);
         SessionApi.Register(dispatcher, _host.Sessions);
         WorktreeApi.Register(dispatcher, _host.Tasks, _host.Modules, _host.Sessions);

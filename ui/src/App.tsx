@@ -9,6 +9,7 @@ import { TaskBoard } from './tasks/TaskBoard';
 import { TaskList } from './tasks/TaskList';
 import { TaskView } from './tasks/TaskView';
 import { Today } from './tasks/Today';
+import { useOpenInWindow } from './windows/useOpenInWindow';
 
 // The kernel's views; modules add theirs after these (ADR 0012).
 const kernelViews: { key: string; label: string }[] = [
@@ -37,8 +38,11 @@ export function App() {
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Until the host has said which task this window opened on, don't report one back.
+  const [windowKnown, setWindowKnown] = useState(false);
   const live = useSessions();
   const modules = useMemo(() => runningModules(info?.modules ?? []), [info]);
+  const { openInWindow, dialog: openInWindowDialog } = useOpenInWindow(tasks, setError);
 
   const refreshList = useCallback(() => {
     request('tasks.list', {})
@@ -50,9 +54,31 @@ export function App() {
     request('app.info', {})
       .then(setInfo)
       .catch((e: Error) => setError(e.message));
+    request('window.get', {})
+      .then((w) => {
+        if (w.task) {
+          setView('tasks');
+          setSelected(w.task);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setWindowKnown(true));
     refreshList();
     return on('tasks.changed', refreshList);
   }, [refreshList]);
+
+  // The task this window shows, if any: what the host saves for the next start and matches when a task is opened
+  // in its own window. Only the Tasks view counts; a task left selected behind Today isn't on screen.
+  const shownTask = view === 'tasks' ? selected : null;
+  useEffect(() => {
+    if (windowKnown) request('window.setTask', { task: shownTask }).catch(() => {});
+  }, [windowKnown, shownTask]);
+
+  const shownTitle = tasks.find((t) => t.id === shownTask)?.title;
+  useEffect(() => {
+    // The host puts this in the window's title bar, so windows can be told apart in Alt+Tab and Task View.
+    document.title = shownTask ? `${shownTask} ${shownTitle ?? ''}`.trim() : 'Ochre';
+  }, [shownTask, shownTitle]);
 
   const openTask = useCallback((id: string) => {
     setView('tasks');
@@ -72,13 +98,14 @@ export function App() {
     () => ({
       tasks,
       openTask,
+      openInWindow,
       showView: (key, param) => {
         setView(key);
         if (param !== undefined) setParam(key, param);
       },
       onError: setError,
     }),
-    [tasks, openTask, setParam],
+    [tasks, openTask, openInWindow, setParam],
   );
 
   const moduleView = modules.find((m) => m.view?.key === view)?.view;
@@ -130,6 +157,7 @@ export function App() {
             setSelected(taskId);
             setTaskThread(sessionId);
           }}
+          onOpenInWindow={openInWindow}
           onSearch={setSearch}
           onNew={() => setCreating(true)}
         />
@@ -193,6 +221,7 @@ export function App() {
       )}
       <div className="body">{body}</div>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {openInWindowDialog}
       <NewTaskDialog
         open={creating}
         onClose={() => setCreating(false)}

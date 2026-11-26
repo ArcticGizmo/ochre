@@ -9,10 +9,11 @@ public sealed record ShellOptions(
     /// <summary>Load the UI from a Vite dev server instead of disk (dev builds only).</summary>
     public Uri? DevServer { get; init; }
 
-    /// <summary>Hide the window on close so it reopens instantly, at the cost of keeping the WebView's memory.</summary>
-    public bool HideOnClose { get; init; }
-
-    /// <summary>Dev aid: open windows unfocused on this virtual desktop so test runs don't land on the user's screen.</summary>
+    /// <summary>
+    /// Dev aid: open windows unfocused on this virtual desktop so test runs don't land on the user's screen. It stands
+    /// in for the user's current desktop: "here" is this desktop, and windows are brought to it rather than to the
+    /// user's.
+    /// </summary>
     public Guid? VirtualDesktop { get; init; }
 
     /// <summary>Dev aid: open windows off-screen, without a taskbar button or focus, so an agent can drive and capture
@@ -23,4 +24,7 @@ public sealed record ShellOptions(
     public bool Unattended => Headless || VirtualDesktop is not null;
 
     public bool EnableDevTools { get; init; }
+
+    /// <summary>Where the open windows are saved for the next start (<c>windows.json</c>).</summary>
+    public string? WindowLayoutFile { get; init; }
 }

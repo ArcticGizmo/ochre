@@ -10,8 +10,9 @@ namespace Ochre.Host;
 internal static class Program
 {
     /// <summary>
-    /// <c>ochre</c> opens the window (starting the host if needed); <c>ochre --tray</c> starts in the tray only (for
-    /// sign-in); <c>ochre --close-window</c> closes the running instance's window. Everything else goes through the
+    /// <c>ochre</c> opens a window (starting the host if needed, which reopens the windows saved at the last quit);
+    /// <c>ochre --tray</c> starts in the tray only (for sign-in; the saved windows reopen with the first window
+    /// opened); <c>ochre --close-window</c> closes the running instance's windows. Everything else goes through the
     /// console CLI (src/Ochre.Cli), which talks to this process over the instance pipe.
     /// </summary>
     [STAThread]
@@ -85,6 +86,8 @@ internal static class Program
             case "open":
                 shell.OpenWindow();
                 return "ok";
+            case "open-task" when argument is not null:
+                return await OpenTask(shell, host, argument).ConfigureAwait(false);
             case "close":
                 shell.CloseWindow();
                 return "ok";
@@ -93,10 +96,19 @@ internal static class Program
                 return "ok";
 #if DEBUG
             case "dev-eval" when argument is not null:
-                return await ((IShellDevTools)shell).EvalAsync(argument).ConfigureAwait(false);
-            case "dev-capture" when argument is not null && Path.IsPathFullyQualified(argument):
-                await ((IShellDevTools)shell).CaptureAsync(argument).ConfigureAwait(false);
-                return argument;
+                var (evalWindow, script) = DevTarget(argument);
+                return await ((IShellDevTools)shell).EvalAsync(script, evalWindow).ConfigureAwait(false);
+            case "dev-capture" when argument is not null:
+                var (captureWindow, path) = DevTarget(argument);
+                if (!Path.IsPathFullyQualified(path)) return "error: the capture path must be absolute";
+                await ((IShellDevTools)shell).CaptureAsync(path, captureWindow).ConfigureAwait(false);
+                return path;
+            case "dev-windows":
+                return await ((IShellDevTools)shell).ListWindowsAsync().ConfigureAwait(false);
+            case "dev-move-window" when argument is not null:
+                var (moveWindow, desktop) = DevTarget(argument);
+                if (moveWindow is null || !Guid.TryParse(desktop, out var desktopId)) return "error: expected a window id and a desktop guid";
+                return await ((IShellDevTools)shell).MoveWindowAsync(moveWindow, desktopId).ConfigureAwait(false);
             case "dev-session-ending":
                 // What Windows' shutdown request does, without shutting down; the cancel check runs as it would.
                 host.Modules.SessionEnding();
@@ -110,6 +122,30 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// <c>ochre-cli open T-0042 [--bring|--new]</c>. The reply is the outcome (<c>opened</c>, <c>focused</c>,
+    /// <c>moved</c>), or <c>elsewhere</c> when only a window on another desktop shows the task and the CLI should ask.
+    /// </summary>
+    private static async Task<string> OpenTask(WindowsShell shell, OchreHost host, string argument)
+    {
+        var parts = argument.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var id = parts.Length > 0 ? parts[0] : "";
+        if (id.Length > 64 || host.Tasks.Get(id) is null) return $"error: no task {id}";
+        var choice = parts.Length > 1 && parts[1] == "bring" ? OpenTaskChoice.Bring : parts.Length > 1 && parts[1] == "new" ? OpenTaskChoice.New : OpenTaskChoice.Ask;
+        var outcome = await shell.OpenTaskAsync(id, choice, null).ConfigureAwait(false);
+        return outcome.ToString().ToLowerInvariant();
+    }
+
+#if DEBUG
+    /// <summary>A dev command's argument, optionally led by a window id and a newline (the CLI's <c>--window</c>).</summary>
+    private static (string? Window, string Value) DevTarget(string argument)
+    {
+        var newline = argument.IndexOf('\n', StringComparison.Ordinal);
+        if (newline > 0 && argument[0] == 'w' && argument[1..newline].All(char.IsAsciiDigit)) return (argument[..newline], argument[(newline + 1)..]);
+        return (null, argument);
+    }
+#endif
+
     private static ShellOptions ShellOptionsFor(OchreProfile profile, OchrePaths paths, AppLog log)
     {
         var options = new ShellOptions(
@@ -118,7 +154,7 @@ internal static class Program
             paths.WebView,
             log.Info)
         {
-            HideOnClose = Environment.GetEnvironmentVariable("OCHRE_HIDE_ON_CLOSE") == "1",
+            WindowLayoutFile = paths.WindowLayout,
             VirtualDesktop = Guid.TryParse(Environment.GetEnvironmentVariable("OCHRE_DEV_DESKTOP"), out var desktop) ? desktop : null,
         };
 #if DEBUG

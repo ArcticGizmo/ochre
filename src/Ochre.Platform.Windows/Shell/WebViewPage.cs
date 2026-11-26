@@ -18,7 +18,8 @@ internal sealed class WebViewPage : IDisposable
     private readonly string _allowedOrigin;
     private bool _closed;
 
-    public WebViewPage(CoreWebView2 core, IWindowHost host, ShellOptions options, IUrlOpener urls, Func<bool> onUiThread, Action<Action> postToUi)
+    /// <param name="onTitle">The page's title changed (UI thread); untrusted text.</param>
+    public WebViewPage(CoreWebView2 core, IShellWindow window, IWindowHost host, ShellOptions options, IUrlOpener urls, Func<bool> onUiThread, Action<Action> postToUi, Action<string> onTitle)
     {
         _core = core;
         _urls = urls;
@@ -54,12 +55,18 @@ internal sealed class WebViewPage : IDisposable
         };
         core.PermissionRequested += (_, e) => e.State = CoreWebView2PermissionState.Deny;
 
-        _session = host.Connect(Post);
+        core.DocumentTitleChanged += (_, _) =>
+        {
+            if (!_closed) onTitle(core.DocumentTitle ?? "");
+        };
+
+        _session = host.Connect(window, Post);
         core.WebMessageReceived += OnWebMessage;
         core.Navigate(options.DevServer?.AbsoluteUri ?? $"https://{HostName}/index.html");
     }
 
-    /// <summary>A hidden-then-shown window has no page load, so tell the page it is visible again.</summary>
+    /// <summary>A window brought back into view (restored from minimised, or moved here from another desktop) has no
+    /// page load, so tell the page it is visible again.</summary>
     public void NotifyShown() => Post("{\"event\":\"window.shown\",\"payload\":{}}");
 
     private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)

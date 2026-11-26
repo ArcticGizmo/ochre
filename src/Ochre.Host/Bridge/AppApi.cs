@@ -61,6 +61,10 @@ public sealed record OpenUrlRequest(string Url, bool NewWindow);
 [JsonSerializable(typeof(WorktreePathRequest))]
 [JsonSerializable(typeof(WorktreeCheckDto))]
 [JsonSerializable(typeof(RemoveWorktreeRequest))]
+[JsonSerializable(typeof(WindowInfo))]
+[JsonSerializable(typeof(WindowTaskRequest))]
+[JsonSerializable(typeof(OpenTaskRequest))]
+[JsonSerializable(typeof(OpenTaskResult))]
 internal sealed partial class AppJson : JsonSerializerContext;
 
 /// <summary>App-level bridge messages: identity, window lifecycle and settings.</summary>

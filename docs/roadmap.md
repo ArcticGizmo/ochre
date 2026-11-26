@@ -59,9 +59,9 @@ The user keeps specific tasks on specific virtual desktops, so Ochre must suppor
 - Opening a task that's already open in a window on another desktop asks: bring that window here, or open another view here. It never silently switches desktops.
 - Closing a window closes only that view; the host and other windows carry on (ADR 0008).
 
-Started early (2026-11-26, at the user's request): the tray brings forward a window on the current desktop, or opens a new one there; see [testing/window-per-desktop-testing.md](testing/window-per-desktop-testing.md). Opening a specific task in its own window, and remembering desktops across a restart, are still M4.
+Started early (2026-11-26, at the user's request): the tray brings forward a window on the current desktop, or opens a new one there; see [testing/window-per-desktop-testing.md](testing/window-per-desktop-testing.md). Done in M4 slice 4 (2026-11-26): task windows, the "bring it here or open another" question, and windows reopening on their desktops and monitors; see [testing/m4-windows-testing.md](testing/m4-windows-testing.md). The "jump to task" hotkey is still to do.
 
-Until then, don't build anything that assumes a single window: per-window UI state (selected task, scroll) lives in the page, and host events go to every window (WindowHost already broadcasts).
+Don't build anything that assumes a single window: per-window UI state (selected task, scroll) lives in the page, and host events go to every window (WindowHost already broadcasts).
 
 ## M5: attention inbox and Roost grid
 

@@ -1,6 +1,7 @@
 :root {
   --bg: #1b1a19;
   --panel: #242322;
+  --term-bg: #141312;
   --raised: #2e2c2a;
   --line: #3a3836;
   --text: #e8e4df;
@@ -1602,4 +1603,156 @@ button.agent-chip:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Terminal tabs (M3, docs/design/m3-terminals). */
+.mono {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+}
+
+.nav-count {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.terminals {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminals-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.term-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  flex: none;
+}
+
+.term-tab {
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding-right: 4px;
+  flex: none;
+}
+
+.term-tab.on {
+  background: var(--term-bg);
+  border-color: var(--line);
+}
+
+.term-tab-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 6px 4px 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.term-tab.on .term-tab-main,
+.term-tab-main:hover {
+  color: var(--text);
+}
+
+.term-tab-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.term-tab-sub {
+  font-size: 12px;
+}
+
+.term-chip {
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--accent-text);
+}
+
+button.link.term-close {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 4px;
+}
+
+button.link.term-close:hover {
+  color: var(--text);
+  background: var(--line);
+}
+
+.term-new {
+  margin: 0 0 4px 6px;
+  padding: 2px 10px;
+  font-size: 13px;
+  flex: none;
+}
+
+.term-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 5px 16px;
+  font-size: 13px;
+  background: var(--term-bg);
+  border-bottom: 1px solid var(--panel);
+  flex: none;
+}
+
+.term-info .path {
+  max-width: 360px;
+}
+
+button.link.term-task {
+  color: var(--accent-text);
+  padding: 0;
+}
+
+.term-surface {
+  flex: 1;
+  min-height: 0;
+  background: var(--term-bg);
+  padding: 6px 0 0 10px;
+  display: flex;
+}
+
+.xterm-box {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.term-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 16px;
+  font-size: 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  min-height: 24px;
+  flex: none;
 }

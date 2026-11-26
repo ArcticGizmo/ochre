@@ -21,6 +21,7 @@ public sealed record TerminalDto(
     string OpenedAt);
 
 /// <param name="Profile">A shell profile id from terminals.profiles.</param>
+/// <param name="Folder">An absolute folder; empty opens in the user's home folder.</param>
 /// <param name="TaskId">The task this terminal belongs to, if any.</param>
 /// <param name="StartupCommand">Typed into the shell once it starts, e.g. <c>pnpm dev</c>.</param>
 public sealed record OpenTerminalRequest(string Profile, string Folder, string? TaskId, string? StartupCommand, int Cols, int Rows);

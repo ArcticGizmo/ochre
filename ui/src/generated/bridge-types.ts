@@ -80,6 +80,11 @@ export interface OpenTerminalRequest {
   rows: number;
 }
 
+export interface OpenUrlRequest {
+  url: string;
+  newWindow: boolean;
+}
+
 export interface ParkDto {
   at: string;
   note: string;
@@ -346,6 +351,7 @@ export interface UpdateTaskRequest {
 export interface Requests {
   'app.info': { req: Empty; res: AppInfo };
   'app.ready': { req: Empty; res: Ack };
+  'app.openUrl': { req: OpenUrlRequest; res: Ack };
   'settings.get': { req: Empty; res: SettingsDto };
   'settings.update': { req: SettingsDto; res: SettingsDto };
   'tasks.list': { req: Empty; res: TaskListItem[] };

@@ -20,6 +20,7 @@ How Ochre's UI should behave. Follow these when building any view; propose a cha
 - The ID sits under the title, not beside it.
 - Status is a dropdown, and each status has its own colour, used everywhere it appears (list, board, detail), so state reads at a glance: Backlog warm grey, Active ochre, Parked blue, Done green (`--st-*` in `ui/src/styles.css`). Choosing a state that has its own flow (Parked) opens that flow; a terminal one (Done) is confirmed.
 - An agent's status is a dot and a word, the same everywhere: working, ready, needs you, dormant (hollow dot: no process, sending resumes it), ended (can't be opened).
+- A terminal's status is the same dot: running (green), or exited with its code (hollow).
 - Content that isn't full width has a max width and is centred, rather than leaving a wide empty gutter on the right.
 
 ## General

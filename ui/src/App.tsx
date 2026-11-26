@@ -8,13 +8,17 @@ import { TaskBoard } from './tasks/TaskBoard';
 import { TaskList } from './tasks/TaskList';
 import { TaskView } from './tasks/TaskView';
 import { Today } from './tasks/Today';
+import { NewTerminalDialog } from './terminals/NewTerminalDialog';
+import { TerminalsView } from './terminals/TerminalsView';
+import { useTerminals } from './terminals/useTerminals';
 
-type View = 'today' | 'tasks' | 'board';
+type View = 'today' | 'tasks' | 'board' | 'terminals';
 
 const views: { key: View; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'tasks', label: 'Tasks' },
   { key: 'board', label: 'Board' },
+  { key: 'terminals', label: 'Terminals' },
 ];
 
 interface Thread {
@@ -36,6 +40,10 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const live = useSessions();
+  const terminals = useTerminals();
+  const [terminal, setTerminal] = useState<string | null>(null);
+  // Open while the New terminal dialog is up; holds the task it was opened from.
+  const [newTerminal, setNewTerminal] = useState<{ taskId: string | null } | null>(null);
 
   const refreshList = useCallback(() => {
     request('tasks.list', {})
@@ -63,8 +71,25 @@ export function App() {
     if (v === 'today') setThread(null);
   };
 
+  const openTerminal = (id: string) => {
+    setView('terminals');
+    setTerminal(id);
+  };
+
   let body;
-  if (view === 'today') {
+  if (view === 'terminals') {
+    body = (
+      <TerminalsView
+        terminals={terminals}
+        tasks={tasks}
+        selected={terminal}
+        onSelect={setTerminal}
+        onNew={() => setNewTerminal({ taskId: null })}
+        onOpenTask={openTask}
+        onError={setError}
+      />
+    );
+  } else if (view === 'today') {
     body = (
       <main className="content">
         {thread ? (
@@ -110,7 +135,17 @@ export function App() {
         />
         <main className="content">
           {selected ? (
-            <TaskView key={selected} id={selected} openSession={taskThread} onOpenSession={setTaskThread} onError={setError} onDeleted={() => setSelected(null)} />
+            <TaskView
+              key={selected}
+              id={selected}
+              openSession={taskThread}
+              onOpenSession={setTaskThread}
+              terminals={terminals}
+              onOpenTerminal={openTerminal}
+              onNewTerminal={(taskId) => setNewTerminal({ taskId })}
+              onError={setError}
+              onDeleted={() => setSelected(null)}
+            />
           ) : (
             <p className="empty">{tasks.length ? 'Select a task.' : 'Create a task to start. Agents are launched from tasks.'}</p>
           )}
@@ -128,6 +163,7 @@ export function App() {
           {views.map((v) => (
             <button key={v.key} className={view === v.key ? 'nav on' : 'nav'} aria-current={view === v.key ? 'page' : undefined} onClick={() => show(v.key)}>
               {v.label}
+              {v.key === 'terminals' && terminals.length > 0 && <span className="nav-count">{terminals.length}</span>}
             </button>
           ))}
         </nav>
@@ -155,6 +191,16 @@ export function App() {
       )}
       <div className="body">{body}</div>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <NewTerminalDialog
+        open={newTerminal !== null}
+        taskId={newTerminal?.taskId ?? null}
+        tasks={tasks}
+        onClose={() => setNewTerminal(null)}
+        onOpened={(id) => {
+          setNewTerminal(null);
+          openTerminal(id);
+        }}
+      />
       <NewTaskDialog
         open={creating}
         onClose={() => setCreating(false)}

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Ochre.Core.Bridge;
+using Ochre.Core.Platform;
 
 namespace Ochre.Host.Bridge;
 
@@ -10,6 +11,9 @@ public sealed record AppInfo(string Version, string Profile);
 
 /// <param name="AutoParkOnShutdown">Park tasks with running agents, with an automatic note, when Windows shuts down or signs out.</param>
 public sealed record SettingsDto(bool AutoParkOnShutdown);
+
+/// <param name="NewWindow">Open a new browser window (middle click) rather than reuse the last one.</param>
+public sealed record OpenUrlRequest(string Url, bool NewWindow);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -40,6 +44,7 @@ public sealed record SettingsDto(bool AutoParkOnShutdown);
 [JsonSerializable(typeof(SetEffortRequest))]
 [JsonSerializable(typeof(BindSessionRequest))]
 [JsonSerializable(typeof(SettingsDto))]
+[JsonSerializable(typeof(OpenUrlRequest))]
 [JsonSerializable(typeof(SessionUpdateEvent))]
 [JsonSerializable(typeof(IReadOnlyList<ShellProfileDto>))]
 [JsonSerializable(typeof(IReadOnlyList<TerminalDto>))]
@@ -65,6 +70,14 @@ internal static class AppApi
         {
             host.Settings.AutoParkOnShutdown = r.AutoParkOnShutdown;
             return new SettingsDto(host.Settings.AutoParkOnShutdown);
+        });
+        // Links from untrusted text (terminal output) open here; OpenTargets keeps it to web and mail links.
+        bridge.Handle("app.openUrl", j.OpenUrlRequest, j.Ack, r =>
+        {
+            if (r.Url.Length > 4096 || OpenTargets.WebUrl(r.Url) is not { } url) throw new BridgeRejectException("only web links can be opened");
+            if (r.NewWindow) host.Urls.OpenInNewWindow(url);
+            else host.Urls.Open(url);
+            return new Ack();
         });
         bridge.Handle("app.ready", j.Empty, j.Ack, _ =>
         {

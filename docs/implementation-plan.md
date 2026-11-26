@@ -223,6 +223,7 @@ Planned 2026-11-26. Perch has no terminal code, so everything here is new or lif
 - Links: hovering shows the target; Ctrl+click opens it in the browser through the host, which re-checks the scheme; middle click opens a new browser window (UX conventions).
 - Input from a window is sent only while that window has focus, and never while it replays scrollback, so query replies from a second window or a replay don't reach the shell. PTY size follows the window that last resized it.
 - Terminals attach to a task: opened from the task (folder from its repos), or attached and detached from the tab's menu. The task view lists its terminals.
+- Done 2026-11-26; see `docs/testing/m3-terminal-tabs-testing.md`. Design agreed as a first pass (Terminals title-bar tab; the task lists its terminals). Links open through a new `app.openUrl` bridge call, checked by `OpenTargets.WebUrl` on the host. Input counts as the user's when the window has focus or within a second of a key, paste or click in that terminal; relying on `document.hasFocus()` alone risked silently dropping typing. xterm is a separate 337 KB chunk loaded on first use. An empty folder opens in the home folder. The "keep scrollback" switch moves to slice 3, where it does something.
 
 ### Slice 3: restore across quit
 

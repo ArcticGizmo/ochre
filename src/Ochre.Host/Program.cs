@@ -33,8 +33,9 @@ internal static class Program
         AppDomain.CurrentDomain.UnhandledException += (_, e) => log.Error("unhandled exception", e.ExceptionObject as Exception);
         log.Info($"starting {AppInfoProvider.Version} profile={(profile.IsDefault ? "default" : profile.Name)}");
 
-        using var host = new OchreHost(profile, paths, log, new Ochre.Platform.Windows.Terminals.ConPtyPlatform());
-        var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), new UrlOpener());
+        var urls = new UrlOpener();
+        using var host = new OchreHost(profile, paths, log, new Ochre.Platform.Windows.Terminals.ConPtyPlatform(), urls);
+        var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), urls);
         host.Attach(shell);
         var agents = new AgentCommands(host.Tasks, host.ParkRequests);
         using var ending = new SessionEnding();

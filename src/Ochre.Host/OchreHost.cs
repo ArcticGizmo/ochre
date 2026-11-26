@@ -15,8 +15,9 @@ namespace Ochre.Host;
 /// </summary>
 internal sealed class OchreHost : IDisposable
 {
-    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log, ITerminalPlatform terminalPlatform)
+    public OchreHost(OchreProfile profile, OchrePaths paths, AppLog log, ITerminalPlatform terminalPlatform, IUrlOpener urls)
     {
+        Urls = urls;
         Profile = profile;
         Paths = paths;
         Log = log;
@@ -44,6 +45,9 @@ internal sealed class OchreHost : IDisposable
 
     /// <summary>Terminal tabs; their shells keep running with every window closed, until the host quits.</summary>
     public TerminalManager Terminals { get; }
+
+    /// <summary>Opens web links in the user's browser.</summary>
+    public IUrlOpener Urls { get; }
 
     /// <summary>Agents asked for a park note; shared with the agent command handler, which takes the notes.</summary>
     public ParkRequests ParkRequests { get; } = new();

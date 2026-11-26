@@ -27,7 +27,8 @@ internal static class TerminalApi
         bridge.Handle("terminals.open", j.OpenTerminalRequest, j.TerminalDto, r =>
         {
             var folder = r.Folder.Trim();
-            if (folder.Length == 0 || folder.Length > 1024 || !Path.IsPathFullyQualified(folder)) throw new BridgeRejectException("choose an absolute folder");
+            if (folder.Length == 0) folder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (folder.Length > 1024 || !Path.IsPathFullyQualified(folder)) throw new BridgeRejectException("choose an absolute folder");
             folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
             if (!Directory.Exists(folder)) throw new BridgeRejectException($"folder not found: {folder}");
             var taskId = CheckTask(r.TaskId, tasks);

@@ -14,6 +14,7 @@ public static class BridgeContract
     [
         new("app.info", typeof(Empty), typeof(AppInfo)),
         new("app.ready", typeof(Empty), typeof(Ack)),
+        new("app.openUrl", typeof(OpenUrlRequest), typeof(Ack)),
         new("settings.get", typeof(Empty), typeof(SettingsDto)),
         new("settings.update", typeof(SettingsDto), typeof(SettingsDto)),
         new("tasks.list", typeof(Empty), typeof(IReadOnlyList<TaskListItem>)),

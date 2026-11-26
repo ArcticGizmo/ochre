@@ -4,7 +4,8 @@ using System.Runtime.InteropServices.Marshalling;
 namespace Ochre.Platform.Windows.Shell;
 
 /// <summary>
-/// Dev aid: moves one of our own windows to another virtual desktop so test runs don't land on the user's screen.
+/// Virtual desktops through the documented IVirtualDesktopManager: whether one of our windows is on the desktop the
+/// user is looking at, and (a dev aid) moving one to another desktop so test runs don't land on the user's screen.
 /// Windows only lets a process move its own windows.
 /// </summary>
 internal static partial class VirtualDesktop
@@ -22,18 +23,35 @@ internal static partial class VirtualDesktop
     public static bool TryMove(nint hwnd, Guid desktop, Action<string> log)
     {
         if (hwnd == 0) return false;
+        var result = WithManager(m => m.MoveWindowToDesktop(hwnd, desktop), log);
+        if (result is { } hr and not 0) log($"move to virtual desktop failed: 0x{hr:X8}");
+        return result == 0;
+    }
+
+    /// <summary>
+    /// Whether the window is on the desktop the user is looking at. When Windows can't say (no desktops, the
+    /// service unavailable), it answers yes, so the caller falls back to reusing the window.
+    /// </summary>
+    public static bool IsOnCurrentDesktop(nint hwnd, Action<string> log)
+    {
+        if (hwnd == 0) return true;
+        var onCurrent = 1;
+        var result = WithManager(m => m.IsWindowOnCurrentVirtualDesktop(hwnd, out onCurrent), log);
+        return result != 0 || onCurrent != 0;
+    }
+
+    private static int? WithManager(Func<IVirtualDesktopManager, int> call, Action<string> log)
+    {
         var hr = CoCreateInstance(ManagerClsid, 0, 1 | 4 /* CLSCTX_INPROC_SERVER | CLSCTX_LOCAL_SERVER */, ManagerIid, out var ptr);
         if (hr != 0)
         {
             log($"virtual desktop manager unavailable: 0x{hr:X8}");
-            return false;
+            return null;
         }
         try
         {
             var manager = (IVirtualDesktopManager)new StrategyBasedComWrappers().GetOrCreateObjectForComInstance(ptr, CreateObjectFlags.None);
-            hr = manager.MoveWindowToDesktop(hwnd, desktop);
-            if (hr != 0) log($"move to virtual desktop failed: 0x{hr:X8}");
-            return hr == 0;
+            return call(manager);
         }
         finally
         {

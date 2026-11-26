@@ -4,7 +4,10 @@ using Ochre.Core.Platform;
 
 namespace Ochre.Platform.Windows.Shell;
 
-/// <summary>Tray icon plus one WebView2 window, on a WinForms message loop. Draws no UI of its own.</summary>
+/// <summary>
+/// Tray icon plus WebView2 windows, at most one per virtual desktop from the tray, on a WinForms message loop. Draws
+/// no UI of its own.
+/// </summary>
 public sealed class WindowsShell : IShell, IShellDevTools
 {
     private readonly IWindowHost _host;
@@ -82,7 +85,8 @@ public sealed class WindowsShell : IShell, IShellDevTools
         private readonly Control _invoker = new();
         private readonly Icon _icon = AppIcon.Create();
         private Task<CoreWebView2Environment>? _environment;
-        private MainWindow? _window;
+        // Most recently used last; dev eval and capture act on the last one.
+        private readonly List<MainWindow> _windows = [];
 
         public TrayContext(IWindowHost host, ShellOptions options, IUrlOpener urls)
         {
@@ -104,7 +108,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
             Application.Idle += OnFirstIdle;
         }
 
-        public CoreWebView2? Core => _window is { IsDisposed: false } w ? w.Core : null;
+        public CoreWebView2? Core => _windows.LastOrDefault(w => !w.IsDisposed)?.Core;
 
         private void OnFirstIdle(object? sender, EventArgs e)
         {
@@ -127,13 +131,18 @@ public sealed class WindowsShell : IShell, IShellDevTools
         public void OpenWindow()
         {
             _host.WindowOpenRequested();
-            if (_window is { IsDisposed: false })
+            // A window on the desktop the user is on comes forward; one on another desktop is left where it is, and a
+            // new window opens here instead (roadmap, "Multiple windows": never switch desktops). The dev setting
+            // puts every window on one other desktop, so there the single window is always reused.
+            var here = _windows.LastOrDefault(w => !w.IsDisposed && (_options.VirtualDesktop is not null || VirtualDesktop.IsOnCurrentDesktop(w.Handle, _options.Log)));
+            if (here is not null)
             {
-                var wasHidden = !_window.Visible;
-                _window.Show();
-                if (_window.WindowState == FormWindowState.Minimized) _window.WindowState = FormWindowState.Normal;
-                if (_options.VirtualDesktop is null) _window.Activate();
-                if (wasHidden) _window.NotifyShown();
+                var wasHidden = !here.Visible;
+                here.Show();
+                if (here.WindowState == FormWindowState.Minimized) here.WindowState = FormWindowState.Normal;
+                if (_options.VirtualDesktop is null) here.Activate();
+                if (wasHidden) here.NotifyShown();
+                Touch(here);
                 return;
             }
 
@@ -141,22 +150,32 @@ public sealed class WindowsShell : IShell, IShellDevTools
                 null,
                 _options.WebViewDataFolder,
                 new CoreWebView2EnvironmentOptions(_options.VirtualDesktop is null ? null : VirtualDesktop.UnthrottledBrowserArguments));
-            _window = new MainWindow(_host, _options, _urls, _environment, _icon);
-            _window.FormClosed += (_, _) => _window = null;
-            _window.Show();
+            var window = new MainWindow(_host, _options, _urls, _environment, _icon);
+            window.FormClosed += (_, _) => _windows.Remove(window);
+            window.Activated += (_, _) => Touch(window);
+            _windows.Add(window);
+            window.Show();
+        }
+
+        private void Touch(MainWindow window)
+        {
+            _windows.Remove(window);
+            _windows.Add(window);
         }
 
         public void CloseWindow()
         {
-            if (_window is not { IsDisposed: false }) return;
-            if (_options.HideOnClose) _window.Hide();
-            else _window.Close();
+            foreach (var window in _windows.Where(w => !w.IsDisposed).ToList())
+            {
+                if (_options.HideOnClose) window.Hide();
+                else window.Close();
+            }
         }
 
         public void Quit()
         {
             _tray.Visible = false;
-            if (_window is { IsDisposed: false }) _window.CloseForQuit();
+            foreach (var window in _windows.Where(w => !w.IsDisposed).ToList()) window.CloseForQuit();
             ExitThread();
         }
 

@@ -9,10 +9,13 @@ public interface IShell
     /// <summary>Runs the tray and message loop on the calling thread until <see cref="Quit"/>.</summary>
     void Run(bool openWindow);
 
-    /// <summary>Opens or activates the window. Safe from any thread.</summary>
+    /// <summary>
+    /// Activates a window on the user's current virtual desktop, or opens a new one there; never switches desktops.
+    /// Safe from any thread.
+    /// </summary>
     void OpenWindow();
 
-    /// <summary>Closes the window; the app keeps running in the tray. Safe from any thread.</summary>
+    /// <summary>Closes every window; the app keeps running in the tray. Safe from any thread.</summary>
     void CloseWindow();
 
     /// <summary>Closes every window and ends <see cref="Run"/>. Safe from any thread.</summary>
@@ -25,10 +28,10 @@ public interface IShell
 /// </summary>
 public interface IShellDevTools
 {
-    /// <summary>Runs <paramref name="script"/> in the open page and returns its result as JSON.</summary>
+    /// <summary>Runs <paramref name="script"/> in the most recently used window's page and returns its result as JSON.</summary>
     Task<string> EvalAsync(string script);
 
-    /// <summary>Writes a PNG of the page to <paramref name="path"/>.</summary>
+    /// <summary>Writes a PNG of the most recently used window's page to <paramref name="path"/>.</summary>
     Task CaptureAsync(string path);
 }
 

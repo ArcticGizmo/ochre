@@ -326,6 +326,7 @@ Slices are ordered so the exit criterion's three parts come first; the git graph
 ### Slice 7: exit run
 
 - Walk the exit criterion by hand, write `docs/testing/m4-testing.md`.
+- Done 2026-11-26, ahead of slice 6 (the exit criterion doesn't need Jira); see `docs/testing/m4-testing.md`. Every module off (including a real agent on a task), and a sprig slot made and given back from a task on InFlight.NextGen, walked in the dev host; windows on two desktops by the user. Found on the way: sprig can make a slot and then refuse it, which left a slot and branch nothing tracked; the sprig provider now records the slot it finds for the branch, so the task shows sprig's error and can give it back.
 
 ### Not in M4
 

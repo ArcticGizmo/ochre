@@ -23,9 +23,31 @@ internal sealed class SprigWorktreeProvider(SprigWatch watch) : IWorktreeProvide
     {
         var plan = Plan(repo, branch);
         var (result, checkout) = SprigCli.Checkout(repo, plan.Branch);
-        if (!result.Ok || checkout is null) throw new WorktreeException(Explain(result));
-        return new WorktreePlan(checkout.Folder, checkout.Branch ?? plan.Branch, checkout.BranchCreated, plan.Base, checkout.Key);
+        if (result.Ok && checkout is not null)
+            return new WorktreePlan(checkout.Folder, checkout.Branch ?? plan.Branch, checkout.BranchCreated, plan.Base, checkout.Key);
+
+        // Sprig can make the slot and then refuse it (the new branch has no sprig.yaml, say). The slot and branch are
+        // real, so the task records them, with sprig's error showing beside the slot, rather than leaving a slot that
+        // nothing tracks or gives back.
+        if (result.Ok || MadeSlot(repo, plan.Branch, ct) is not { } made) throw new WorktreeException(Explain(result));
+        return new WorktreePlan(made.Folder, plan.Branch, plan.NewBranch, plan.Base, made.Key);
     }, ct);
+
+    // The slot sprig holds for this branch and repo, from the watch (which may trail the checkout by a moment). Only a
+    // slot folder beside the repo counts, never the repo's own checkout.
+    private (string Folder, string Key)? MadeSlot(string repo, string branch, CancellationToken ct)
+    {
+        var slotPrefix = SprigFolders.Normalize(repo) + "--";
+        var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        bool InSlot(string dir) => SprigFolders.Normalize(dir) is { } d && d.StartsWith(slotPrefix, cmp);
+        for (var waited = TimeSpan.Zero; ; waited += TimeSpan.FromMilliseconds(250))
+        {
+            var slot = watch.Current.Workspaces.FirstOrDefault(w => !w.IsFree && w.Branch == branch && w.Dirs.Any(InSlot));
+            if (slot?.Dirs.FirstOrDefault(InSlot) is { } folder) return (folder, slot.Key);
+            if (waited >= TimeSpan.FromSeconds(5) || ct.IsCancellationRequested) return null;
+            Thread.Sleep(250);
+        }
+    }
 
     public Task<WorktreeCheck> CheckAsync(TaskWorktree worktree, CancellationToken ct) => Task.Run(() =>
     {

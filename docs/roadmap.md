@@ -48,7 +48,7 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 - sprig module: `WorktreeProvider`, app status and logs panel.
 - Multiple windows, each showing a specific task (or the task list), so tasks can live on specific virtual desktops; see "Multiple windows" below. Per-monitor placement; "jump to task" hotkey.
 
-**Exit:** turn every module off and the kernel still works; turn sprig on and a task's worktree is a sprig slot; two tasks open in two windows on two virtual desktops come back on those desktops after quitting and relaunching.
+**Exit:** turn every module off and the kernel still works; turn sprig on and a task's worktree is a sprig slot; two tasks open in two windows on two virtual desktops come back on those desktops after quitting and relaunching. Met 2026-11-26: see [testing/m4-testing.md](testing/m4-testing.md). Still to do in M4: the Jira module and the "jump to task" hotkey.
 
 ### Multiple windows (requirement, 2026-11-25)
 

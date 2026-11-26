@@ -116,7 +116,7 @@ internal static class SprigCli
     public static (SprigActionResult Result, SprigCheckout? Checkout) Checkout(string repo, string branch)
     {
         var (result, stdout) = Run(["checkout", "-b", branch, "--json"], TimeSpan.FromMinutes(10), repo);
-        if (!result.Ok) return (result, null);
+        if (!result.Ok) return (result, ParseCheckout(stdout, repo));
         return ParseCheckout(stdout, repo) is { } checkout
             ? (result, checkout)
             : (new SprigActionResult(false, "error", "sprig made the slot but its answer didn't say where"), null);

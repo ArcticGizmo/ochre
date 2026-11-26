@@ -51,6 +51,8 @@ public static class BridgeContract
     public static IReadOnlyList<EventContract> Events { get; } =
     [
         new("window.shown", typeof(Empty)),
+        // Sent to one window: the jump hotkey brought it forward, so show the "jump to task" picker.
+        new("window.jump", typeof(Empty)),
         new("tasks.changed", typeof(TaskChangedEvent)),
         new("sessions.update", typeof(SessionUpdateEvent)),
         // A session appeared or went, or an observed one's suggestions may have changed: fetch sessions.list again.

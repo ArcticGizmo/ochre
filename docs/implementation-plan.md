@@ -318,7 +318,7 @@ Slices are ordered so the exit criterion's three parts come first; the git graph
 
 ### Slice 6: Jira module
 
-- Moved after the git graph on 2026-11-26 at the user's request; it isn't part of the exit criterion.
+- Moved after the git graph on 2026-11-26 at the user's request; it isn't part of the exit criterion. Then moved out of M4 to the roadmap's Later list the same day, also the user's call; the plan below stands for when it's scheduled.
 - New code. `TaskSource`: import an issue as a task (key, summary, description as notes, link back). `LinkResolver`: title, summary and live status for a `jira` link, shown on the task; `ochre task fetch <link>` returns detail marked as untrusted (security threat 2).
 - Credentials: site, email and an API token, the token in Windows Credential Manager (`CredWrite`/`CredRead` behind a Core `ISecretStore`), never in settings or logs. Set up from the module's settings section.
 - Needs a Jira site to test against; ask before this slice starts.
@@ -328,9 +328,21 @@ Slices are ordered so the exit criterion's three parts come first; the git graph
 - Walk the exit criterion by hand, write `docs/testing/m4-testing.md`.
 - Done 2026-11-26, ahead of slice 6 (the exit criterion doesn't need Jira); see `docs/testing/m4-testing.md`. Every module off (including a real agent on a task), and a sprig slot made and given back from a task on InFlight.NextGen, walked in the dev host; windows on two desktops by the user. Found on the way: sprig can make a slot and then refuse it, which left a slot and branch nothing tracked; the sprig provider now records the slot it finds for the branch, so the task shows sprig's error and can give it back.
 
+### Jump to task
+
+- The roadmap's "jump to task" hotkey, done after the exit run: a system-wide shortcut that brings up an Ochre window on the current desktop (or opens one) with a picker of tasks, and Ctrl+K for the same picker inside a window.
+- Done 2026-11-26; see `docs/testing/m4-jump-testing.md`. Decisions made while building:
+  - **Ctrl+Alt+Space** by default (the user's pick), kept in `settings.json` as `jumpHotkey` ("" turns it off) and changed in Settings, where it applies at once; Core's `Hotkey` parses it (at least one of Ctrl, Alt or Win; a letter, digit, F1 to F24 or Space) and says why another app's registration or a bad entry stops it.
+  - **Kernel and shell, not a module**: the picker is navigation like the title bar, and the hotkey needs the shell's windows, which modules can't reach (ADR 0012). Registered with `RegisterHotKey` on a message-only window on the UI thread; receiving the hotkey is what lets Windows bring Ochre's window forward.
+  - **Enter shows the task in the window the picker is in; Ctrl+Enter opens it in a window of its own** (slice 4's rules: one here comes forward, one elsewhere asks). Done tasks appear only once you search.
+  - **Ctrl+K leaves terminals alone**: a focused terminal keeps it for the shell (clear to end of line).
+  - **Dev runs on another desktop or headless don't register it**, so a test run never takes the user's shortcut; `ochre-cli dev jump` does what pressing it does, and Settings says it isn't registered.
+  - A window the hotkey opens learns it from `window.get` (`jump: true`); one already open gets a `window.jump` event sent to it alone.
+
 ### Not in M4
 
-- Third-party plugins (M7). The contracts are shaped so they can be served out of process later, but nothing loads code that isn't built into Ochre.
+- Third-party plugins (M7).
+- The Jira module (slice 6), moved to the roadmap's Later list. The contracts are shaped so they can be served out of process later, but nothing loads code that isn't built into Ochre.
 - Live module toggling without a restart; git write operations from the graph; graph avatars.
 
 ## M5 onwards (outline)

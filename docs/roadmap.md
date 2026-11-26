@@ -44,11 +44,10 @@ Settle the UI technology and shell. See [spike-stack.md](spike-stack.md).
 - Module host + settings to turn modules on and off.
 - Move existing features behind modules where they belong.
 - Git graph + worktrees module (port Perch's `GitGraph` model and `GitRunner`).
-- Jira module: import + link, `LinkResolver`, `task fetch`.
 - sprig module: `WorktreeProvider`, app status and logs panel.
 - Multiple windows, each showing a specific task (or the task list), so tasks can live on specific virtual desktops; see "Multiple windows" below. Per-monitor placement; "jump to task" hotkey.
 
-**Exit:** turn every module off and the kernel still works; turn sprig on and a task's worktree is a sprig slot; two tasks open in two windows on two virtual desktops come back on those desktops after quitting and relaunching. Met 2026-11-26: see [testing/m4-testing.md](testing/m4-testing.md). Still to do in M4: the Jira module and the "jump to task" hotkey.
+**Exit:** turn every module off and the kernel still works; turn sprig on and a task's worktree is a sprig slot; two tasks open in two windows on two virtual desktops come back on those desktops after quitting and relaunching. Met 2026-11-26: see [testing/m4-testing.md](testing/m4-testing.md). The "jump to task" hotkey followed the same day ([testing/m4-jump-testing.md](testing/m4-jump-testing.md)), which completes M4. The Jira module moved to Later (2026-11-26, the user's call).
 
 ### Multiple windows (requirement, 2026-11-25)
 
@@ -59,7 +58,7 @@ The user keeps specific tasks on specific virtual desktops, so Ochre must suppor
 - Opening a task that's already open in a window on another desktop asks: bring that window here, or open another view here. It never silently switches desktops.
 - Closing a window closes only that view; the host and other windows carry on (ADR 0008).
 
-Started early (2026-11-26, at the user's request): the tray brings forward a window on the current desktop, or opens a new one there; see [testing/window-per-desktop-testing.md](testing/window-per-desktop-testing.md). Done in M4 slice 4 (2026-11-26): task windows, the "bring it here or open another" question, and windows reopening on their desktops and monitors; see [testing/m4-windows-testing.md](testing/m4-windows-testing.md). The "jump to task" hotkey is still to do.
+Started early (2026-11-26, at the user's request): the tray brings forward a window on the current desktop, or opens a new one there; see [testing/window-per-desktop-testing.md](testing/window-per-desktop-testing.md). Done in M4 slice 4 (2026-11-26): task windows, the "bring it here or open another" question, and windows reopening on their desktops and monitors; see [testing/m4-windows-testing.md](testing/m4-windows-testing.md). The "jump to task" hotkey (Ctrl+Alt+Space by default, Ctrl+K inside a window) followed; see [testing/m4-jump-testing.md](testing/m4-jump-testing.md).
 
 Don't build anything that assumes a single window: per-window UI state (selected task, scroll) lives in the page, and host events go to every window (WindowHost already broadcasts).
 
@@ -84,6 +83,7 @@ Don't build anything that assumes a single window: per-window UI state (selected
 
 ## Later
 
+- Jira module: import + link, `LinkResolver`, `task fetch` (moved out of M4 on 2026-11-26; its plan stays in `docs/implementation-plan.md`, M4 slice 6, and needs a Jira site to test against).
 - Per-task usage/cost/time.
 - Plan usage (5-hour and weekly limits) in place of the API-equivalent cost, which means little on a Pro or Max plan. Perch reads it from Claude's OAuth usage endpoint (`UsageMonitor`), which needs the user's OAuth token, so it would be opt-in.
 - MCP server mirroring the agent CLI, if a client that can't run a shell needs task access.

@@ -69,6 +69,9 @@ internal sealed class WebViewPage : IDisposable
     /// page load, so tell the page it is visible again.</summary>
     public void NotifyShown() => Post("{\"event\":\"window.shown\",\"payload\":{}}");
 
+    /// <summary>The jump hotkey brought this window forward: show the "jump to task" picker.</summary>
+    public void NotifyJump() => Post("{\"event\":\"window.jump\",\"payload\":{}}");
+
     private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         if (_closed || !e.Source.StartsWith(_allowedOrigin, StringComparison.Ordinal)) return;

@@ -27,6 +27,13 @@ public interface IShell
     /// <summary>Closes every window; the app keeps running in the tray. Safe from any thread.</summary>
     void CloseWindow();
 
+    /// <summary>
+    /// Registers <paramref name="hotkey"/> system-wide (replacing any earlier one; null for none). Pressing it brings
+    /// forward a window on the current desktop, or opens one, and shows the "jump to task" picker there. Returns why it
+    /// couldn't be registered (another app has it), or null. Safe from any thread.
+    /// </summary>
+    Task<string?> SetJumpHotkeyAsync(Hotkey? hotkey);
+
     /// <summary>Saves the window layout, closes every window and ends <see cref="Run"/>. Safe from any thread.</summary>
     void Quit();
 }
@@ -64,6 +71,9 @@ public interface IShellWindow
 
     /// <summary>The task the page shows now, as it last reported. Safe from any thread.</summary>
     void ReportTask(string? taskId);
+
+    /// <summary>True once if the window was opened by the jump hotkey, so its page shows the picker when it loads.</summary>
+    bool TakeJumpRequest();
 }
 
 /// <summary>
@@ -86,6 +96,9 @@ public interface IShellDevTools
 
     /// <summary>Moves a window to a virtual desktop, as the user would from Task View.</summary>
     Task<string> MoveWindowAsync(string windowId, Guid desktop);
+
+    /// <summary>Does what pressing the jump hotkey does, for a dev run that doesn't register it.</summary>
+    void PressJumpHotkey();
 }
 
 /// <summary>What a shell calls back into: one session per loaded page.</summary>

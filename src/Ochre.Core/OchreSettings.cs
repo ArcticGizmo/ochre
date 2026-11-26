@@ -47,6 +47,34 @@ public sealed class OchreSettings(string path)
         }
     }
 
+    /// <summary>The "jump to task" shortcut as the user wrote it: the default when they haven't chosen, "" when off.</summary>
+    public string JumpHotkey
+    {
+        get
+        {
+            lock (_gate)
+            {
+                try
+                {
+                    return Root()["jumpHotkey"] is JsonValue v && v.TryGetValue<string>(out var s) ? s : Hosting.Hotkey.DefaultJump;
+                }
+                catch (InvalidOperationException)
+                {
+                    return Hosting.Hotkey.DefaultJump;
+                }
+            }
+        }
+    }
+
+    public void SetJumpHotkey(string hotkey)
+    {
+        lock (_gate)
+        {
+            Root()["jumpHotkey"] = hotkey;
+            AtomicFile.Write(path, Root().ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+    }
+
     private JsonObject Root()
     {
         if (_root is not null) return _root;

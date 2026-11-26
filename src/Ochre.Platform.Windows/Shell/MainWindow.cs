@@ -89,6 +89,22 @@ internal sealed class MainWindow : Form, IShellWindow
 
     public void NotifyShown() => _page?.NotifyShown();
 
+    private volatile bool _jumpRequested;
+
+    /// <summary>The jump hotkey chose this window. A page that's loaded is told now; one still loading asks on load.</summary>
+    public void ShowJump(bool loaded)
+    {
+        if (loaded && _page is not null) _page.NotifyJump();
+        else _jumpRequested = true;
+    }
+
+    public bool TakeJumpRequest()
+    {
+        var requested = _jumpRequested;
+        _jumpRequested = false;
+        return requested;
+    }
+
     public CoreWebView2? Core => _page is null ? null : _web.CoreWebView2;
 
     // A test run's windows, and windows reopened on other desktops, shouldn't take focus.

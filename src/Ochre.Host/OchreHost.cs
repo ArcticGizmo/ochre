@@ -69,6 +69,37 @@ internal sealed class OchreHost : IDisposable
 
     public void Attach(IShell shell) => Shell = shell;
 
+    /// <summary>False for a dev run driven by a test (another desktop, or headless): it mustn't take the user's
+    /// system-wide shortcut.</summary>
+    public bool RegistersHotkeys { get; set; } = true;
+
+    /// <summary>Why the jump shortcut isn't working (another app has it, or settings.json holds one Ochre can't read), or null.</summary>
+    public string? JumpHotkeyError { get; private set; }
+
+    /// <summary>Registers the jump shortcut from settings, replacing the one before.</summary>
+    public async Task ApplyJumpHotkeyAsync()
+    {
+        if (!RegistersHotkeys)
+        {
+            JumpHotkeyError = "Not registered in a dev run on another desktop or headless; use cli dev jump.";
+            return;
+        }
+        if (Shell is not { } shell) return;
+        var text = Settings.JumpHotkey.Trim();
+        Hotkey? hotkey = null;
+        string? error = null;
+        if (text.Length > 0) hotkey = Hotkey.Parse(text, out error);
+        if (error is not null) Log.Info($"jump hotkey in settings.json: {error}");
+        try
+        {
+            JumpHotkeyError = error ?? await shell.SetJumpHotkeyAsync(hotkey).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            JumpHotkeyError = ex.Message;
+        }
+    }
+
     public void RequestRestart()
     {
         RestartRequested = true;

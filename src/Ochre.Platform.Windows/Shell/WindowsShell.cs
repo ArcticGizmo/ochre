@@ -47,6 +47,9 @@ public sealed class WindowsShell : IShell, IShellDevTools
 
     public void CloseWindow() => Post(c => c.CloseWindow());
 
+    // Registering the hotkey opens no window, so it doesn't reopen the saved ones either.
+    public Task<string?> SetJumpHotkeyAsync(Hotkey? hotkey) => OnUiThread(c => Task.FromResult(c.SetJumpHotkey(hotkey)), restore: false);
+
     public void Quit() => Post(c => c.Quit());
 
     private void Post(Action<TrayContext> action)
@@ -68,11 +71,13 @@ public sealed class WindowsShell : IShell, IShellDevTools
             return path;
         });
 
+    public void PressJumpHotkey() => Post(c => c.Jump());
+
     public Task<string> ListWindowsAsync() => OnUiThread(c => Task.FromResult(c.ListWindows()));
 
     public Task<string> MoveWindowAsync(string windowId, Guid desktop) => OnUiThread(c => Task.FromResult(c.MoveWindow(windowId, desktop)));
 
-    private async Task<T> OnUiThread<T>(Func<TrayContext, Task<T>> action)
+    private async Task<T> OnUiThread<T>(Func<TrayContext, Task<T>> action, bool restore = true)
     {
         try
         {
@@ -89,7 +94,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
             try
             {
                 // Reopening the saved windows posts work of its own (each window's move to its desktop); run after it.
-                if (c.RestoreIfFirst())
+                if (restore && c.RestoreIfFirst())
                 {
                     c.Post(async c2 => await Complete(c2).ConfigureAwait(true));
                     return;
@@ -128,6 +133,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
         private readonly System.Windows.Forms.Timer _saveTimer = new() { Interval = 1000 };
         private readonly Lock _writeGate = new();
         private Task<CoreWebView2Environment>? _environment;
+        private GlobalHotkey? _hotkey;
         // Most recently used last; dev eval and capture act on the last one unless told which.
         private readonly List<MainWindow> _windows = [];
         private int _nextId;
@@ -216,10 +222,34 @@ public sealed class WindowsShell : IShell, IShellDevTools
             BringOrOpenHere();
         }
 
-        private void BringOrOpenHere()
+        private void BringOrOpenHere(bool jump = false)
         {
-            if (Open.LastOrDefault(IsHere) is { } here) BringForward(here, notify: false);
-            else Create(null, null, activate: true);
+            if (Open.LastOrDefault(IsHere) is { } here)
+            {
+                BringForward(here, notify: false);
+                if (jump) here.ShowJump(loaded: true);
+            }
+            else Create(null, null, activate: true, jump: jump);
+        }
+
+        public string? SetJumpHotkey(Hotkey? hotkey)
+        {
+            _hotkey ??= new GlobalHotkey(Jump);
+            var error = _hotkey.Set(hotkey);
+            if (error is not null) _options.Log($"jump hotkey: {error}");
+            return error;
+        }
+
+        /// <summary>The jump hotkey: the picker in a window on the desktop the user is on, opening one if needed.</summary>
+        public void Jump()
+        {
+            _host.WindowOpenRequested();
+            if (RestoreIfFirst())
+            {
+                Post(c => c.BringOrOpenHere(jump: true));
+                return;
+            }
+            BringOrOpenHere(jump: true);
         }
 
         public OpenTaskOutcome OpenTask(string taskId, OpenTaskChoice choice, IShellWindow? from)
@@ -275,13 +305,14 @@ public sealed class WindowsShell : IShell, IShellDevTools
             Touch(w);
         }
 
-        private void Create(string? task, SavedWindow? saved, bool activate)
+        private void Create(string? task, SavedWindow? saved, bool activate, bool jump = false)
         {
             _environment ??= CoreWebView2Environment.CreateAsync(
                 null,
                 _options.WebViewDataFolder,
                 new CoreWebView2EnvironmentOptions(_options.Unattended ? VirtualDesktop.UnthrottledBrowserArguments : null));
             var window = new MainWindow(_host, _options, _urls, _environment, _icon, $"w{++_nextId}", task, saved, activate);
+            if (jump) window.ShowJump(loaded: false);
             window.ClosingFor += reason =>
             {
                 // Windows ending the session closes every window; save them first, as quitting does.
@@ -391,6 +422,7 @@ public sealed class WindowsShell : IShell, IShellDevTools
         {
             if (disposing)
             {
+                _hotkey?.Dispose();
                 _saveTimer.Dispose();
                 _tray.Dispose();
                 _invoker.Dispose();

@@ -10,7 +10,7 @@ internal static class WindowApi
     {
         var j = AppJson.Default;
         bridge.Handle("window.get", j.Empty, j.WindowInfo, _ =>
-            new WindowInfo(window.InitialTask is { } t && host.Tasks.Get(t) is not null ? t : null));
+            new WindowInfo(window.InitialTask is { } t && host.Tasks.Get(t) is not null ? t : null, window.TakeJumpRequest()));
         bridge.Handle("window.setTask", j.WindowTaskRequest, j.Ack, r =>
         {
             // Saved to windows.json and matched against later opens, so only ever a task that exists.

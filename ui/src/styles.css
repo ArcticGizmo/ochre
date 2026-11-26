@@ -2352,3 +2352,66 @@ button.link.term-task {
   margin: 2px 0 6px;
   font-size: 13px;
 }
+
+.settings-heading + .settings-note + .settings-field,
+.check-field + .settings-heading {
+  margin-top: 16px;
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.settings-field input {
+  width: 220px;
+}
+
+/* The jump-to-task picker. */
+.jump-search {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 15px;
+  padding: 8px 10px;
+}
+
+.jump-results {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 360px;
+  min-width: 520px;
+  overflow: auto;
+}
+
+.jump-results li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.jump-results li.selected {
+  background: var(--raised);
+}
+
+.jump-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jump-id {
+  font-size: 12px;
+}
+
+.jump-hint {
+  font-size: 12px;
+  margin-right: auto;
+}

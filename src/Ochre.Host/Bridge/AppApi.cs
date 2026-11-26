@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Ochre.Core.Bridge;
+using Ochre.Core.Hosting;
 using Ochre.Core.Platform;
 
 namespace Ochre.Host.Bridge;
@@ -13,11 +14,14 @@ public sealed record AppInfo(string Version, string Profile, IReadOnlyList<strin
 /// <param name="Error">Why it failed to start this session, if it did.</param>
 public sealed record ModuleDto(string Id, string Name, string Description, bool Enabled, bool Running, string? Error);
 
-public sealed record SettingsDto(IReadOnlyList<ModuleDto> Modules);
+/// <param name="JumpHotkey">The "jump to task" shortcut, e.g. <c>Ctrl+Alt+Space</c>; "" when off.</param>
+/// <param name="JumpHotkeyError">Why it isn't working (another app has it), or null.</param>
+public sealed record SettingsDto(IReadOnlyList<ModuleDto> Modules, string JumpHotkey, string? JumpHotkeyError);
 
 public sealed record ModuleChoiceDto(string Id, bool Enabled);
 
-public sealed record SettingsUpdateRequest(IReadOnlyList<ModuleChoiceDto> Modules);
+/// <param name="JumpHotkey">A new shortcut, "" to turn it off, or null to leave it; applies at once.</param>
+public sealed record SettingsUpdateRequest(IReadOnlyList<ModuleChoiceDto> Modules, string? JumpHotkey);
 
 /// <param name="NewWindow">Open a new browser window (middle click) rather than reuse the last one.</param>
 public sealed record OpenUrlRequest(string Url, bool NewWindow);
@@ -76,11 +80,23 @@ internal static class AppApi
         bridge.Handle("app.info", j.Empty, j.AppInfo, _ =>
             new AppInfo(AppInfoProvider.Version, host.Profile.IsDefault ? "" : host.Profile.Name, host.Modules.RunningIds));
         bridge.Handle("settings.get", j.Empty, j.SettingsDto, _ => Settings(host));
-        bridge.Handle("settings.update", j.SettingsUpdateRequest, j.SettingsDto, r =>
+        bridge.Handle("settings.update", j.SettingsUpdateRequest, j.SettingsDto, async r =>
         {
             var known = host.Modules.States.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
             if (r.Modules.Any(m => !known.Contains(m.Id))) throw new BridgeRejectException("unknown module");
+            string? hotkey = null;
+            if (r.JumpHotkey is { } text)
+            {
+                text = text.Trim();
+                if (text.Length > 64) throw new BridgeRejectException("that shortcut is too long");
+                hotkey = text.Length == 0 ? "" : Hotkey.Parse(text, out var why)?.ToString() ?? throw new BridgeRejectException(why!);
+            }
             host.Settings.SetModules(r.Modules.ToDictionary(m => m.Id, m => m.Enabled, StringComparer.Ordinal));
+            if (hotkey is not null && hotkey != host.Settings.JumpHotkey)
+            {
+                host.Settings.SetJumpHotkey(hotkey);
+                await host.ApplyJumpHotkeyAsync().ConfigureAwait(false);
+            }
             return Settings(host);
         });
         bridge.Handle("app.restart", j.Empty, j.Ack, _ =>
@@ -104,7 +120,9 @@ internal static class AppApi
     }
 
     private static SettingsDto Settings(OchreHost host) =>
-        new(host.Modules.States.Select(m => new ModuleDto(m.Id, m.Name, m.Description, m.Enabled, m.Running, m.Error)).ToList());
+        new(host.Modules.States.Select(m => new ModuleDto(m.Id, m.Name, m.Description, m.Enabled, m.Running, m.Error)).ToList(),
+            host.Settings.JumpHotkey,
+            host.JumpHotkeyError);
 }
 
 internal static class AppInfoProvider

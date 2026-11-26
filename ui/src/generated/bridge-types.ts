@@ -389,10 +389,13 @@ export interface SetStateRequest {
 
 export interface SettingsDto {
   modules: ModuleDto[];
+  jumpHotkey: string;
+  jumpHotkeyError: string | null;
 }
 
 export interface SettingsUpdateRequest {
   modules: ModuleChoiceDto[];
+  jumpHotkey: string | null;
 }
 
 export interface ShellProfileDto {
@@ -592,6 +595,7 @@ export interface UpdateTaskRequest {
 
 export interface WindowInfo {
   task: string | null;
+  jump: boolean;
 }
 
 export interface WindowTaskRequest {
@@ -705,6 +709,7 @@ export interface Requests {
 
 export interface Events {
   'window.shown': Empty;
+  'window.jump': Empty;
   'tasks.changed': TaskChangedEvent;
   'sessions.update': SessionUpdateEvent;
   'sessions.changed': Empty;

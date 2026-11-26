@@ -41,4 +41,4 @@ Checked by the user on two real virtual desktops (`m4-windows-testing.md`, exit 
 
 Per-slice checks: `m4-modules-testing.md`, `m4-git-testing.md`, `m4-sprig-testing.md`, `m4-windows-testing.md`, `m4-graph-testing.md`.
 
-Not done in M4 yet: the Jira module (slice 6, moved after the graph; needs a Jira site), and the roadmap's "jump to task" hotkey.
+Afterwards (same day): the "jump to task" hotkey was built (`m4-jump-testing.md`), and the Jira module (slice 6) moved out of M4 to the roadmap's Later list.

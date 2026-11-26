@@ -27,6 +27,7 @@ internal static class Program
             ["dev", "capture", var path] => Send(profile, "dev-capture", Path.GetFullPath(path), print: true),
             ["dev", "capture", "--window", var window, var path] => Send(profile, "dev-capture", $"{window}\n{Path.GetFullPath(path)}", print: true),
             ["dev", "windows"] => Send(profile, "dev-windows", null, print: true),
+            ["dev", "jump"] => Send(profile, "dev-jump", null, print: true),
             ["dev", "move-window", var window, var desktop] => Send(profile, "dev-move-window", $"{window}\n{desktop}", print: true),
             ["dev", "session-ending"] => Send(profile, "dev-session-ending", null, print: true),
             ["task", var op, .. var rest] => Task(profile, op, rest),
@@ -65,6 +66,7 @@ internal static class Program
               dev capture [--window <id>] <file.png>
                                      save a picture of a window
               dev windows            list the open windows: id, task, desktop, bounds
+              dev jump               do what the jump-to-task hotkey does
               dev move-window <id> <desktop-guid>
                                      move a window to another virtual desktop
               dev session-ending     act as if Windows were shutting down (dev builds)

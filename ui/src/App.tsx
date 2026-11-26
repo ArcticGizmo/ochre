@@ -4,6 +4,7 @@ import { runningModules, type AppContext } from './modules';
 import { SessionView } from './sessions/SessionView';
 import { SettingsDialog } from './SettingsDialog';
 import { useSessions } from './sessions/useSessions';
+import { JumpDialog } from './tasks/JumpDialog';
 import { NewTaskDialog } from './tasks/NewTaskDialog';
 import { TaskBoard } from './tasks/TaskBoard';
 import { TaskList } from './tasks/TaskList';
@@ -37,6 +38,7 @@ export function App() {
   const [thread, setThread] = useState<Thread | null>(null);
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [jumping, setJumping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Until the host has said which task this window opened on, don't report one back.
   const [windowKnown, setWindowKnown] = useState(false);
@@ -60,6 +62,7 @@ export function App() {
           setView('tasks');
           setSelected(w.task);
         }
+        if (w.jump) setJumping(true);
       })
       .catch(() => {})
       .finally(() => setWindowKnown(true));
@@ -84,6 +87,23 @@ export function App() {
     setView('tasks');
     setSelected(id);
     setTaskThread(null);
+  }, []);
+
+  // Jump to task: Ctrl+K here, or the global hotkey bringing this window forward.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'k') return;
+      // Shells use Ctrl+K (clear to the end of the line); a focused terminal keeps it.
+      if (e.target instanceof Element && e.target.closest('.xterm')) return;
+      e.preventDefault();
+      setJumping(true);
+    };
+    window.addEventListener('keydown', key);
+    const off = on('window.jump', () => setJumping(true));
+    return () => {
+      window.removeEventListener('keydown', key);
+      off();
+    };
   }, []);
 
   const show = (v: string) => {
@@ -222,6 +242,7 @@ export function App() {
       <div className="body">{body}</div>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {openInWindowDialog}
+      <JumpDialog open={jumping} tasks={tasks} onClose={() => setJumping(false)} onOpen={openTask} onOpenInWindow={openInWindow} />
       <NewTaskDialog
         open={creating}
         onClose={() => setCreating(false)}

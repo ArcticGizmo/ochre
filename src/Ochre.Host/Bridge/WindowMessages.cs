@@ -5,7 +5,8 @@ namespace Ochre.Host.Bridge;
 // Bridge shapes for windows: which task a window shows, and opening a task in a window of its own.
 
 /// <param name="Task">The task this window opened on (reopened from the saved layout, or opened for a task), else null.</param>
-public sealed record WindowInfo(string? Task);
+/// <param name="Jump">The jump hotkey opened it: show the "jump to task" picker.</param>
+public sealed record WindowInfo(string? Task, bool Jump);
 
 /// <param name="Task">The task the page shows now, or null when it shows none (Today, Board, a module view).</param>
 public sealed record WindowTaskRequest(string? Task);

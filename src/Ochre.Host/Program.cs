@@ -54,8 +54,12 @@ internal static class Program
             [typeof(Ochre.Core.Platform.IUrlOpener)] = urls,
         };
         using var host = new OchreHost(profile, paths, log, urls, services);
-        var shell = new WindowsShell(host.Windows, ShellOptionsFor(profile, paths, log), urls);
+        var shellOptions = ShellOptionsFor(profile, paths, log);
+        var shell = new WindowsShell(host.Windows, shellOptions, urls);
         host.Attach(shell);
+        host.RegistersHotkeys = !shellOptions.Unattended;
+        // Waits inside the shell for the message loop that owns the hotkey.
+        _ = host.ApplyJumpHotkeyAsync();
         var agents = new AgentCommands(host.Tasks, host.ParkRequests);
         using var ending = new SessionEnding();
         ending.Ending += () =>
@@ -103,6 +107,9 @@ internal static class Program
                 if (!Path.IsPathFullyQualified(path)) return "error: the capture path must be absolute";
                 await ((IShellDevTools)shell).CaptureAsync(path, captureWindow).ConfigureAwait(false);
                 return path;
+            case "dev-jump":
+                ((IShellDevTools)shell).PressJumpHotkey();
+                return "ok";
             case "dev-windows":
                 return await ((IShellDevTools)shell).ListWindowsAsync().ConfigureAwait(false);
             case "dev-move-window" when argument is not null:
